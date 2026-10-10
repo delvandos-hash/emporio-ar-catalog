@@ -1,0 +1,16 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Sincronização automática de estoque (2x ao dia)
+# A função só consulta os sites raiz; o catálogo aplica o resultado ao abrir a página.
+# Para gravar no data.js de forma permanente, use o workflow do GitHub Actions (scripts/).
+
+[functions."stock-sync"]
+  schedule = "0 11,23 * * *"
+# 11:00 e 23:00 UTC ≈ 08:00 e 20:00 em Brasília (UTC-3)
+
+[[headers]]
+  for = "/netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"

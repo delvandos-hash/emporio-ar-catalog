@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://catalogoemporioa.netlify.app/sitemap.xml
