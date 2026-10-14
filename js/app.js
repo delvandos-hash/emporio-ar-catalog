@@ -1,7 +1,10 @@
 /**
  * Empório A.R - Catálogo Digital (versão final)
  */
-import { DATA, WHATSAPP, BRAND } from './data.js';
+// Carrega os dados do Netlify Blobs via função serverless
+const response = await fetch('/api/catalogo');
+const dadosDoServidor = await response.json();
+const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 
 const state = {
