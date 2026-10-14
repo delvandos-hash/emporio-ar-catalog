@@ -157,9 +157,6 @@ async function main() {
   console.log(`Correspondências: ${matched} | Alterados: ${changed}`);
   console.log('data.js atualizado localmente.');
 
-  // 2. Envia os dados para o Netlify Blobs
-  console.log('Enviando dados para o Netlify Blobs...');
-  
   // 2. Envia os dados para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
   
