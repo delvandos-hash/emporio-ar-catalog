@@ -151,8 +151,37 @@ async function main() {
     ';\n' +
     'export const WHATSAPP = "5562991134488";\n' +
     'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
+  
+  // 1. Salva o arquivo localmente (como backup)
   fs.writeFileSync(dataPath, out, 'utf8');
   console.log(`Correspondências: ${matched} | Alterados: ${changed}`);
+  console.log('data.js atualizado localmente.');
+
+  // 2. Envia os dados para o Netlify Blobs
+  console.log('Enviando dados para o Netlify Blobs...');
+  
+  try {
+    const { getStore } = await import('@netlify/blobs');
+    
+    const store = getStore({
+      name: "catalogo",
+      siteID: process.env.NETLIFY_SITE_ID,
+      token: process.env.NETLIFY_TOKEN,
+    });
+
+    const dadosParaSite = {
+      DATA: DATA,
+      WHATSAPP: "5562991134488",
+      BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" },
+      ultimaAtualizacao: new Date().toISOString()
+    };
+
+    await store.setJSON("catalogo_completo", dadosParaSite);
+    console.log('✅ Dados enviados para o Netlify Blobs com sucesso!');
+    
+  } catch (error) {
+    console.error('❌ Erro ao enviar para o Netlify Blobs:', error);
+  }
 }
 
 main().catch((e) => {
