@@ -450,3 +450,9 @@ async function main() {
   } catch (error) {
     console.error('❌ Erro ao enviar para o Netlify Blobs:', error);
   }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
