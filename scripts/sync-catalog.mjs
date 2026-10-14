@@ -1,13 +1,8 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
- *
- * Brand: só sessões já selecionadas no catálogo Empório A.R
- * Imarat: estoque + novos com fotos, notas e precificação
- *
- * node scripts/sync-catalog.mjs
- * ADD_IMARAT_NEW=0  → não adiciona novos Imarat (só estoque)
- * ADD_BRAND_NEW=0   → não adiciona novos Brand (só estoque) [padrão: 1]
+ * Envia os dados para o GitHub Gist
  */
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,12 +14,11 @@ const IMARAT_ORIGIN = 'https://imaratperfumaria.com';
 const BRAND_BASE = 'https://brandcollectionpy.com.br';
 const BRAND_SELLER = 'darlanaugusto';
 
-/** Sessões Brand permitidas (as que você selecionou) */
 const BRAND_ALLOWED_SESSIONS = [
   'ARABIC COLLECTION',
   'BEAUTY BRAND',
   'BODY SPLAHS',
-  'BODY SPLASH', // variação de grafia
+  'BODY SPLASH',
   'COLEÇÂO DREAM',
   'COLECAO DREAM',
   'COLEÇÃO BRAND',
@@ -129,11 +123,9 @@ function ensureBrandGroup(DATA, line, brand, cat) {
   return g;
 }
 
-/** Normaliza nome da sessão Brand para o padrão do catálogo */
 function mapBrandSession(raw) {
   const n = norm(raw);
   if (!n) return null;
-  // matching order matters
   if (n.includes('arabic collection') || n === 'arabic') return 'ARABIC COLLECTION';
   if (n.includes('sapatinho')) return 'SAPATINHO GOOD GIRL';
   if (n.includes('flaconete')) return 'FLACONETE BRAND';
@@ -142,7 +134,6 @@ function mapBrandSession(raw) {
   if (n.includes('colecao brand') || n.includes('coleçao brand')) return 'COLEÇÃO BRAND';
   if (n.includes('beauty brand')) return 'BEAUTY BRAND';
   if (n.includes('body splah') || n.includes('body splash')) {
-    // only the short BODY SPLAHS session, not Dream body splash unless allowed
     if (n.includes('dream') || n.includes('maison') || n.includes('brand body')) return null;
     return 'BODY SPLAHS';
   }
@@ -318,7 +309,7 @@ async function main() {
     console.log('Imarat: novos IGNORADOS (só estoque)');
   }
 
-  // ---- BRAND (só sessões selecionadas) ----
+  // ---- BRAND ----
   console.log('Buscando Brand Collection...');
   const brandList = await fetchBrandList();
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
@@ -326,7 +317,6 @@ async function main() {
 
   let addedBrand = 0;
 
-  // estoque dos Brand já no catálogo
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
@@ -404,16 +394,15 @@ async function main() {
     'export const WHATSAPP = "5562991134488";\n' +
     'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
 
-  // 1. Salva o arquivo localmente (como backup)
   fs.writeFileSync(dataPath, out, 'utf8');
   
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
-  console.log(`Novos Brand (só sessões selecionadas): ${addedBrand}`);
+  console.log(`Novos Brand: ${addedBrand}`);
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log('data.js atualizado localmente.');
-  
-  // 2. Envia os dados para o GitHub Gist
+
+  // Envia para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
   
   try {
