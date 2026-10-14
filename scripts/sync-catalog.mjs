@@ -416,17 +416,26 @@ async function main() {
   // 2. Envia os dados para o Netlify Blobs
   console.log('Enviando dados para o Netlify Blobs...');
   
+ // 2. Envia os dados para o Netlify Blobs
+  console.log('Enviando dados para o Netlify Blobs...');
+  
   try {
-    // Importa dinamicamente o pacote do Netlify
     const { getStore } = await import('@netlify/blobs');
+    
+    // ⚠️ IMPORTANTE: Usar a variável de ambiente correta
+    const siteID = process.env.NETLIFY_SITE_ID;
+    const token = process.env.NETLIFY_TOKEN;
+    
+    if (!siteID || !token) {
+      throw new Error(`Configuração ausente: siteID=${siteID ? 'ok' : 'vazio'}, token=${token ? 'ok' : 'vazio'}`);
+    }
     
     const store = getStore({
       name: "catalogo",
-      siteID: process.env.NETLIFY_SITE_ID,
-      token: process.env.NETLIFY_TOKEN,
+      siteID: siteID,
+      token: token,
     });
 
-    // Prepara os dados no formato que o site vai consumir
     const dadosParaSite = {
       DATA: DATA,
       WHATSAPP: "5562991134488",
@@ -434,18 +443,10 @@ async function main() {
       ultimaAtualizacao: new Date().toISOString()
     };
 
-    // Salva no Blobs
     await store.setJSON("catalogo_completo", dadosParaSite);
     console.log('✅ Dados enviados para o Netlify Blobs com sucesso!');
+    console.log(`   Site ID usado: ${siteID.substring(0, 8)}...`);
     
   } catch (error) {
     console.error('❌ Erro ao enviar para o Netlify Blobs:', error);
-    // Não damos exit(1) aqui para não quebrar o workflow se o Blobs falhar
-    // mas o log de erro ficará visível no GitHub Actions
   }
-}
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
