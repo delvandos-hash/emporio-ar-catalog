@@ -1,9 +1,3 @@
-- name: Debug - Listar secrets disponíveis
-        run: |
-          echo "GIST_TOKEN existe? ${{ secrets.GIST_TOKEN != '' }}"
-          echo "GH_GIST_TOKEN existe? ${{ secrets.GH_GIST_TOKEN != '' }}"
-          echo "NETLIFY_TOKEN existe? ${{ secrets.NETLIFY_TOKEN != '' }}"
-          echo "NETLIFY_SITE_ID existe? ${{ secrets.NETLIFY_SITE_ID != '' }}"
 name: Sync catálogo (estoque + novos produtos)
 
 on:
@@ -21,13 +15,21 @@ jobs:
           node-version: '22'
       - name: Instalar dependências
         run: npm install @netlify/blobs
+      - name: Debug - Listar secrets disponíveis
+        run: |
+          echo "GIST_TOKEN existe? ${{ secrets.GIST_TOKEN != '' }}"
+          echo "GH_GIST_TOKEN existe? ${{ secrets.GH_GIST_TOKEN != '' }}"
+          echo "NETLIFY_TOKEN existe? ${{ secrets.NETLIFY_TOKEN != '' }}"
+          echo "NETLIFY_SITE_ID existe? ${{ secrets.NETLIFY_SITE_ID != '' }}"
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Sincronizar estoque (apenas disponibilidade)
         run: node scripts/sync-stock.mjs
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
