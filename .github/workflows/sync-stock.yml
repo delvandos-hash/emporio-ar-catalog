@@ -1,3 +1,9 @@
+- name: Debug - Listar secrets disponíveis
+        run: |
+          echo "GIST_TOKEN existe? ${{ secrets.GIST_TOKEN != '' }}"
+          echo "GH_GIST_TOKEN existe? ${{ secrets.GH_GIST_TOKEN != '' }}"
+          echo "NETLIFY_TOKEN existe? ${{ secrets.NETLIFY_TOKEN != '' }}"
+          echo "NETLIFY_SITE_ID existe? ${{ secrets.NETLIFY_SITE_ID != '' }}"
 name: Sync catálogo (estoque + novos produtos)
 
 on:
