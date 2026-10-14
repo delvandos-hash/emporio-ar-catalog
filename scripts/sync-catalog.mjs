@@ -412,15 +412,6 @@ async function main() {
   console.log(`Novos Brand (só sessões selecionadas): ${addedBrand}`);
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log('data.js atualizado localmente.');
-
-  // 2. Envia os dados para o Netlify Blobs
-  console.log('Enviando dados para o Netlify Blobs...');
-  
- // 2. Envia os dados para o Netlify Blobs
-  console.log('Enviando dados para o Netlify Blobs...');
-  
-  // 2. Envia os dados para o GitHub Gist
-  console.log('Enviando dados para o GitHub Gist...');
   
   // 2. Envia os dados para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
