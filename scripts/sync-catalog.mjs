@@ -404,12 +404,45 @@ async function main() {
     'export const WHATSAPP = "5562991134488";\n' +
     'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
 
+  // 1. Salva o arquivo localmente (como backup)
   fs.writeFileSync(dataPath, out, 'utf8');
+  
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
   console.log(`Novos Brand (só sessões selecionadas): ${addedBrand}`);
   console.log(`Estoque alterado: ${stockChanged}`);
-  console.log('data.js atualizado.');
+  console.log('data.js atualizado localmente.');
+
+  // 2. Envia os dados para o Netlify Blobs
+  console.log('Enviando dados para o Netlify Blobs...');
+  
+  try {
+    // Importa dinamicamente o pacote do Netlify
+    const { getStore } = await import('@netlify/blobs');
+    
+    const store = getStore({
+      name: "catalogo",
+      siteID: process.env.NETLIFY_SITE_ID,
+      token: process.env.NETLIFY_TOKEN,
+    });
+
+    // Prepara os dados no formato que o site vai consumir
+    const dadosParaSite = {
+      DATA: DATA,
+      WHATSAPP: "5562991134488",
+      BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" },
+      ultimaAtualizacao: new Date().toISOString()
+    };
+
+    // Salva no Blobs
+    await store.setJSON("catalogo_completo", dadosParaSite);
+    console.log('✅ Dados enviados para o Netlify Blobs com sucesso!');
+    
+  } catch (error) {
+    console.error('❌ Erro ao enviar para o Netlify Blobs:', error);
+    // Não damos exit(1) aqui para não quebrar o workflow se o Blobs falhar
+    // mas o log de erro ficará visível no GitHub Actions
+  }
 }
 
 main().catch((e) => {
