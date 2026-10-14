@@ -1,28 +1,37 @@
-import { getStore } from "@netlify/blobs";
-
 export default async (req, context) => {
-  // Conecta ao mesmo "balde" que o robô usou
-  const store = getStore("catalogo");
-  
-  // Tenta pegar os dados salvos
-  const data = await store.get("catalogo_completo", { type: "json" });
-  
-  // Se os dados não existirem ainda, retorna um objeto vazio
-  // para o site não quebrar
-  if (!data) {
-    return new Response(JSON.stringify({ 
-      DATA: {}, 
-      WHATSAPP: "",
-      BRAND: {},
-      erro: "Nenhum dado encontrado no Blobs ainda." 
-    }), {
+  try {
+    const gistRawUrl = "https://gist.githubusercontent.com/delvandos-hash/bac3a717b309d02379455e971c9a9103/raw/catalogo.json";
+    
+    const response = await fetch(gistRawUrl);
+    
+    if (!response.ok) {
+      return new Response(JSON.stringify({
+        erro: "Falha ao buscar no Gist",
+        status: response.status,
+        statusText: response.statusText
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    
+    const data = await response.json();
+    
+    return new Response(JSON.stringify(data), {
       status: 200,
+      headers: { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
+    });
+    
+  } catch (error) {
+    return new Response(JSON.stringify({
+      erro: "Falha inesperada",
+      mensagem: error.message
+    }), {
+      status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-  
-  // Devolve os dados para o site
-  return new Response(JSON.stringify(data), {
-    headers: { "Content-Type": "application/json" },
-  });
 };
