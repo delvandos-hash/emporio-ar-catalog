@@ -14,3 +14,7 @@
   for = "/netlify/functions/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+[[redirects]]
+  from = "/api/catalogo"
+  to = "/.netlify/functions/get-catalog"
+  status = 200
