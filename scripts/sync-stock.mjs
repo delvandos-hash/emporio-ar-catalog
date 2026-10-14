@@ -160,15 +160,17 @@ async function main() {
   // 2. Envia os dados para o Netlify Blobs
   console.log('Enviando dados para o Netlify Blobs...');
   
+  // 2. Envia os dados para o GitHub Gist
+  console.log('Enviando dados para o GitHub Gist...');
+  
   try {
-    const { getStore } = await import('@netlify/blobs');
+    const gistId = "bac3a717b309d02379455e971c9a9103";
+    const githubToken = process.env.GH_GIST_TOKEN;
     
-    const store = getStore({
-      name: "catalogo",
-      siteID: process.env.NETLIFY_SITE_ID,
-      token: process.env.NETLIFY_TOKEN,
-    });
-
+    if (!githubToken) {
+      throw new Error('GH_GIST_TOKEN não configurado nos secrets do GitHub');
+    }
+    
     const dadosParaSite = {
       DATA: DATA,
       WHATSAPP: "5562991134488",
@@ -176,11 +178,31 @@ async function main() {
       ultimaAtualizacao: new Date().toISOString()
     };
 
-    await store.setJSON("catalogo_completo", dadosParaSite);
-    console.log('✅ Dados enviados para o Netlify Blobs com sucesso!');
+    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${githubToken}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        files: {
+          'catalogo.json': {
+            content: JSON.stringify(dadosParaSite, null, 2)
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`GitHub API ${response.status}: ${errorText}`);
+    }
+
+    console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
     
   } catch (error) {
-    console.error('❌ Erro ao enviar para o Netlify Blobs:', error);
+    console.error('❌ Erro ao enviar para o GitHub Gist:', error);
   }
 }
 
