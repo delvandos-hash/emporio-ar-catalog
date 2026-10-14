@@ -422,12 +422,15 @@ async function main() {
   // 2. Envia os dados para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
   
+  // 2. Envia os dados para o GitHub Gist
+  console.log('Enviando dados para o GitHub Gist...');
+  
   try {
     const gistId = "bac3a717b309d02379455e971c9a9103";
-    const githubToken = process.env.GH_GIST_TOKEN;
+    const githubToken = process.env.GIST_TOKEN;
     
     if (!githubToken) {
-      throw new Error('GH_GIST_TOKEN não configurado nos secrets do GitHub');
+      throw new Error('GIST_TOKEN não configurado nos secrets do GitHub');
     }
     
     const dadosParaSite = {
