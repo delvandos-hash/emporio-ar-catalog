@@ -186,7 +186,7 @@ async function main() {
       body: JSON.stringify({
         files: {
           'catalogo.json': {
-            content: JSON.stringify(dadosParaSite, null, 2)
+            content: '\uFEFF' + JSON.stringify(dadosParaSite, null, 2)
           }
         }
       })
