@@ -2,15 +2,17 @@
   publish = "."
   functions = "netlify/functions"
 
-# Sincronização automática de estoque (2x ao dia)
-# A função só consulta os sites raiz; o catálogo aplica o resultado ao abrir a página.
-# Para gravar no data.js de forma permanente, use o workflow do GitHub Actions (scripts/).
-
 [[headers]]
   for = "/netlify/functions/*"
   [headers.values]
-    Access-Control-Allow-Origin = '*'
+    Access-Control-Allow-Origin = "*"
+
 [[redirects]]
   from = "/api/catalogo"
   to = "/.netlify/functions/get-catalog"
+  status = 200
+
+[[redirects]]
+  from = "/api/stock-sync"
+  to = "/.netlify/functions/stock-sync"
   status = 200
