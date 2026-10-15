@@ -167,7 +167,9 @@ async function fetchImaratList() {
       headers: { 'User-Agent': 'EmporioAR-Sync/1.0', Accept: 'application/json' },
     });
     if (!res.ok) throw new Error(`Imarat list HTTP ${res.status}`);
-    const data = await res.json();
+   const buffer = await res.arrayBuffer();
+const text = new TextDecoder('utf-8').decode(buffer);
+const data = JSON.parse(text);
     total = data.total || total;
     const products = data.products || [];
     if (!products.length) break;
@@ -217,7 +219,11 @@ async function fetchBrandList() {
       }
     );
     if (!res.ok) break;
-    const data = await res.json();
+    const buffer = await res.arrayBuffer();
+const text = new TextDecoder('utf-8').decode(buffer);
+const buffer = await res.arrayBuffer();
+const text = new TextDecoder('utf-8').decode(buffer);
+const data = JSON.parse(text);
     const products = Array.isArray(data) ? data : data.produtos || [];
     if (!products.length) break;
     all.push(...products);
