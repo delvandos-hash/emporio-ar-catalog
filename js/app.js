@@ -1,11 +1,31 @@
 /**
- * Empório A.R - Catálogo Digital (versão final)
+ * Empório A.R - Catálogo Digital
+ * Dados: Gist (via /api/catalogo ou URL direta) + estoque ao vivo (stock-sync)
  */
-// Carrega os dados do Netlify Blobs via função serverless
-const response = await fetch('/api/catalogo');
-const dadosDoServidor = await response.json();
-const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
+
+const GIST_CATALOG_URL =
+  'https://gist.githubusercontent.com/delvandos-hash/bac3a717b309d02379455e971c9a9103/raw/catalogo.json';
+
+async function loadCatalogData() {
+  const urls = ['/api/catalogo', GIST_CATALOG_URL];
+  let lastErr;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      if (j && j.DATA) return j;
+      if (j && j.erro) throw new Error(j.erro);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('Falha ao carregar catálogo');
+}
+
+const dadosDoServidor = await loadCatalogData();
+const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
 
 const state = {
   gender: 'Todos',
@@ -151,6 +171,89 @@ function parsePrice(str) {
 function isAvailable(item) {
   return (item.disponivel || 'Sim') === 'Sim';
 }
+
+
+const STOCK_CACHE_KEY = 'emporio_ar_stock_cache';
+const STOCK_CACHE_TTL_MS = 30 * 60 * 1000;
+let stockLiveMap = null;
+
+function normStockKey(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function lookupLiveStock(item, brand, cat) {
+  if (!stockLiveMap) return null;
+  const n = normStockKey(item.nome);
+  const isBrand = cat === 'Brand' || String(cat || '').startsWith('Brand') || String(brand || '').toUpperCase().includes('BRAND') || String(brand || '').toUpperCase().includes('ARABIC') || String(brand || '').toUpperCase().includes('DREAM') || String(brand || '').toUpperCase().includes('FLACONETE') || String(brand || '').toUpperCase().includes('SAPATINHO') || String(brand || '').toUpperCase().includes('BODY') || String(brand || '').toUpperCase().includes('BEAUTY') || String(brand || '').toUpperCase().includes('COLE');
+  const map = isBrand ? (stockLiveMap.brandMap || {}) : (stockLiveMap.map || {});
+  const byName = isBrand ? (stockLiveMap.brandByName || {}) : (stockLiveMap.byName || {});
+  const b = normStockKey(brand);
+  const k1 = n + '|' + b;
+  if (map[k1]) return map[k1];
+  if (byName[n]) return byName[n];
+  if (isBrand) {
+    for (const [kn, v] of Object.entries(byName)) {
+      if (kn.length > 6 && (n.includes(kn) || kn.includes(n))) return v;
+    }
+  }
+  return null;
+}
+
+function withLiveStock(item, brand, cat) {
+  const live = lookupLiveStock(item, brand, cat);
+  if (!live) return { ...item, brand };
+  return { ...item, brand, disponivel: live };
+}
+
+async function syncStockFromRoot() {
+  try {
+    try {
+      const raw = localStorage.getItem(STOCK_CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached && cached.updatedAt && Date.now() - new Date(cached.updatedAt).getTime() < STOCK_CACHE_TTL_MS) {
+          stockLiveMap = cached;
+          return true;
+        }
+      }
+    } catch (e) {}
+
+    const endpoints = ['/.netlify/functions/stock-sync', '/api/stock-sync'];
+    let data = null;
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) continue;
+        data = await res.json();
+        if (data && data.ok) break;
+      } catch (e) {}
+    }
+
+    if (data && data.ok) {
+      stockLiveMap = data;
+      try {
+        localStorage.setItem(STOCK_CACHE_KEY, JSON.stringify({
+          map: data.map || {},
+          byName: data.byName || {},
+          brandMap: data.brandMap || {},
+          brandByName: data.brandByName || {},
+          updatedAt: data.updatedAt || new Date().toISOString(),
+        }));
+      } catch (e) {}
+      return true;
+    }
+  } catch (e) {
+    console.warn('Sync estoque falhou', e);
+  }
+  return false;
+}
+
 
 function inPriceRange(varejo) {
   if (state.price === 'Todos') return true;
@@ -490,7 +593,7 @@ function buildDetailsNavList() {
         atacado: item.atacado,
         foto: item.foto,
         notas: item.notas,
-        disponivel: item.disponivel || 'Sim',
+        disponivel: (lookupLiveStock(item, typeof g !== 'undefined' ? g.brand : item.brand, typeof g !== 'undefined' ? g.cat : item.cat) || item.disponivel || 'Sim'),
         badge: item.badge || ''
       });
     }
@@ -525,6 +628,8 @@ function showDetailsAt(index, direction) {
 
 
 function openDetails(p, opts = {}) {
+  const live = lookupLiveStock(p, p.brand, p.cat);
+  if (live) p = { ...p, disponivel: live };
   currentProduct = p;
   if (!opts.fromNav) {
     detailsNavList = buildDetailsNavList();
@@ -685,7 +790,7 @@ function render() {
         const pdata = encodeURIComponent(JSON.stringify({
           nome: item.nome, brand: b.brand, volume: item.volume,
           varejo: item.varejo, atacado: item.atacado, foto: item.foto, notas: item.notas,
-          disponivel: item.disponivel || 'Sim', badge: item.badge || ''
+          disponivel: (lookupLiveStock(item, typeof g !== 'undefined' ? g.brand : item.brand, typeof g !== 'undefined' ? g.cat : item.cat) || item.disponivel || 'Sim'), badge: item.badge || ''
         }));
         const photoHtml = isScoop
           ? ''
@@ -1015,3 +1120,6 @@ ensureBrandCategoryFilters();
 updateShareLink();
 updateCartUI();
 render();
+syncStockFromRoot().then((ok) => {
+  if (ok) render();
+});
