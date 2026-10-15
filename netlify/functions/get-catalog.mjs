@@ -11,19 +11,22 @@ export default async (req, context) => {
         statusText: response.statusText
       }), {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+  "Content-Type": "application/json; charset=utf-8",
+  "Access-Control-Allow-Origin": "*"
+},
       });
     }
     
     const data = await response.json();
     
     return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      },
-    });
+  status: 200,
+  headers: { 
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*"
+  },
+});
     
   } catch (error) {
     return new Response(JSON.stringify({
@@ -31,7 +34,10 @@ export default async (req, context) => {
       mensagem: error.message
     }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+     headers: { 
+  "Content-Type": "application/json; charset=utf-8",
+  "Access-Control-Allow-Origin": "*"
+},
     });
   }
 };
