@@ -62,8 +62,8 @@ function priceImarat(priceCents, atacadoCents) {
 
 function priceBrand(orig, isArabicMini) {
   if (isArabicMini) return { varejo: '125,00', atacado: '85,00' };
-  if (orig <= 100) return { varejo: fmtBRL(orig + 60), atacado: fmtBRL(orig + 30) };
-  return { varejo: fmtBRL(orig + 90), atacado: fmtBRL(orig + 60) };
+  if (orig <= 100) return { varejo: fmtBRL(orig + 60), atacado: fmtBRL(orig + 40) };
+  return { varejo: fmtBRL(orig + 90), atacado: fmtBRL(orig + 70) };
 }
 
 function volumeFrom(sizeMl, nome) {
