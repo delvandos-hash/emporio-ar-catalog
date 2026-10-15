@@ -1,6 +1,6 @@
 /**
  * Atualiza disponivel no data.js — Imarat + Brand Collection
- * node scripts/sync-stock.mjs
+ * Envia os dados para o GitHub Gist
  */
 import fs from 'fs';
 import path from 'path';
@@ -31,7 +31,9 @@ async function fetchImarat() {
       headers: { 'User-Agent': 'EmporioAR-StockSync/1.0', Accept: 'application/json' },
     });
     if (!res.ok) throw new Error(`Imarat HTTP ${res.status}`);
-    const data = await res.json();
+    const buffer = await res.arrayBuffer();
+    const text = new TextDecoder('utf-8').decode(buffer);
+    const data = JSON.parse(text);
     total = data.total || total;
     const products = data.products || [];
     if (!products.length) break;
@@ -75,7 +77,9 @@ async function fetchBrand() {
       }
     );
     if (!res.ok) break;
-    const data = await res.json();
+    const buffer = await res.arrayBuffer();
+    const text = new TextDecoder('utf-8').decode(buffer);
+    const data = JSON.parse(text);
     const products = Array.isArray(data) ? data : data.produtos || [];
     if (!products.length) break;
     for (const p of products) {
@@ -151,23 +155,20 @@ async function main() {
     ';\n' +
     'export const WHATSAPP = "5562991134488";\n' +
     'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
-  
-  // 1. Salva o arquivo localmente (como backup)
+
   fs.writeFileSync(dataPath, out, 'utf8');
   console.log(`Correspondências: ${matched} | Alterados: ${changed}`);
   console.log('data.js atualizado localmente.');
 
-  // 2. Envia os dados para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
-  
   try {
     const gistId = "bac3a717b309d02379455e971c9a9103";
     const githubToken = process.env.GIST_TOKEN;
-    
+
     if (!githubToken) {
       throw new Error('GIST_TOKEN não configurado nos secrets do GitHub');
     }
-    
+
     const dadosParaSite = {
       DATA: DATA,
       WHATSAPP: "5562991134488",
@@ -197,7 +198,7 @@ async function main() {
     }
 
     console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
-    
+
   } catch (error) {
     console.error('❌ Erro ao enviar para o GitHub Gist:', error);
   }
