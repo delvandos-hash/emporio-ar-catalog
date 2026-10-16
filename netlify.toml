@@ -16,3 +16,8 @@
   from = "/api/stock-sync"
   to = "/.netlify/functions/stock-sync"
   status = 200
+  
+[[redirects]]
+  from = "/feed.xml"
+  to = "/.netlify/functions/get-feed"
+  status = 200
