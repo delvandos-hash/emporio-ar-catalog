@@ -26,7 +26,7 @@ export default async (req, context) => {
           const preco = parseFloat(String(item.varejo).replace('.', '').replace(',', '.')) || 0;
           const id = `${normId(g.brand)}-${normId(item.nome)}-${normId(item.volume)}`;
           
-          const link = `${baseUrl}/#${id}`;
+          const link = `${baseUrl}/?produto=${id}`;
           const imagem = item.foto || '';
           const disponibilidade = item.disponivel === 'Sim' ? 'in_stock' : 'out_of_stock';
           
