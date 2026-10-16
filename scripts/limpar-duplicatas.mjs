@@ -1,6 +1,7 @@
 /**
- * Remove duplicatas específicas do data.js (miniaturas com preço antigo).
- * Mantém apenas a versão com preço corrigido (R$ 115,00 / R$ 75,00).
+ * Remove duplicatas do data.js.
+ * Regra: remove produtos que começam com "Mini " (mas não "Mini Armaf")
+ * e têm preço de varejo abaixo de R$ 100,00 (versões antigas).
  */
 
 import fs from 'fs';
@@ -9,29 +10,6 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
-
-// Lista de nomes (normalizados) que devem ser REMOVIDOS (versão antiga)
-const NOMES_PARA_REMOVER = [
-  // Armaf (preço antigo R$ 105,00 / R$ 55,00)
-  'mini mandarin elixir',
-  'mini mandarin sky',
-  'mini bananas',
-  'mini black',
-  'mini cofee',
-  'mini dubai',
-  'mini go mango',
-  'mini limoni',
-  'mini montagne',
-  'mini spectra',
-  'mini dubai candy',
-  'mini marshmellow',
-  // Vulcan (preço antigo R$ 90,00 / R$ 70,00)
-  'mini vulcan bale 30ml',
-  'mini vulcan sable 30ml',
-  'mini vulcan feu 30ml',
-  // Marshmallow (preço antigo R$ 105,00 / R$ 55,00)
-  'mini marshmallow',
-];
 
 function norm(s) {
   return String(s || '')
@@ -43,12 +21,32 @@ function norm(s) {
     .replace(/\s+/g, ' ');
 }
 
-function isRemover(nome, varejo) {
+function parsePrice(str) {
+  if (!str || str === '—') return 0;
+  const n = parseFloat(String(str).replace(/[R$\s]/g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function deveRemover(nome, varejo) {
   const n = norm(nome);
-  if (NOMES_PARA_REMOVER.includes(n)) {
-    const preco = parseFloat(String(varejo).replace(',', '.'));
-    return preco < 100; // Remove apenas versões antigas (preço menor)
+  const preco = parsePrice(varejo);
+
+  // Regra 1: Começa com "mini " mas NÃO é "mini armaf" (versão correta) e NÃO é "miniatura"
+  const ehMiniAntigo =
+    n.startsWith('mini ') &&
+    !n.startsWith('mini armaf') &&
+    !n.startsWith('miniatura');
+
+  // Regra 2: Preço abaixo de 100 (versão antiga)
+  if (ehMiniAntigo && preco > 0 && preco < 100) {
+    return true;
   }
+
+  // Regra 3: Também remove as versões antigas do Vulcan (nome com "30ml" e preço < 100)
+  if (n.includes('vulcan') && n.includes('30ml') && preco > 0 && preco < 100) {
+    return true;
+  }
+
   return false;
 }
 
@@ -64,9 +62,9 @@ async function main() {
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       g.items = g.items.filter((item) => {
-        if (isRemover(item.nome, item.varejo)) {
+        if (deveRemover(item.nome, item.varejo)) {
           removidos++;
-          console.log(`  Removido: ${item.nome} (${item.varejo})`);
+          console.log(`  Removido: ${item.nome} (R$ ${item.varejo})`);
           return false;
         }
         return true;
@@ -80,7 +78,7 @@ async function main() {
   }
 
   const out =
-    '/** Empório A.R — limpeza cirúrgica ' +
+    '/** Empório A.R — limpeza flexível ' +
     new Date().toISOString() +
     ` | ${removidos} duplicatas removidas */\n` +
     'export const DATA = ' +
@@ -91,17 +89,13 @@ async function main() {
 
   fs.writeFileSync(dataPath, out, 'utf8');
   console.log(`✅ ${removidos} duplicatas removidas.`);
-  console.log('data.js atualizado localmente.');
 
   // Envia para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
   try {
     const gistId = "bac3a717b309d02379455e971c9a9103";
     const githubToken = process.env.GIST_TOKEN;
-
-    if (!githubToken) {
-      throw new Error('GIST_TOKEN não configurado nos secrets do GitHub');
-    }
+    if (!githubToken) throw new Error('GIST_TOKEN não configurado');
 
     const dadosParaSite = {
       DATA: DATA,
@@ -119,9 +113,7 @@ async function main() {
       },
       body: JSON.stringify({
         files: {
-          'catalogo.json': {
-            content: '\uFEFF' + JSON.stringify(dadosParaSite, null, 2)
-          }
+          'catalogo.json': { content: '\uFEFF' + JSON.stringify(dadosParaSite, null, 2) }
         }
       })
     });
@@ -130,9 +122,7 @@ async function main() {
       const errorText = await response.text();
       throw new Error(`GitHub API ${response.status}: ${errorText}`);
     }
-
     console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
-
   } catch (error) {
     console.error('❌ Erro ao enviar para o GitHub Gist:', error);
   }
