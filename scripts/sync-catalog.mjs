@@ -1,6 +1,7 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
+ * Regras de preço para miniaturas Imarat aplicadas.
  */
 
 import fs from 'fs';
@@ -54,17 +55,124 @@ function parseOrig(s) {
   return isNaN(n) ? 0 : n;
 }
 
-function priceImarat(priceCents, atacadoCents) {
-  const varejoOrig = (priceCents || 0) / 100;
-  const atacadoOrig = atacadoCents != null ? atacadoCents / 100 : Math.max(varejoOrig - 30, 0);
-  return { varejo: fmtBRL(varejoOrig + 30), atacado: fmtBRL(atacadoOrig + 30) };
+// ---- DETECÇÃO DE MINIATURA ----
+function isMiniatura(nome, volume, categoria) {
+  const n = norm(nome);
+  const cat = norm(categoria || '');
+
+  // 1. Nome contém palavras-chave de miniatura
+  if (n.includes('mini ') || n.includes('miniatura') || n.includes('mini-')) return true;
+
+  // 2. Categoria contém "miniatura"
+  if (cat.includes('miniatura')) return true;
+
+  // 3. Fallback: volume <= 50ml
+  if (volume) {
+    const v = parseFloat(String(volume).replace('ml', ''));
+    if (!isNaN(v) && v <= 50) return true;
+  }
+
+  return false;
 }
 
-function priceBrand(orig, isArabicMini) {
-  if (isArabicMini) return { varejo: '125,00', atacado: '85,00' };
-  if (orig <= 100) return { varejo: fmtBRL(orig + 60), atacado: fmtBRL(orig + 40) };
-  return { varejo: fmtBRL(orig + 90), atacado: fmtBRL(orig + 70) };
+// ---- DETECÇÃO DE CASOS ESPECIAIS ----
+function isOleoCliveDorris(nome, brand) {
+  const n = norm(nome);
+  const b = norm(brand);
+  return b.includes('clive') && n.includes('oleo');
 }
+
+function isKitLattafa(nome, brand) {
+  const n = norm(nome);
+  const b = norm(brand);
+  return b.includes('lattafa') && n.includes('kit');
+}
+
+function isKitMusaman(nome) {
+  return norm(nome).includes('kit musaman');
+}
+
+function isKitVulcan(nome) {
+  const n = norm(nome);
+  return n.includes('kit vulcan') || (n.includes('vulcan') && n.includes('kit'));
+}
+
+// ---- CÁLCULO DE PREÇO PARA MINIATURAS ----
+function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig) {
+  // Se não for miniatura, retorna os preços com a regra antiga (perfumes)
+  if (!isMiniatura(nome, volume, categoria)) {
+    return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
+  }
+
+  const n = norm(nome);
+  const b = norm(brand);
+
+  // Exceções e regras específicas
+  if (isOleoCliveDorris(nome, brand)) {
+    return { varejo: fmtBRL(55), atacado: fmtBRL(44) };
+  }
+
+  if (isKitVulcan(nome)) {
+    return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
+  }
+
+  if (isKitMusaman(nome)) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 65) };
+  }
+
+  if (isKitLattafa(nome, brand)) {
+    return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
+  }
+
+  // Regras por marca (miniaturas)
+  if (b.includes('orientica')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
+  }
+  if (b.includes('afeer')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 20), atacado: fmtBRL(precoAtacadoOrig + 30) };
+  }
+  if (b.includes('clive')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('only')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('armaf')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('outra')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('lattafa')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('mais you')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('maison')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('meryam')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('french')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('al wataniah')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 45) };
+  }
+  if (b.includes('arabic')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  }
+  if (b.includes('club woman') || n.includes('club woman')) {
+    return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
+  }
+
+  // Fallback: se não caiu em nenhuma regra, mantém o preço original com +30
+  return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
+}
+
+// ---- FIM DAS REGRAS DE PREÇO ----
 
 function volumeFrom(sizeMl, nome) {
   if (sizeMl) return `${sizeMl}ml`;
@@ -248,6 +356,7 @@ async function main() {
 
   let stockChanged = 0;
   let addedImarat = 0;
+  let priceChanged = 0;
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
@@ -266,6 +375,17 @@ async function main() {
         if ((it.disponivel || 'Sim') !== disp) {
           it.disponivel = disp;
           stockChanged++;
+        }
+
+        // RECALCULA O PREÇO (MESMO PARA PRODUTOS JÁ EXISTENTES)
+        const precoVarejoOrig = (hit.priceCents || 0) / 100;
+        const precoAtacadoOrig = hit.atacado && hit.atacado.precoCents != null ? hit.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
+        const categoria = hit.categoria_nome || hit.categoria || '';
+        const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+        if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
+          it.varejo = prices.varejo;
+          it.atacado = prices.atacado;
+          priceChanged++;
         }
       }
     }
@@ -287,14 +407,18 @@ async function main() {
         }
       }
 
-      const prices = priceImarat(p.priceCents, p.atacado && p.atacado.precoCents);
+      const precoVarejoOrig = (p.priceCents || 0) / 100;
+      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
+      const categoria = p.categoria_nome || p.categoria || '';
+      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+
       const line = genderLine(p.gender);
       const foto = p.image
         ? p.image.startsWith('http')
           ? p.image
           : IMARAT_ORIGIN + p.image
         : '';
-      const cat = volume && volume !== '—' && parseFloat(volume) <= 35 ? 'Miniaturas' : 'Perfumes';
+      const cat = isMiniatura(nome, volume, categoria) ? 'Miniaturas' : 'Perfumes';
 
       const group = ensureBrandGroup(DATA, line, brand, cat);
       group.items.push({
@@ -393,7 +517,7 @@ async function main() {
   const out =
     '/** Empório A.R — sync ' +
     new Date().toISOString() +
-    ` | +${addedImarat} Imarat +${addedBrand} Brand (sessões filtradas) | estoqueΔ ${stockChanged} */\n` +
+    ` | +${addedImarat} Imarat +${addedBrand} Brand (sessões filtradas) | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` +
     'export const DATA = ' +
     JSON.stringify(DATA) +
     ';\n' +
@@ -406,6 +530,7 @@ async function main() {
   console.log(`Novos Imarat: ${addedImarat}`);
   console.log(`Novos Brand: ${addedBrand}`);
   console.log(`Estoque alterado: ${stockChanged}`);
+  console.log(`Preços alterados: ${priceChanged}`);
   console.log('data.js atualizado localmente.');
 
   // Envia para o GitHub Gist
