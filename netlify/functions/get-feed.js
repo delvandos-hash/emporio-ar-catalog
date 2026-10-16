@@ -26,13 +26,17 @@ export default async (req, context) => {
           const preco = parseFloat(String(item.varejo).replace('.', '').replace(',', '.')) || 0;
           const id = `${normId(g.brand)}-${normId(item.nome)}-${normId(item.volume)}`;
           
+          const link = `${baseUrl}/#${id}`;
+          const imagem = item.foto || '';
+          const disponibilidade = item.disponivel === 'Sim' ? 'in_stock' : 'out_of_stock';
+          
           feedItems.push(`    <item>
-      <g:id>${id}</g:id>
+      <g:id><![CDATA[${id}]]></g:id>
       <g:title><![CDATA[${item.nome} ${item.volume}]]></g:title>
       <g:description><![CDATA[${(item.notas || item.nome).slice(0, 4900)}]]></g:description>
-      <g:link>${baseUrl}/#${id}</g:link>
-      <g:image_link>${item.foto || ''}</g:image_link>
-      <g:availability>${item.disponivel === 'Sim' ? 'in_stock' : 'out_of_stock'}</g:availability>
+      <g:link><![CDATA[${link}]]></g:link>
+      <g:image_link><![CDATA[${imagem}]]></g:image_link>
+      <g:availability><![CDATA[${disponibilidade}]]></g:availability>
       <g:price>${preco.toFixed(2)} BRL</g:price>
       <g:brand><![CDATA[${g.brand}]]></g:brand>
       <g:condition>new</g:condition>
@@ -45,9 +49,9 @@ export default async (req, context) => {
     const feedXml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
-    <title>Empório A.R - Catálogo</title>
+    <title><![CDATA[Empório A.R - Catálogo]]></title>
     <link>${baseUrl}</link>
-    <description>Catálogo de perfumes Empório A.R</description>
+    <description><![CDATA[Catálogo de perfumes Empório A.R]]></description>
 ${feedItems.join('\n')}
   </channel>
 </rss>`;
@@ -61,7 +65,7 @@ ${feedItems.join('\n')}
     });
     
   } catch (error) {
-    return new Response(`<?xml version="1.0" encoding="UTF-8"?><error>${error.message}</error>`, {
+    return new Response(`<?xml version="1.0" encoding="UTF-8"?><error><![CDATA[${error.message}]]></error>`, {
       status: 500,
       headers: { "Content-Type": "application/xml; charset=utf-8" },
     });
