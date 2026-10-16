@@ -1,7 +1,6 @@
 /**
- * Remove duplicatas do data.js
- * Mantém a entrada com o MAIOR preço de varejo (a versão corrigida).
- * Também envia o resultado para o Gist.
+ * Remove duplicatas específicas do data.js (miniaturas com preço antigo).
+ * Mantém apenas a versão com preço corrigido (R$ 115,00 / R$ 75,00).
  */
 
 import fs from 'fs';
@@ -10,6 +9,29 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
+
+// Lista de nomes (normalizados) que devem ser REMOVIDOS (versão antiga)
+const NOMES_PARA_REMOVER = [
+  // Armaf (preço antigo R$ 105,00 / R$ 55,00)
+  'mini mandarin elixir',
+  'mini mandarin sky',
+  'mini bananas',
+  'mini black',
+  'mini cofee',
+  'mini dubai',
+  'mini go mango',
+  'mini limoni',
+  'mini montagne',
+  'mini spectra',
+  'mini dubai candy',
+  'mini marshmellow',
+  // Vulcan (preço antigo R$ 90,00 / R$ 70,00)
+  'mini vulcan bale 30ml',
+  'mini vulcan sable 30ml',
+  'mini vulcan feu 30ml',
+  // Marshmallow (preço antigo R$ 105,00 / R$ 55,00)
+  'mini marshmallow',
+];
 
 function norm(s) {
   return String(s || '')
@@ -21,17 +43,13 @@ function norm(s) {
     .replace(/\s+/g, ' ');
 }
 
-function normSemVolume(s) {
-  return norm(s)
-    .replace(/\s*\d+\s*(ml|g)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function parsePrice(str) {
-  if (!str || str === '—') return 0;
-  const n = parseFloat(String(str).replace(/[R$\s]/g, '').replace(',', '.'));
-  return isNaN(n) ? 0 : n;
+function isRemover(nome, varejo) {
+  const n = norm(nome);
+  if (NOMES_PARA_REMOVER.includes(n)) {
+    const preco = parseFloat(String(varejo).replace(',', '.'));
+    return preco < 100; // Remove apenas versões antigas (preço menor)
+  }
+  return false;
 }
 
 async function main() {
@@ -45,41 +63,24 @@ async function main() {
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
-      const vistos = new Map();
-      const novosItens = [];
-
-      for (const item of g.items) {
-        const chave = `${normSemVolume(item.nome)}|${norm(g.brand)}`;
-        const precoAtual = parsePrice(item.varejo);
-
-        if (vistos.has(chave)) {
-          const idxExistente = vistos.get(chave);
-          const itemExistente = novosItens[idxExistente];
-          const precoExistente = parsePrice(itemExistente.varejo);
-
-          if (precoAtual > precoExistente) {
-            novosItens[idxExistente] = item;
-          }
+      g.items = g.items.filter((item) => {
+        if (isRemover(item.nome, item.varejo)) {
           removidos++;
-        } else {
-          vistos.set(chave, novosItens.length);
-          novosItens.push(item);
+          console.log(`  Removido: ${item.nome} (${item.varejo})`);
+          return false;
         }
-      }
-
-      g.items = novosItens;
+        return true;
+      });
     }
   }
 
+  // Remove grupos vazios
   for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
-      g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-    }
-    DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
+    DATA[line] = DATA[line].filter((g) => g.items.length > 0);
   }
 
   const out =
-    '/** Empório A.R — limpeza ' +
+    '/** Empório A.R — limpeza cirúrgica ' +
     new Date().toISOString() +
     ` | ${removidos} duplicatas removidas */\n` +
     'export const DATA = ' +
