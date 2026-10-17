@@ -142,8 +142,22 @@ function isKitVulcan(nome) {
   return n.includes('kit vulcan') || (n.includes('vulcan') && n.includes('kit'));
 }
 
+/** Mesma regra de preço do Kit Vulcan (Imarat +130 varejo / +125 atacado) */
+function isKitMiniatura9(nome) {
+  const n = norm(nome);
+  return n.includes('kit') && n.includes('miniatura') && /\b9\b/.test(n);
+}
+
+function isOleo(nome) {
+  const n = norm(nome);
+  return n.startsWith('oleo') || n.includes(' oleo ');
+}
+
 function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig) {
-  if (!isMiniatura(nome, volume, categoria)) {
+  // Óleos Clive: preço fixo mesmo fora de “miniatura”
+  if (isOleoCliveDorris(nome, brand)) return { varejo: fmtBRL(55), atacado: fmtBRL(44) };
+
+  if (!isMiniatura(nome, volume, categoria) && !isKitMiniatura9(nome) && !isKitVulcan(nome)) {
     return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
   }
 
@@ -151,7 +165,10 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
   const b = norm(brand);
 
   if (isOleoCliveDorris(nome, brand)) return { varejo: fmtBRL(55), atacado: fmtBRL(44) };
-  if (isKitVulcan(nome)) return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
+  // Kit Vulcan e Kit Miniatura 9: mesma regra
+  if (isKitVulcan(nome) || isKitMiniatura9(nome)) {
+    return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
+  }
   if (isKitMusaman(nome)) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 65) };
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
 
@@ -417,7 +434,7 @@ async function main() {
       const brand = (p.brand || 'Outros').toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
-      const ehMini = isMiniatura(nome, volume, categoria);
+      const ehMini = isMiniatura(nome, volume, categoria) && !isOleo(nome);
 
       let duplicado;
       if (ehMini) {
@@ -454,7 +471,9 @@ async function main() {
           ? p.image
           : IMARAT_ORIGIN + p.image
         : '';
-      const cat = ehMini ? 'Miniaturas' : 'Perfumes';
+      // Óleos nunca vão para Miniaturas
+      const ehOleo = isOleo(nome);
+      const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
 
       const group = ensureBrandGroup(DATA, line, brand, cat);
       group.items.push({
@@ -470,7 +489,7 @@ async function main() {
       // Atualiza ambos os índices (para que futuros produtos não dupliquem)
       indexNormal.add(`${norm(nome)}|${norm(brand)}`);
       indexNormal.add(norm(nome));
-      if (ehMini) {
+      if (ehMini && !ehOleo) {
         const chave = chaveComparacaoMini(nome);
         indexMiniImarat.add(`${chave}|${norm(brand)}`);
         indexMiniImarat.add(chave);
