@@ -1,7 +1,6 @@
 /**
- * Remove duplicatas do data.js.
- * Regra: remove produtos que começam com "Mini " (mas não "Mini Armaf")
- * e têm preço de varejo abaixo de R$ 100,00 (versões antigas).
+ * Remove APENAS as duplicatas exatas da Armaf (versão antiga com preço R$ 105,00).
+ * Não usa regras genéricas. Não afeta outros produtos.
  */
 
 import fs from 'fs';
@@ -10,6 +9,22 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
+
+// Lista EXATA dos nomes a remover (normalizados)
+const NOMES_EXATOS_PARA_REMOVER = [
+  'mini mandarin elixir',
+  'mini mandarin sky',
+  'mini bananas',
+  'mini black',
+  'mini cofee',
+  'mini dubai',
+  'mini go mango',
+  'mini limoni',
+  'mini montagne',
+  'mini spectra',
+  'mini dubai candy',
+  'mini marshmellow',
+];
 
 function norm(s) {
   return String(s || '')
@@ -21,33 +36,9 @@ function norm(s) {
     .replace(/\s+/g, ' ');
 }
 
-function parsePrice(str) {
-  if (!str || str === '—') return 0;
-  const n = parseFloat(String(str).replace(/[R$\s]/g, '').replace(',', '.'));
-  return isNaN(n) ? 0 : n;
-}
-
-function deveRemover(nome, varejo) {
+function deveRemover(nome) {
   const n = norm(nome);
-  const preco = parsePrice(varejo);
-
-  // Regra 1: Começa com "mini " mas NÃO é "mini armaf" (versão correta) e NÃO é "miniatura"
-  const ehMiniAntigo =
-    n.startsWith('mini ') &&
-    !n.startsWith('mini armaf') &&
-    !n.startsWith('miniatura');
-
-  // Regra 2: Preço abaixo de 100 (versão antiga)
-  if (ehMiniAntigo && preco > 0 && preco < 100) {
-    return true;
-  }
-
-  // Regra 3: Também remove as versões antigas do Vulcan (nome com "30ml" e preço < 100)
-  if (n.includes('vulcan') && n.includes('30ml') && preco > 0 && preco < 100) {
-    return true;
-  }
-
-  return false;
+  return NOMES_EXATOS_PARA_REMOVER.includes(n);
 }
 
 async function main() {
@@ -62,7 +53,7 @@ async function main() {
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       g.items = g.items.filter((item) => {
-        if (deveRemover(item.nome, item.varejo)) {
+        if (deveRemover(item.nome)) {
           removidos++;
           console.log(`  Removido: ${item.nome} (R$ ${item.varejo})`);
           return false;
@@ -78,7 +69,7 @@ async function main() {
   }
 
   const out =
-    '/** Empório A.R — limpeza flexível ' +
+    '/** Empório A.R — limpeza cirúrgica exata ' +
     new Date().toISOString() +
     ` | ${removidos} duplicatas removidas */\n` +
     'export const DATA = ' +
