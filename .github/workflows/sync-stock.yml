@@ -2,7 +2,9 @@ name: Sync catálogo (estoque + novos produtos)
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    # 08:00 e 20:00 horário de Brasília (UTC-3) → 11:00 e 23:00 UTC
+    - cron: '0 11 * * *'
+    - cron: '0 23 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,14 +15,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Instalar dependências
-        run: npm install @netlify/blobs
-      - name: Debug - Listar secrets disponíveis
-        run: |
-          echo "GIST_TOKEN existe? ${{ secrets.GIST_TOKEN != '' }}"
-          echo "GH_GIST_TOKEN existe? ${{ secrets.GH_GIST_TOKEN != '' }}"
-          echo "NETLIFY_TOKEN existe? ${{ secrets.NETLIFY_TOKEN != '' }}"
-          echo "NETLIFY_SITE_ID existe? ${{ secrets.NETLIFY_SITE_ID != '' }}"
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
