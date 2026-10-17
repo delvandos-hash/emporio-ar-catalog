@@ -28,7 +28,25 @@ const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
 
 // Prefixos para ignorar APENAS em miniaturas Imarat
 const PREFIXOS_MINI_IMARAT = [
-  'mini armaf', 'miniatura', 'mini',
+  'mini armaf',
+  'miniatura armaf',
+  'miniatura',
+  'mini',
+];
+
+// Marcas que entram no NOME e geravam duplicata (ex: Mini vs Mini Armaf)
+const MARCAS_NO_NOME_MINI = [
+  'armaf',
+  'lattafa',
+  'orientica',
+  'afeer',
+  'clive dorris',
+  'french avenue',
+  'maison alhambra',
+  'al wataniah',
+  'only you',
+  'mais you',
+  'meryam',
 ];
 
 function norm(s) {
@@ -50,10 +68,11 @@ function removerVolume(s) {
 
 function removerPrefixosMini(s) {
   let resultado = norm(s);
-  for (const prefixo of PREFIXOS_MINI_IMARAT) {
+  const prefixos = [...PREFIXOS_MINI_IMARAT].sort((a, b) => b.length - a.length);
+  for (const prefixo of prefixos) {
     const p = norm(prefixo);
     if (resultado.startsWith(p + ' ')) {
-      resultado = resultado.substring(p.length + 1).trim();
+      resultado = resultado.slice(p.length).trim();
     } else if (resultado === p) {
       resultado = '';
     }
@@ -61,9 +80,25 @@ function removerPrefixosMini(s) {
   return resultado;
 }
 
-// Chave de comparação APENAS para miniaturas Imarat
+function removerMarcaDoNome(s) {
+  let resultado = norm(s);
+  const marcas = [...MARCAS_NO_NOME_MINI].sort((a, b) => b.length - a.length);
+  for (const marca of marcas) {
+    const m = norm(marca);
+    if (resultado.startsWith(m + ' ')) {
+      resultado = resultado.slice(m.length).trim();
+    }
+    if (resultado.endsWith(' ' + m)) {
+      resultado = resultado.slice(0, -(m.length + 1)).trim();
+    }
+  }
+  return resultado;
+}
+
+// Chave única mini Imarat: ignora mini/miniatura, volume e marca no nome
+// Mini Marshmellow === Mini Armaf Marshmellow → "marshmellow"
 function chaveComparacaoMini(nome) {
-  return removerPrefixosMini(removerVolume(nome));
+  return removerMarcaDoNome(removerPrefixosMini(removerVolume(nome)));
 }
 
 function fmtBRL(n) {
@@ -386,9 +421,14 @@ async function main() {
 
       let duplicado;
       if (ehMini) {
-        // Comparação inteligente (sem prefixos, sem volume) - APENAS para miniaturas
+        // Comparação inteligente: core do nome (sem mini/marca/volume)
         const chave = chaveComparacaoMini(nome);
-        duplicado = indexMiniImarat.has(`${chave}|${norm(brand)}`) || indexMiniImarat.has(chave);
+        duplicado =
+          indexMiniImarat.has(chave) ||
+          indexMiniImarat.has(`${chave}|${norm(brand)}`) ||
+          indexMiniImarat.has(`${chave}|armaf`) ||
+          indexMiniImarat.has(`${chave}|outros`) ||
+          indexMiniImarat.has(`${chave}|outra`);
       } else {
         // Comparação exata - para todos os outros
         duplicado = indexNormal.has(`${norm(nome)}|${norm(brand)}`) || indexNormal.has(norm(nome));
