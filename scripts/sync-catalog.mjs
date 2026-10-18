@@ -1,8 +1,7 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
- * Regras de preço para miniaturas Imarat aplicadas.
- * Correção: evita duplicatas APENAS para miniaturas da Imarat.
+ * Correção: leitura UTF-8 correta e prevenção de duplicatas em miniaturas.
  */
 
 import fs from 'fs';
@@ -26,79 +25,28 @@ const BRAND_ALLOWED_SESSIONS = [
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
 
-// Prefixos para ignorar APENAS em miniaturas Imarat
-const PREFIXOS_MINI_IMARAT = [
-  'mini armaf',
-  'miniatura armaf',
-  'miniatura',
-  'mini',
-];
-
-// Marcas que entram no NOME e geravam duplicata (ex: Mini vs Mini Armaf)
-const MARCAS_NO_NOME_MINI = [
-  'armaf',
-  'lattafa',
-  'orientica',
-  'afeer',
-  'clive dorris',
-  'french avenue',
-  'maison alhambra',
-  'al wataniah',
-  'only you',
-  'mais you',
-  'meryam',
-];
+const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura', 'mini'];
 
 function norm(s) {
-  return String(s || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
 
 function removerVolume(s) {
-  return norm(s)
-    .replace(/\s*\d+\s*(ml|g)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return norm(s).replace(/\s*\d+\s*(ml|g)\b/gi, '').replace(/\s+/g, ' ').trim();
 }
 
 function removerPrefixosMini(s) {
   let resultado = norm(s);
-  const prefixos = [...PREFIXOS_MINI_IMARAT].sort((a, b) => b.length - a.length);
-  for (const prefixo of prefixos) {
+  for (const prefixo of PREFIXOS_MINI_IMARAT) {
     const p = norm(prefixo);
-    if (resultado.startsWith(p + ' ')) {
-      resultado = resultado.slice(p.length).trim();
-    } else if (resultado === p) {
-      resultado = '';
-    }
+    if (resultado.startsWith(p + ' ')) resultado = resultado.substring(p.length + 1).trim();
+    else if (resultado === p) resultado = '';
   }
   return resultado;
 }
 
-function removerMarcaDoNome(s) {
-  let resultado = norm(s);
-  const marcas = [...MARCAS_NO_NOME_MINI].sort((a, b) => b.length - a.length);
-  for (const marca of marcas) {
-    const m = norm(marca);
-    if (resultado.startsWith(m + ' ')) {
-      resultado = resultado.slice(m.length).trim();
-    }
-    if (resultado.endsWith(' ' + m)) {
-      resultado = resultado.slice(0, -(m.length + 1)).trim();
-    }
-  }
-  return resultado;
-}
-
-// Chave única mini Imarat: ignora mini/miniatura, volume e marca no nome
-// Mini Marshmellow === Mini Armaf Marshmellow → "marshmellow"
 function chaveComparacaoMini(nome) {
-  return removerMarcaDoNome(removerPrefixosMini(removerVolume(nome)));
+  return removerPrefixosMini(removerVolume(nome));
 }
 
 function fmtBRL(n) {
@@ -124,56 +72,20 @@ function isMiniatura(nome, volume, categoria) {
   return false;
 }
 
-function isOleoCliveDorris(nome, brand) {
-  const n = norm(nome);
-  const b = norm(brand);
-  return b.includes('clive') && n.includes('oleo');
-}
-function isKitLattafa(nome, brand) {
-  const n = norm(nome);
-  const b = norm(brand);
-  return b.includes('lattafa') && n.includes('kit');
-}
-function isKitMusaman(nome) {
-  return norm(nome).includes('kit musaman');
-}
-function isKitVulcan(nome) {
-  const n = norm(nome);
-  return n.includes('kit vulcan') || (n.includes('vulcan') && n.includes('kit'));
-}
-
-/** Mesma regra de preço do Kit Vulcan (Imarat +130 varejo / +125 atacado) */
-function isKitMiniatura9(nome) {
-  const n = norm(nome);
-  return n.includes('kit') && n.includes('miniatura') && /\b9\b/.test(n);
-}
-
-function isOleo(nome) {
-  const n = norm(nome);
-  return n.startsWith('oleo') || n.includes(' oleo ');
-}
+function isOleoCliveDorris(nome, brand) { return norm(brand).includes('clive') && norm(nome).includes('oleo'); }
+function isKitLattafa(nome, brand) { return norm(brand).includes('lattafa') && norm(nome).includes('kit'); }
+function isKitMusaman(nome) { return norm(nome).includes('kit musaman'); }
+function isKitVulcan(nome) { const n = norm(nome); return n.includes('kit vulcan') || (n.includes('vulcan') && n.includes('kit')); }
 
 function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig) {
-  // Óleos Clive: preço fixo mesmo fora de “miniatura”
+  if (!isMiniatura(nome, volume, categoria)) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
+  const n = norm(nome); const b = norm(brand);
   if (isOleoCliveDorris(nome, brand)) return { varejo: fmtBRL(55), atacado: fmtBRL(44) };
-
-  if (!isMiniatura(nome, volume, categoria) && !isKitMiniatura9(nome) && !isKitVulcan(nome)) {
-    return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
-  }
-
-  const n = norm(nome);
-  const b = norm(brand);
-
-  if (isOleoCliveDorris(nome, brand)) return { varejo: fmtBRL(55), atacado: fmtBRL(44) };
-  // Kit Vulcan e Kit Miniatura 9: mesma regra
-  if (isKitVulcan(nome) || isKitMiniatura9(nome)) {
-    return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
-  }
+  if (isKitVulcan(nome)) return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
   if (isKitMusaman(nome)) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 65) };
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
-
   if (b.includes('orientica')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
-  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 20), atacado: fmtBRL(precoAtacadoOrig + 30) };
+  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) }; // CORRIGIDO: +30 no varejo para Afeer
   if (b.includes('clive')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('only')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('armaf')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
@@ -186,7 +98,6 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
   if (b.includes('al wataniah')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 45) };
   if (b.includes('arabic')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('club woman') || n.includes('club woman')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
-
   return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
 }
 
@@ -219,8 +130,6 @@ function notesToText(notes) {
   return parts.join(' | ');
 }
 
-// ---- ÍNDICES SEPARADOS ----
-// Índice normal (nome exato) - usado para tudo que NÃO é miniatura Imarat
 function buildIndexNormal(DATA) {
   const set = new Set();
   for (const line of Object.keys(DATA)) {
@@ -234,12 +143,10 @@ function buildIndexNormal(DATA) {
   return set;
 }
 
-// Índice inteligente (nome base sem prefixos) - usado APENAS para miniaturas Imarat
 function buildIndexMiniImarat(DATA) {
   const set = new Set();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
-      // Só inclui miniaturas de origem Imarat (não Brand)
       if (g.cat === 'Brand' || String(g.cat || '').startsWith('Brand')) continue;
       for (const it of g.items) {
         if (!isMiniatura(it.nome, it.volume, g.cat)) continue;
@@ -254,10 +161,7 @@ function buildIndexMiniImarat(DATA) {
 function ensureBrandGroup(DATA, line, brand, cat) {
   DATA[line] = DATA[line] || [];
   let g = DATA[line].find((x) => x.brand === brand && x.cat === cat);
-  if (!g) {
-    g = { cat, brand, items: [] };
-    DATA[line].push(g);
-  }
+  if (!g) { g = { cat, brand, items: [] }; DATA[line].push(g); }
   return g;
 }
 
@@ -278,24 +182,13 @@ function mapBrandSession(raw) {
   return null;
 }
 
-function isAllowedBrandProduct(p) {
-  const raw = String(p.categoria_nome || p.categoria || '');
-  return mapBrandSession(raw) != null;
-}
-
+function isAllowedBrandProduct(p) { return mapBrandSession(p.categoria_nome || p.categoria || '') != null; }
 function brandDisponivel(p) {
   if (p.status === false) return 'Não';
   if (p.controlar_estoque && p.total_estoque != null && Number(p.total_estoque) <= 0) return 'Não';
   return 'Sim';
 }
-
-function isArabicMiniBrand(p, session) {
-  if (session === 'ARABIC COLLECTION') {
-    const nome = String(p.nome || '').toUpperCase();
-    return nome.includes('25ML') || nome.includes('25 ML');
-  }
-  return false;
-}
+function isArabicMiniBrand(p, session) { return session === 'ARABIC COLLECTION' && /25\s*ML/i.test(String(p.nome || '')); }
 
 function priceBrand(orig, isArabicMini) {
   if (isArabicMini) return { varejo: '125,00', atacado: '85,00' };
@@ -308,11 +201,10 @@ async function fetchImaratList() {
   let page = 1, total = 0, fetched = 0;
   for (let g = 0; g < 40; g++) {
     const res = await fetch(`${IMARAT_API}?page=${page}&perPage=60`, {
-      headers: { 'User-Agent': 'EmporioAR-Sync/1.0', Accept: 'application/json' },
+      headers: { 'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8' },
     });
     if (!res.ok) throw new Error(`Imarat list HTTP ${res.status}`);
-    const buffer = await res.arrayBuffer();
-    const text = new TextDecoder('utf-8').decode(buffer);
+    const text = await res.text();
     const data = JSON.parse(text);
     total = data.total || total;
     const products = data.products || [];
@@ -328,45 +220,32 @@ async function fetchImaratList() {
 async function fetchImaratDetail(slug) {
   try {
     const res = await fetch(`${IMARAT_API}/${encodeURIComponent(slug)}`, {
-      headers: { 'User-Agent': 'EmporioAR-Sync/1.0', Accept: 'application/json' },
+      headers: { 'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8' },
     });
     if (!res.ok) return null;
-    const buffer = await res.arrayBuffer();
-    const text = new TextDecoder('utf-8').decode(buffer);
+    const text = await res.text();
     return JSON.parse(text);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 async function fetchBrandList() {
   const all = [];
-  const warm = await fetch(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, {
-    headers: { 'User-Agent': 'EmporioAR-Sync/1.0' },
-  });
+  const warm = await fetch(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, { headers: { 'User-Agent': 'EmporioAR-Sync/1.0' } });
   const setCookie = warm.headers.get('set-cookie') || '';
   const cookie = setCookie.split(',').map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
 
   for (let page = 1; page <= 80; page++) {
-    const res = await fetch(
-      `${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`,
-      {
-        method: 'POST',
-        headers: {
-          'User-Agent': 'EmporioAR-Sync/1.0',
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Referer: `${BRAND_BASE}/c/atacado/${BRAND_SELLER}`,
-          Origin: BRAND_BASE,
-          'X-Requested-With': 'XMLHttpRequest',
-          ...(cookie ? { Cookie: cookie } : {}),
-        },
-        body: JSON.stringify({ pagina_especifica: '' }),
-      }
-    );
+    const res = await fetch(`${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Content-Type': 'application/json',
+        Referer: `${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, Origin: BRAND_BASE, 'X-Requested-With': 'XMLHttpRequest',
+        'Accept-Charset': 'utf-8', ...(cookie ? { Cookie: cookie } : {}),
+      },
+      body: JSON.stringify({ pagina_especifica: '' }),
+    });
     if (!res.ok) break;
-    const buffer = await res.arrayBuffer();
-    const text = new TextDecoder('utf-8').decode(buffer);
+    const text = await res.text();
     const data = JSON.parse(text);
     const products = Array.isArray(data) ? data : data.produtos || [];
     if (!products.length) break;
@@ -387,43 +266,26 @@ async function main() {
 
   console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW}`);
 
-  // ---- IMARAT ----
   console.log('Buscando Imarat...');
   const imaratList = await fetchImaratList();
   console.log(`Imarat: ${imaratList.length} produtos`);
 
-  let stockChanged = 0;
-  let addedImarat = 0;
-  let priceChanged = 0;
+  let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (g.cat === 'Brand' || String(g.cat || '').startsWith('Brand')) continue;
       for (const it of g.items) {
-        const n = norm(it.nome);
-        const b = norm(g.brand);
-        const hit =
-          imaratList.find(
-            (p) =>
-              norm(p.name) === n &&
-              (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))
-          ) || imaratList.find((p) => norm(p.name) === n);
+        const n = norm(it.nome); const b = norm(g.brand);
+        const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
         if (!hit) continue;
         const disp = hit.inStock === true ? 'Sim' : 'Não';
-        if ((it.disponivel || 'Sim') !== disp) {
-          it.disponivel = disp;
-          stockChanged++;
-        }
-
+        if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
         const precoVarejoOrig = (hit.priceCents || 0) / 100;
         const precoAtacadoOrig = hit.atacado && hit.atacado.precoCents != null ? hit.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
         const categoria = hit.categoria_nome || hit.categoria || '';
         const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-        if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
-          it.varejo = prices.varejo;
-          it.atacado = prices.atacado;
-          priceChanged++;
-        }
+        if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) { it.varejo = prices.varejo; it.atacado = prices.atacado; priceChanged++; }
       }
     }
   }
@@ -434,74 +296,36 @@ async function main() {
       const brand = (p.brand || 'Outros').toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
-      const ehMini = isMiniatura(nome, volume, categoria) && !isOleo(nome);
+      const ehMini = isMiniatura(nome, volume, categoria);
 
       let duplicado;
       if (ehMini) {
-        // Comparação inteligente: core do nome (sem mini/marca/volume)
         const chave = chaveComparacaoMini(nome);
-        duplicado =
-          indexMiniImarat.has(chave) ||
-          indexMiniImarat.has(`${chave}|${norm(brand)}`) ||
-          indexMiniImarat.has(`${chave}|armaf`) ||
-          indexMiniImarat.has(`${chave}|outros`) ||
-          indexMiniImarat.has(`${chave}|outra`);
+        duplicado = indexMiniImarat.has(`${chave}|${norm(brand)}`) || indexMiniImarat.has(chave);
       } else {
-        // Comparação exata - para todos os outros
         duplicado = indexNormal.has(`${norm(nome)}|${norm(brand)}`) || indexNormal.has(norm(nome));
       }
-
       if (duplicado) continue;
 
       let notas = '';
-      if (p.slug) {
-        const detail = await fetchImaratDetail(p.slug);
-        if (detail) {
-          notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
-        }
-      }
+      if (p.slug) { const detail = await fetchImaratDetail(p.slug); if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400); }
 
       const precoVarejoOrig = (p.priceCents || 0) / 100;
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-
       const line = genderLine(p.gender);
-      const foto = p.image
-        ? p.image.startsWith('http')
-          ? p.image
-          : IMARAT_ORIGIN + p.image
-        : '';
-      // Óleos nunca vão para Miniaturas
-      const ehOleo = isOleo(nome);
-      const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
+      const foto = p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : '';
+      const cat = ehMini ? 'Miniaturas' : 'Perfumes';
 
       const group = ensureBrandGroup(DATA, line, brand, cat);
-      group.items.push({
-        nome,
-        volume,
-        varejo: prices.varejo,
-        atacado: prices.atacado,
-        disponivel: p.inStock === true ? 'Sim' : 'Não',
-        notas: notas || '',
-        foto,
-      });
+      group.items.push({ nome, volume, varejo: prices.varejo, atacado: prices.atacado, disponivel: p.inStock === true ? 'Sim' : 'Não', notas: notas || '', foto });
 
-      // Atualiza ambos os índices (para que futuros produtos não dupliquem)
-      indexNormal.add(`${norm(nome)}|${norm(brand)}`);
-      indexNormal.add(norm(nome));
-      if (ehMini && !ehOleo) {
-        const chave = chaveComparacaoMini(nome);
-        indexMiniImarat.add(`${chave}|${norm(brand)}`);
-        indexMiniImarat.add(chave);
-      }
-
+      indexNormal.add(`${norm(nome)}|${norm(brand)}`); indexNormal.add(norm(nome));
+      if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); indexMiniImarat.add(chave); }
       addedImarat++;
     }
-  } else {
-    console.log('Imarat: novos IGNORADOS (só estoque)');
   }
 
-  // ---- BRAND ----
   console.log('Buscando Brand Collection...');
   const brandList = await fetchBrandList();
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
@@ -514,78 +338,41 @@ async function main() {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
       for (const it of g.items) {
         const n = norm(it.nome);
-        const hit =
-          brandList.find((p) => norm(p.nome) === n) ||
-          brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
+        const hit = brandList.find((p) => norm(p.nome) === n) || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
         if (!hit) continue;
         const disp = brandDisponivel(hit);
-        if ((it.disponivel || 'Sim') !== disp) {
-          it.disponivel = disp;
-          stockChanged++;
-        }
+        if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
       }
     }
   }
 
   if (ADD_BRAND_NEW) {
     for (const p of brandAllowed) {
-      const nome = p.nome || '';
-      if (!nome) continue;
-      const session = mapBrandSession(p.categoria_nome || p.categoria || '');
-      if (!session) continue;
-
+      const nome = p.nome || ''; if (!nome) continue;
+      const session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session) continue;
       const volume = volumeFrom(null, nome);
-      // Brand SEMPRE usa comparação exata (nunca "inteligente")
       const duplicado = indexNormal.has(`${norm(nome)}|${norm(session)}`) || indexNormal.has(norm(nome));
       if (duplicado) continue;
 
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco);
       const prices = priceBrand(orig, isArabicMiniBrand(p, session));
       const line = genderLine(nome + ' ' + session);
-      let foto = '';
-      if (p.imagens && p.imagens[0]) {
-        const img = p.imagens[0];
-        foto = img.startsWith('http')
-          ? img
-          : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`;
-      }
+      let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
 
       const group = ensureBrandGroup(DATA, line, session, 'Brand');
-      group.items.push({
-        nome,
-        volume,
-        varejo: prices.varejo,
-        atacado: prices.atacado,
-        disponivel: brandDisponivel(p),
-        notas: notas.slice(0, 500),
-        foto,
-      });
-      indexNormal.add(`${norm(nome)}|${norm(session)}`);
-      indexNormal.add(norm(nome));
+      group.items.push({ nome, volume, varejo: prices.varejo, atacado: prices.atacado, disponivel: brandDisponivel(p), notas: notas.slice(0, 500), foto });
+      indexNormal.add(`${norm(nome)}|${norm(session)}`); indexNormal.add(norm(nome));
       addedBrand++;
     }
-  } else {
-    console.log('Brand: novos IGNORADOS (só estoque)');
   }
 
   for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
-      g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-    }
+    for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
   }
 
-  const out =
-    '/** Empório A.R — sync ' +
-    new Date().toISOString() +
-    ` | +${addedImarat} Imarat +${addedBrand} Brand (sessões filtradas) | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` +
-    'export const DATA = ' +
-    JSON.stringify(DATA) +
-    ';\n' +
-    'export const WHATSAPP = "5562991134488";\n' +
-    'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
-
+  const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
   fs.writeFileSync(dataPath, out, 'utf8');
 
   console.log('---');
@@ -595,45 +382,20 @@ async function main() {
   console.log(`Preços alterados: ${priceChanged}`);
   console.log('data.js atualizado localmente.');
 
-  // Envia para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
   try {
     const gistId = "bac3a717b309d02379455e971c9a9103";
     const githubToken = process.env.GIST_TOKEN;
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
-
-    const dadosParaSite = {
-      DATA: DATA,
-      WHATSAPP: "5562991134488",
-      BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" },
-      ultimaAtualizacao: new Date().toISOString()
-    };
-
+    const dadosParaSite = { DATA: DATA, WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
     const response = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        files: {
-          'catalogo.json': { content: '\uFEFF' + JSON.stringify(dadosParaSite, null, 2) }
-        }
-      })
+      headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'catalogo.json': { content: '\uFEFF' + JSON.stringify(dadosParaSite, null, 2) } } })
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`GitHub API ${response.status}: ${errorText}`);
-    }
+    if (!response.ok) { const errorText = await response.text(); throw new Error(`GitHub API ${response.status}: ${errorText}`); }
     console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
-  } catch (error) {
-    console.error('❌ Erro ao enviar para o GitHub Gist:', error);
-  }
+  } catch (error) { console.error('❌ Erro ao enviar para o GitHub Gist:', error); }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main().catch((e) => { console.error(e); process.exit(1); });
