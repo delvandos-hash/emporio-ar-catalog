@@ -1,17 +1,15 @@
-name: Corrigir Acentos
+name: Limpar Acentos Profundos
 
 on:
   workflow_dispatch:
 
 jobs:
-  corrigir:
+  limpar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Rodar correção forçada no Gist
-        run: node scripts/corrigir-gist.mjs
-        env:
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+      - name: Rodar limpeza
+        run: node scripts/limpar-acentos.mjs
