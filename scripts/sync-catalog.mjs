@@ -1,7 +1,7 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
- * Correção: leitura UTF-8 correta e prevenção de duplicatas em miniaturas.
+ * Correção: Sobrescreve dados antigos com os novos (limpa acentos quebrados).
  */
 
 import fs from 'fs';
@@ -85,7 +85,7 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
   if (isKitMusaman(nome)) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 65) };
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
   if (b.includes('orientica')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
-  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) }; // CORRIGIDO: +30 no varejo para Afeer
+  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
   if (b.includes('clive')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('only')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('armaf')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
@@ -128,34 +128,6 @@ function notesToText(notes) {
   if (heart) parts.push('Coração: ' + heart);
   if (base) parts.push('Fundo: ' + base);
   return parts.join(' | ');
-}
-
-function buildIndexNormal(DATA) {
-  const set = new Set();
-  for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
-      for (const it of g.items) {
-        set.add(`${norm(it.nome)}|${norm(g.brand)}`);
-        set.add(norm(it.nome));
-      }
-    }
-  }
-  return set;
-}
-
-function buildIndexMiniImarat(DATA) {
-  const set = new Set();
-  for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
-      if (g.cat === 'Brand' || String(g.cat || '').startsWith('Brand')) continue;
-      for (const it of g.items) {
-        if (!isMiniatura(it.nome, it.volume, g.cat)) continue;
-        set.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
-        set.add(chaveComparacaoMini(it.nome));
-      }
-    }
-  }
-  return set;
 }
 
 function ensureBrandGroup(DATA, line, brand, cat) {
@@ -261,9 +233,6 @@ async function main() {
   if (!m) throw new Error('DATA não encontrado');
   const DATA = JSON.parse(m[1]);
 
-  const indexNormal = buildIndexNormal(DATA);
-  const indexMiniImarat = buildIndexMiniImarat(DATA);
-
   console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW}`);
 
   console.log('Buscando Imarat...');
@@ -272,20 +241,49 @@ async function main() {
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
+  // Esta etapa atualiza os produtos existentes (sobrescrevendo dados antigos)
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (g.cat === 'Brand' || String(g.cat || '').startsWith('Brand')) continue;
-      for (const it of g.items) {
+      for (let i = 0; i < g.items.length; i++) {
+        const it = g.items[i];
         const n = norm(it.nome); const b = norm(g.brand);
+        
+        // AQUI ESTÁ A MÁGICA: Busca o produto na Imarat comparando o nome 
+        // (mesmo que o nome no data.js esteja com acento quebrado, a função norm remove os acentos para comparar)
         const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
+        
         if (!hit) continue;
+        
+        // Se encontrou, ATUALIZA O NOME E AS NOTAS com o texto novo (correto) da Imarat
+        it.nome = hit.name; 
+        let notas = '';
+        if (hit.slug) { const detail = await fetchImaratDetail(hit.slug); if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400); }
+        if (notas) it.notas = notas;
+
         const disp = hit.inStock === true ? 'Sim' : 'Não';
         if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
+        
         const precoVarejoOrig = (hit.priceCents || 0) / 100;
         const precoAtacadoOrig = hit.atacado && hit.atacado.precoCents != null ? hit.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
         const categoria = hit.categoria_nome || hit.categoria || '';
         const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+        
         if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) { it.varejo = prices.varejo; it.atacado = prices.atacado; priceChanged++; }
+      }
+    }
+  }
+
+  // O resto do script (adicionar novos) pode continuar como estava, pois os índices agora estarão limpos.
+  const indexNormal = new Set();
+  const indexMiniImarat = new Set();
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line]) {
+      for (const it of g.items) {
+        indexNormal.add(`${norm(it.nome)}|${norm(g.brand)}`);
+        if (isMiniatura(it.nome, it.volume, g.cat)) {
+          indexMiniImarat.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
+        }
       }
     }
   }
@@ -320,8 +318,8 @@ async function main() {
       const group = ensureBrandGroup(DATA, line, brand, cat);
       group.items.push({ nome, volume, varejo: prices.varejo, atacado: prices.atacado, disponivel: p.inStock === true ? 'Sim' : 'Não', notas: notas || '', foto });
 
-      indexNormal.add(`${norm(nome)}|${norm(brand)}`); indexNormal.add(norm(nome));
-      if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); indexMiniImarat.add(chave); }
+      indexNormal.add(`${norm(nome)}|${norm(brand)}`);
+      if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); }
       addedImarat++;
     }
   }
@@ -336,10 +334,15 @@ async function main() {
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
-      for (const it of g.items) {
+      for (let i = 0; i < g.items.length; i++) {
+        const it = g.items[i];
         const n = norm(it.nome);
         const hit = brandList.find((p) => norm(p.nome) === n) || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
         if (!hit) continue;
+        
+        it.nome = hit.nome; // Atualiza nome da Brand
+        if (hit.descricao) it.notas = String(hit.descricao).trim().slice(0, 500);
+        
         const disp = brandDisponivel(hit);
         if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
       }
@@ -362,7 +365,7 @@ async function main() {
 
       const group = ensureBrandGroup(DATA, line, session, 'Brand');
       group.items.push({ nome, volume, varejo: prices.varejo, atacado: prices.atacado, disponivel: brandDisponivel(p), notas: notas.slice(0, 500), foto });
-      indexNormal.add(`${norm(nome)}|${norm(session)}`); indexNormal.add(norm(nome));
+      indexNormal.add(`${norm(nome)}|${norm(session)}`);
       addedBrand++;
     }
   }
@@ -380,7 +383,7 @@ async function main() {
   console.log(`Novos Brand: ${addedBrand}`);
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log(`Preços alterados: ${priceChanged}`);
-  console.log('data.js atualizado localmente.');
+  console.log('data.js atualizado localmente (e nomes corrigidos).');
 
   console.log('Enviando dados para o GitHub Gist...');
   try {
