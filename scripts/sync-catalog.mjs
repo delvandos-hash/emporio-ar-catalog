@@ -1,7 +1,7 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
- * Correção: Sobrescreve dados antigos com os novos (limpa acentos quebrados).
+ * Correção: Regras de preço da Afeer corrigidas (+20 varejo / +30 atacado).
  */
 
 import fs from 'fs';
@@ -85,7 +85,10 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
   if (isKitMusaman(nome)) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 65) };
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
   if (b.includes('orientica')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
-  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
+  
+  // REGRA CORRIGIDA DA AFEER: +20 Varejo / +30 Atacado
+  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 20), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
+  
   if (b.includes('clive')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('only')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('armaf')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
@@ -241,7 +244,6 @@ async function main() {
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
-  // Esta etapa atualiza os produtos existentes (sobrescrevendo dados antigos)
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (g.cat === 'Brand' || String(g.cat || '').startsWith('Brand')) continue;
@@ -249,13 +251,10 @@ async function main() {
         const it = g.items[i];
         const n = norm(it.nome); const b = norm(g.brand);
         
-        // AQUI ESTÁ A MÁGICA: Busca o produto na Imarat comparando o nome 
-        // (mesmo que o nome no data.js esteja com acento quebrado, a função norm remove os acentos para comparar)
+        // Sobrescreve o nome com o original da Imarat para limpar acentos
         const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
-        
         if (!hit) continue;
         
-        // Se encontrou, ATUALIZA O NOME E AS NOTAS com o texto novo (correto) da Imarat
         it.nome = hit.name; 
         let notas = '';
         if (hit.slug) { const detail = await fetchImaratDetail(hit.slug); if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400); }
@@ -267,6 +266,8 @@ async function main() {
         const precoVarejoOrig = (hit.priceCents || 0) / 100;
         const precoAtacadoOrig = hit.atacado && hit.atacado.precoCents != null ? hit.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
         const categoria = hit.categoria_nome || hit.categoria || '';
+        
+        // AQUI A REGRA DA AFEER É APLICADA
         const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
         
         if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) { it.varejo = prices.varejo; it.atacado = prices.atacado; priceChanged++; }
@@ -274,52 +275,45 @@ async function main() {
     }
   }
 
-  // O resto do script (adicionar novos) pode continuar como estava, pois os índices agora estarão limpos.
+  // Remove possíveis duplicatas que ficaram no mesmo grupo
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line]) {
+        const vistos = new Set();
+        g.items = g.items.filter(item => {
+            const chave = item.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+            if (vistos.has(chave)) return false;
+            vistos.add(chave);
+            return true;
+        });
+    }
+  }
+
   const indexNormal = new Set();
   const indexMiniImarat = new Set();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       for (const it of g.items) {
         indexNormal.add(`${norm(it.nome)}|${norm(g.brand)}`);
-        if (isMiniatura(it.nome, it.volume, g.cat)) {
-          indexMiniImarat.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
-        }
+        if (isMiniatura(it.nome, it.volume, g.cat)) indexMiniImarat.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
       }
     }
   }
 
   if (ADD_IMARAT_NEW) {
     for (const p of imaratList) {
-      const nome = p.name;
-      const brand = (p.brand || 'Outros').toUpperCase();
-      const volume = volumeFrom(p.sizeMl, nome);
-      const categoria = p.categoria_nome || p.categoria || '';
-      const ehMini = isMiniatura(nome, volume, categoria);
-
+      const nome = p.name; const brand = (p.brand || 'Outros').toUpperCase(); const volume = volumeFrom(p.sizeMl, nome); const categoria = p.categoria_nome || p.categoria || ''; const ehMini = isMiniatura(nome, volume, categoria);
       let duplicado;
-      if (ehMini) {
-        const chave = chaveComparacaoMini(nome);
-        duplicado = indexMiniImarat.has(`${chave}|${norm(brand)}`) || indexMiniImarat.has(chave);
-      } else {
-        duplicado = indexNormal.has(`${norm(nome)}|${norm(brand)}`) || indexNormal.has(norm(nome));
-      }
+      if (ehMini) { const chave = chaveComparacaoMini(nome); duplicado = indexMiniImarat.has(`${chave}|${norm(brand)}`) || indexMiniImarat.has(chave); }
+      else { duplicado = indexNormal.has(`${norm(nome)}|${norm(brand)}`) || indexNormal.has(norm(nome)); }
       if (duplicado) continue;
 
       let notas = '';
       if (p.slug) { const detail = await fetchImaratDetail(p.slug); if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400); }
-
-      const precoVarejoOrig = (p.priceCents || 0) / 100;
-      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
-      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-      const line = genderLine(p.gender);
-      const foto = p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : '';
-      const cat = ehMini ? 'Miniaturas' : 'Perfumes';
-
+      const precoVarejoOrig = (p.priceCents || 0) / 100; const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+      const line = genderLine(p.gender); const foto = p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : ''; const cat = ehMini ? 'Miniaturas' : 'Perfumes';
       const group = ensureBrandGroup(DATA, line, brand, cat);
       group.items.push({ nome, volume, varejo: prices.varejo, atacado: prices.atacado, disponivel: p.inStock === true ? 'Sim' : 'Não', notas: notas || '', foto });
-
-      indexNormal.add(`${norm(nome)}|${norm(brand)}`);
-      if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); }
+      indexNormal.add(`${norm(nome)}|${norm(brand)}`); if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); }
       addedImarat++;
     }
   }
@@ -330,43 +324,28 @@ async function main() {
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
 
   let addedBrand = 0;
-
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
       for (let i = 0; i < g.items.length; i++) {
-        const it = g.items[i];
-        const n = norm(it.nome);
-        const hit = brandList.find((p) => norm(p.nome) === n) || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
+        const it = g.items[i]; const n = norm(it.nome); const hit = brandList.find((p) => norm(p.nome) === n) || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
         if (!hit) continue;
-        
-        it.nome = hit.nome; // Atualiza nome da Brand
-        if (hit.descricao) it.notas = String(hit.descricao).trim().slice(0, 500);
-        
-        const disp = brandDisponivel(hit);
-        if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
+        it.nome = hit.nome; if (hit.descricao) it.notas = String(hit.descricao).trim().slice(0, 500);
+        const disp = brandDisponivel(hit); if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
       }
     }
   }
 
   if (ADD_BRAND_NEW) {
     for (const p of brandAllowed) {
-      const nome = p.nome || ''; if (!nome) continue;
-      const session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session) continue;
-      const volume = volumeFrom(null, nome);
-      const duplicado = indexNormal.has(`${norm(nome)}|${norm(session)}`) || indexNormal.has(norm(nome));
-      if (duplicado) continue;
-
-      const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco);
-      const prices = priceBrand(orig, isArabicMiniBrand(p, session));
-      const line = genderLine(nome + ' ' + session);
-      let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`; }
+      const nome = p.nome || ''; if (!nome) continue; const session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session) continue;
+      const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${norm(nome)}|${norm(session)}`) || indexNormal.has(norm(nome)); if (duplicado) continue;
+      const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session));
+      const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
-
       const group = ensureBrandGroup(DATA, line, session, 'Brand');
       group.items.push({ nome, volume, varejo: prices.varejo, atacado: prices.atacado, disponivel: brandDisponivel(p), notas: notas.slice(0, 500), foto });
-      indexNormal.add(`${norm(nome)}|${norm(session)}`);
-      addedBrand++;
+      indexNormal.add(`${norm(nome)}|${norm(session)}`); addedBrand++;
     }
   }
 
