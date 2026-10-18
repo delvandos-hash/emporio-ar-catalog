@@ -1,4 +1,4 @@
-name: Corrigir Acentos
+name: Corrigir gist
 
 on:
   workflow_dispatch: # Isso cria um botão "Run workflow" no GitHub para você rodar manualmente
