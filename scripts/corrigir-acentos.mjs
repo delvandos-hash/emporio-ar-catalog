@@ -1,14 +1,18 @@
-name: Corrigir Acentos
+// scripts/corrigir-acentos.mjs
 
-on:
-  workflow corrigir:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Rodar correção forçada no Gist
-        run: node scripts/corrigir-gist.mjs
-        env:
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+async function corrigirAcentos() {
+    console.log("Iniciando a correção de acentos...");
+    
+    // ==========================================
+    // COLOQUE AQUI A SUA LÓGICA DE CORREÇÃO
+    // Exemplo: ler um arquivo JSON, trocar caracteres, etc.
+    // ==========================================
+    
+    console.log("Correção de acentos finalizada.");
+}
+
+// Executa a função
+corrigirAcentos().catch((erro) => {
+    console.error("Erro ao corrigir acentos:", erro);
+    process.exit(1); // Força o GitHub Actions a falhar se der erro
+});
