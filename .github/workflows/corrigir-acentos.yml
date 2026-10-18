@@ -1,15 +1,19 @@
 name: Corrigir Acentos
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Permite rodar manualmente pelo botão no GitHub
 
 jobs:
   corrigir:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Rodar correção
-        run: node scripts/corrigir-acentos.mjs
+          
+      - name: Rodar correção forçada no Gist
+        run: node scripts/corrigir-gist.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
