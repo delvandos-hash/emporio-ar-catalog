@@ -1,7 +1,7 @@
 name: Corrigir Acentos
 
 on:
-  workflow_dispatch: # Permite rodar manualmente pelo botão no GitHub
+  workflow_dispatch: # Isso cria um botão "Run workflow" no GitHub para você rodar manualmente
 
 jobs:
   corrigir:
