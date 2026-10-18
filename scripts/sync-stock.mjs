@@ -84,4 +84,60 @@ function resolve(item, brand, map, byName) {
   }
   if (byName[n]) return byName[n];
   for (const [kn, v] of Object.entries(byName)) {
-    if (kn.length > 6 && (n.includes(kn
+    if (kn.length > 6 && (n.includes(kn) || kn.includes(n))) return v;
+  }
+  return null;
+}
+
+async function main() {
+  console.log('Buscando Imarat...');
+  const imarat = await fetchImarat();
+  console.log(`Imarat: ${imarat.fetched}/${imarat.total}`);
+
+  console.log('Buscando Brand Collection...');
+  const brand = await fetchBrand();
+  console.log(`Brand: ${brand.fetched}`);
+
+  let raw = fs.readFileSync(dataPath, 'utf8');
+  const m = raw.match(/export const DATA = (\{[\s\S]*?\});\s*\nexport const WHATSAPP/);
+  if (!m) throw new Error('DATA não encontrado');
+  const DATA = JSON.parse(m[1]);
+
+  let changed = 0, matched = 0;
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line]) {
+      const isBrand = g.cat === 'Brand' || String(g.cat || '').startsWith('Brand');
+      const map = isBrand ? brand.map : imarat.map;
+      const byName = isBrand ? brand.byName : imarat.byName;
+      for (const item of g.items) {
+        const next = resolve(item, g.brand, map, byName);
+        if (!next) continue;
+        matched++;
+        if ((item.disponivel || 'Sim') !== next) { item.disponivel = next; changed++; }
+      }
+    }
+  }
+
+  const out = '/** Empório A.R — estoque sincronizado ' + new Date().toISOString() + ' (Imarat+Brand) */\n' + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
+
+  fs.writeFileSync(dataPath, out, 'utf8');
+  console.log(`Correspondências: ${matched} | Alterados: ${changed}`);
+  console.log('data.js atualizado localmente.');
+
+  console.log('Enviando dados para o GitHub Gist...');
+  try {
+    const gistId = "bac3a717b309d02379455e971c9a9103";
+    const githubToken = process.env.GIST_TOKEN;
+    if (!githubToken) throw new Error('GIST_TOKEN não configurado');
+    const dadosParaSite = { DATA: DATA, WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
+    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'catalogo.json': { content: '\uFEFF' + JSON.stringify(dadosParaSite, null, 2) } } })
+    });
+    if (!response.ok) { const errorText = await response.text(); throw new Error(`GitHub API ${response.status}: ${errorText}`); }
+    console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
+  } catch (error) { console.error('❌ Erro ao enviar para o GitHub Gist:', error); }
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });
