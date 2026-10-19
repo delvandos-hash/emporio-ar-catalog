@@ -561,4 +561,47 @@ async function main() {
   }
 
   for (const line of Object.keys(DATA)) {
-    for (const g
+    for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
+  }
+
+  const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
+  fs.writeFileSync(dataPath, out, 'utf8');
+
+  // --- BUSCA AS ROUPAS (NOVO) ---
+  const roupasSophia = await fetchSophiaModa();
+
+  console.log('---');
+  console.log(`Novos Imarat: ${addedImarat}`);
+  console.log(`Novos Brand: ${addedBrand}`);
+  console.log(`Roupas Sophia: ${roupasSophia.length}`);
+  console.log(`Estoque alterado: ${stockChanged}`);
+  console.log(`Preços alterados: ${priceChanged}`);
+  console.log('data.js atualizado localmente.');
+
+  console.log('Enviando dados para o GitHub Gist...');
+  try {
+    const gistId = "bac3a717b309d02379455e971c9a9103";
+    const githubToken = process.env.GIST_TOKEN;
+    if (!githubToken) throw new Error('GIST_TOKEN não configurado');
+    
+    // --- ESTRUTURA ATUALIZADA COM A CHAVE ROUPAS ---
+    const dadosParaSite = { 
+      DATA: DATA, 
+      ROUPAS: roupasSophia,
+      WHATSAPP: "5562991134488", 
+      BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, 
+      ultimaAtualizacao: new Date().toISOString() 
+    };
+    
+    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'catalogo.json': { content: '\uFEFF' + JSON.stringify(dadosParaSite, null, 2) } } })
+    });
+    if (!response.ok) { const errorText = await response.text(); throw new Error(`GitHub API ${response.status}: ${errorText}`); }
+    console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
+  } catch (error) { console.error('❌ Erro ao enviar para o GitHub Gist:', error); }
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });
