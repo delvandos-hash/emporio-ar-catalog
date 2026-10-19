@@ -1,7 +1,7 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
- * Versão: Kit 9=Vulcan, anti-dup Armaf (removerMarcaDoNome), óleos→Óleos, sanitiza Tabaco/UTF-8.
+ * Versão: Kit 9=Vulcan, anti-dup Armaf, óleos→Óleos, Tabaco, precoManual protegido, BODY SPLASH.
  */
 
 import fs from 'fs';
@@ -16,7 +16,7 @@ const BRAND_BASE = 'https://brandcollectionpy.com.br';
 const BRAND_SELLER = 'darlanaugusto';
 
 const BRAND_ALLOWED_SESSIONS = [
-  'ARABIC COLLECTION', 'BEAUTY BRAND', 'BODY SPLAHS', 'BODY SPLASH',
+  'ARABIC COLLECTION', 'BEAUTY BRAND', 'BODY SPLASH', 'BODY SPLAHS',
   'COLEÇÂO DREAM', 'COLECAO DREAM', 'COLEÇÃO BRAND', 'COLECAO BRAND',
   'DREAM BRAND 80/100ML', 'DREAM BRAND', 'FLACONETE BRAND',
   'FLACONETE  BRAND', 'SAPATINHO GOOD GIRL',
@@ -217,7 +217,7 @@ function mapBrandSession(raw) {
   if (n.includes('beauty brand')) return 'BEAUTY BRAND';
   if (n.includes('body splah') || n.includes('body splash')) {
     if (n.includes('dream') || n.includes('maison') || n.includes('brand body')) return null;
-    return 'BODY SPLAHS';
+    return 'BODY SPLASH';
   }
   return null;
 }
@@ -350,13 +350,28 @@ async function main() {
 
         const disp = hit.inStock === true ? 'Sim' : 'Não';
         if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
+
+        // Notas: limpa UTF-8 + remove palavra Tabaco (Merchant Center)
+        if (it.notas) {
+          const notasLimpas = sanitizarNotas(it.notas);
+          if (notasLimpas !== it.notas) it.notas = notasLimpas;
+        }
         
         const precoVarejoOrig = (hit.priceCents || 0) / 100;
         const precoAtacadoOrig = hit.atacado && hit.atacado.precoCents != null ? hit.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
         const categoria = hit.categoria_nome || hit.categoria || '';
-        
-        const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-        if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) { it.varejo = prices.varejo; it.atacado = prices.atacado; priceChanged++; }
+
+        // precoManual: true no item → robô NÃO altera varejo/atacado
+        if (it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1) {
+          // mantém preços definidos manualmente
+        } else {
+          const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+          if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
+            it.varejo = prices.varejo;
+            it.atacado = prices.atacado;
+            priceChanged++;
+          }
+        }
       }
     }
   }
