@@ -1,7 +1,7 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
- * Correção: Limpeza forçada na API e na gravação.
+ * Versão Final: Regras fixas, Meryam, Kit Miniatura 9 e anti-duplicação respeitando "Caixa".
  */
 
 import fs from 'fs';
@@ -60,7 +60,13 @@ function norm(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
 
-function removerVolume(s) { return norm(s).replace(/\s*\d+\s*(ml|g)\b/gi, '').replace(/\s+/g, ' ').trim(); }
+// Remove apenas volumes, MANTENDO a palavra "caixa" e outras nomenclaturas.
+function limparParaComparacao(s) { 
+    return norm(s)
+      .replace(/\s*\d+\s*(ml|g)\b/gi, '')
+      .replace(/\s+/g, ' ').trim(); 
+}
+
 function removerPrefixosMini(s) {
   let resultado = norm(s);
   for (const prefixo of PREFIXOS_MINI_IMARAT) {
@@ -70,7 +76,11 @@ function removerPrefixosMini(s) {
   }
   return resultado;
 }
-function chaveComparacaoMini(nome) { return removerPrefixosMini(removerVolume(nome)); }
+
+function chaveComparacaoMini(nome) { 
+    return removerPrefixosMini(limparParaComparacao(nome)); 
+}
+
 function fmtBRL(n) { if (n == null || isNaN(n)) return '—'; return n.toFixed(2).replace('.', ','); }
 function parseOrig(s) { if (s == null) return 0; const n = parseFloat(String(s).replace(/[R$\s]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n; }
 
@@ -85,29 +95,44 @@ function isMiniatura(nome, volume, categoria) {
 function isOleoCliveDorris(nome, brand) { return norm(brand).includes('clive') && norm(nome).includes('oleo'); }
 function isKitLattafa(nome, brand) { return norm(brand).includes('lattafa') && norm(nome).includes('kit'); }
 function isKitMusaman(nome) { return norm(nome).includes('kit musaman'); }
-function isKitVulcan(nome) { const n = norm(nome); return n.includes('kit vulcan') || (n.includes('vulcan') && n.includes('kit')); }
+function isKitVulcanOuMiniatura9(nome) { 
+  const n = norm(nome); 
+  return n.includes('kit vulcan') || (n.includes('vulcan') && n.includes('kit')) || n.includes('kit miniatura 9'); 
+}
+function isKit2em1(nome) { return norm(nome).includes('kit 2 em 1'); }
+function isMiniaturaBolsa(nome) { return norm(nome).includes('bolsa'); }
 
 function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig) {
   if (!isMiniatura(nome, volume, categoria)) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
+  
   const n = norm(nome); const b = norm(brand);
+  
+  // --- REGRAS DE PREÇO FIXO ---
+  if (isKit2em1(nome)) return { varejo: fmtBRL(85), atacado: fmtBRL(55) };
+  if (isMiniaturaBolsa(nome)) return { varejo: fmtBRL(65), atacado: fmtBRL(45) };
   if (isOleoCliveDorris(nome, brand)) return { varejo: fmtBRL(55), atacado: fmtBRL(44) };
-  if (isKitVulcan(nome)) return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
+  
+  // --- REGRAS DE ACRÉSCIMO ---
+  if (isKitVulcanOuMiniatura9(nome)) return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
   if (isKitMusaman(nome)) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 65) };
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
+  
   if (b.includes('orientica')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
   if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 20), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
   if (b.includes('clive')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('only')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('armaf')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
-  if (b.includes('outra')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('lattafa')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('mais you')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('maison')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
-  if (b.includes('meryam')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+  if (b.includes('meryam') || n.includes('meryam')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('french')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('al wataniah')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 45) };
   if (b.includes('arabic')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('club woman') || n.includes('club woman')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
+  
+  if (b.includes('outros') || b.includes('outra')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
+
   return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
 }
 
@@ -191,7 +216,6 @@ async function fetchImaratList() {
     total = data.total || total;
     const products = data.products || [];
     if (!products.length) break;
-    // LIMPA OS ACENTOS AQUI, NA ORIGEM
     for (const p of products) {
         p.name = limparTexto(p.name);
         if (p.brand) p.brand = limparTexto(p.brand);
@@ -214,7 +238,6 @@ async function fetchImaratDetail(slug) {
     if (!res.ok) return null;
     const text = await res.text();
     const detail = JSON.parse(text);
-    // LIMPA OS ACENTOS DO DETALHE TAMBÉM
     if (detail) {
         detail.name = limparTexto(detail.name);
         if (detail.notes) detail.notes = { top: (detail.notes.top||[]).map(limparTexto), heart: (detail.notes.heart||[]).map(limparTexto), base: (detail.notes.base||[]).map(limparTexto) };
@@ -275,7 +298,6 @@ async function main() {
       if (g.cat === 'Brand' || String(g.cat || '').startsWith('Brand')) continue;
       for (let i = 0; i < g.items.length; i++) {
         const it = g.items[i];
-        // Limpa o que já está no data.js
         it.nome = limparTexto(it.nome);
         if (it.notas) it.notas = limparTexto(it.notas);
 
@@ -284,7 +306,6 @@ async function main() {
         const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
         if (!hit) continue;
         
-        // Sobrescreve com o nome limpo da API
         it.nome = hit.name; 
         
         let notas = '';
@@ -307,11 +328,12 @@ async function main() {
     }
   }
 
+  // Filtro de segurança (remove duplicatas exatas dentro do mesmo grupo)
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
         const vistos = new Set();
         g.items = g.items.filter(item => {
-            const chave = norm(item.nome); 
+            const chave = limparParaComparacao(item.nome); 
             if (vistos.has(chave)) return false;
             vistos.add(chave);
             return true;
@@ -324,7 +346,7 @@ async function main() {
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       for (const it of g.items) {
-        indexNormal.add(`${norm(it.nome)}|${norm(g.brand)}`);
+        indexNormal.add(`${limparParaComparacao(it.nome)}|${norm(g.brand)}`);
         if (isMiniatura(it.nome, it.volume, g.cat)) indexMiniImarat.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
       }
     }
@@ -335,7 +357,7 @@ async function main() {
       const nome = p.name; const brand = (p.brand || 'Outros').toUpperCase(); const volume = volumeFrom(p.sizeMl, nome); const categoria = p.categoria_nome || p.categoria || ''; const ehMini = isMiniatura(nome, volume, categoria);
       let duplicado;
       if (ehMini) { const chave = chaveComparacaoMini(nome); duplicado = indexMiniImarat.has(`${chave}|${norm(brand)}`) || indexMiniImarat.has(chave); }
-      else { duplicado = indexNormal.has(`${norm(nome)}|${norm(brand)}`) || indexNormal.has(norm(nome)); }
+      else { duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(brand)}`) || indexNormal.has(limparParaComparacao(nome)); }
       if (duplicado) continue;
 
       let notas = '';
@@ -360,7 +382,7 @@ async function main() {
           foto 
       });
       
-      indexNormal.add(`${norm(nome)}|${norm(brand)}`); if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); }
+      indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`); if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); }
       addedImarat++;
     }
   }
@@ -387,7 +409,7 @@ async function main() {
   if (ADD_BRAND_NEW) {
     for (const p of brandAllowed) {
       const nome = p.nome || ''; if (!nome) continue; const session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session) continue;
-      const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${norm(nome)}|${norm(session)}`) || indexNormal.has(norm(nome)); if (duplicado) continue;
+      const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(session)}`) || indexNormal.has(limparParaComparacao(nome)); if (duplicado) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session));
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
@@ -401,7 +423,7 @@ async function main() {
           notas: notas.slice(0, 500), 
           foto 
       });
-      indexNormal.add(`${norm(nome)}|${norm(session)}`); addedBrand++;
+      indexNormal.add(`${limparParaComparacao(nome)}|${norm(session)}`); addedBrand++;
     }
   }
 
