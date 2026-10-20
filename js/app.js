@@ -404,7 +404,12 @@ function cartKey(p) {
 function buildWaMessage(p) {
   let msg = 'Olá! Gostaria de comprar o seguinte produto do Empório A.R:\n\n';
   msg += `*${p.nome}*\nMarca: ${p.brand}\n`;
-  if (p.volume && p.volume !== '—') msg += `Volume: ${p.volume}\n`;
+  if (p.volume && p.volume !== '—' && !isRoupasProduct(p)) msg += `Volume: ${p.volume}\n`;
+  const variacao = p.variacaoSelecionada || getSelectedVariacao();
+  if (variacao && variacao.nome) {
+    msg += `*Variação / Tamanho: ${variacao.nome}*\n`;
+  }
+  if (p.cat && isRoupasProduct(p)) msg += `Categoria: ${p.cat}\n`;
   msg += `Varejo: R$ ${p.varejo}\n`;
   if (p.atacado && p.atacado !== '—') msg += `Atacado (6+): R$ ${p.atacado}\n`;
   msg += '\nPode me informar a disponibilidade e formas de pagamento?';
@@ -432,7 +437,8 @@ function buildCartWaMessage() {
     const sub = unit * p.qty;
     total += sub;
     msg += `${i + 1}. *${p.nome}* (${p.brand})`;
-    if (p.volume && p.volume !== '—') msg += ` — ${p.volume}`;
+    if (p.variacaoNome) msg += ` — *${p.variacaoNome}*`;
+    else if (p.volume && p.volume !== '—') msg += ` — ${p.volume}`;
     msg += `\n   Qtd: ${p.qty} × R$ ${formatBRL(unit)} = R$ ${formatBRL(sub)}\n`;
   });
   msg += `\n*Total de itens: ${totalItens}*`;
@@ -446,6 +452,19 @@ function openWhatsApp(p) {
     alert('Este produto está esgotado no momento.');
     return;
   }
+  if (isRoupasProduct(p)) {
+    const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
+    const hasAvailable = vars.some(v => (Number(v.estoque) || 0) > 0);
+    if (vars.length && hasAvailable) {
+      const sel = p.variacaoSelecionada || getSelectedVariacao();
+      if (!sel || !sel.nome) {
+        alert('Selecione o tamanho / variação antes de comprar.');
+        document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      p.variacaoSelecionada = sel;
+    }
+  }
   window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p)}`, '_blank');
 }
 
@@ -454,10 +473,34 @@ function addToCart(p, qty = 1) {
     alert('Este produto está esgotado no momento.');
     return;
   }
-  const key = cartKey(p);
-  const existing = cart.find(c => cartKey(c) === key);
+  let variacao = null;
+  if (isRoupasProduct(p)) {
+    const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
+    const hasAvailable = vars.some(v => (Number(v.estoque) || 0) > 0);
+    if (vars.length && hasAvailable) {
+      variacao = p.variacaoSelecionada || getSelectedVariacao();
+      if (!variacao || !variacao.nome) {
+        alert('Selecione o tamanho / variação antes de adicionar ao carrinho.');
+        document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      p.variacaoSelecionada = variacao;
+    }
+  }
+  const key = cartKey(p) + (variacao ? '|' + variacao.nome : '');
+  const existing = cart.find(c => (cartKey(c) + (c.variacaoNome ? '|' + c.variacaoNome : '')) === key);
   if (existing) existing.qty += qty;
-  else cart.push({ nome: p.nome, brand: p.brand, volume: p.volume, varejo: p.varejo, atacado: p.atacado, disponivel: p.disponivel || 'Sim', qty });
+  else cart.push({
+    nome: p.nome,
+    brand: p.brand,
+    volume: p.volume,
+    varejo: p.varejo,
+    atacado: p.atacado,
+    disponivel: p.disponivel || 'Sim',
+    qty,
+    variacaoNome: variacao ? variacao.nome : '',
+    cat: p.cat || ''
+  });
   updateCartUI();
 }
 
@@ -789,18 +832,62 @@ function bindPhotoGallery(photoEl, fotos) {
   }, { passive: true });
 }
 
-function buildVariacoesHtml(p) {
+function buildVariacoesHtml(p, selectedId) {
   const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
   if (!vars.length) return '';
-  const rows = vars.map(v => {
+  const chips = vars.map(v => {
     const qty = Number(v.estoque) || 0;
     const ok = qty > 0;
-    return `<div class="var-row ${ok ? 'var-ok' : 'var-out'}">
-      <span class="var-name">${v.nome || '—'}</span>
-      <span class="var-stock">${ok ? qty + ' un.' : 'Esgotado'}</span>
-    </div>`;
+    const id = String(v.id || v.nome || '');
+    const sel = selectedId != null && String(selectedId) === id ? ' selected' : '';
+    const disabled = ok ? '' : ' disabled';
+    const label = (v.nome || '—').replace(/</g, '&lt;');
+    const stock = ok ? `${qty} un.` : 'Esgotado';
+    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${id}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}>
+      <span class="var-chip-name">${label}</span>
+      <span class="var-chip-stock">${stock}</span>
+    </button>`;
   }).join('');
-  return `<div class="variacoes-box"><strong>Variações e estoque</strong>${rows}</div>`;
+  return `<div class="variacoes-box" id="variacoesBox">
+    <strong>Escolha o tamanho / variação</strong>
+    <div class="var-chips">${chips}</div>
+    <p class="var-hint" id="varHint">Selecione uma opção disponível para comprar</p>
+  </div>`;
+}
+
+function getSelectedVariacao() {
+  const box = document.getElementById('variacoesBox');
+  if (!box) return null;
+  const sel = box.querySelector('.var-chip.selected');
+  if (!sel) return null;
+  return {
+    id: sel.getAttribute('data-var-id') || '',
+    nome: sel.getAttribute('data-var-nome') || '',
+    estoque: Number(sel.getAttribute('data-var-estoque') || 0)
+  };
+}
+
+function bindVariacaoSelector() {
+  const box = document.getElementById('variacoesBox');
+  if (!box) return;
+  box.querySelectorAll('.var-chip:not([disabled])').forEach(btn => {
+    btn.addEventListener('click', () => {
+      box.querySelectorAll('.var-chip').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      const hint = document.getElementById('varHint');
+      if (hint) {
+        hint.textContent = 'Selecionado: ' + (btn.getAttribute('data-var-nome') || '');
+        hint.classList.add('ok');
+      }
+      if (currentProduct) {
+        currentProduct.variacaoSelecionada = {
+          id: btn.getAttribute('data-var-id') || '',
+          nome: btn.getAttribute('data-var-nome') || '',
+          estoque: Number(btn.getAttribute('data-var-estoque') || 0)
+        };
+      }
+    });
+  });
 }
 
 function openDetails(p, opts = {}) {
@@ -858,6 +945,12 @@ function openDetails(p, opts = {}) {
   } else {
     notasEl.style.display = 'none';
     notasEl.innerHTML = '';
+  }
+
+  // seletor de variação (Roupas)
+  if (roupas) {
+    p.variacaoSelecionada = null;
+    bindVariacaoSelector();
   }
 
   // Estoque ao vivo para Roupas (melhor esforço)
@@ -921,10 +1014,12 @@ async function refreshRoupasStock(p) {
         if (currentProduct.notas) {
           html += `<strong>Descrição</strong><br>${String(currentProduct.notas).replace(/\n/g, '<br>')}`;
         }
-        html += buildVariacoesHtml(currentProduct);
+        const prevSel = currentProduct.variacaoSelecionada?.id || null;
+        html += buildVariacoesHtml(currentProduct, prevSel);
         if (html) {
           notasEl.style.display = 'block';
           notasEl.innerHTML = html;
+          bindVariacaoSelector();
         }
       }
 
