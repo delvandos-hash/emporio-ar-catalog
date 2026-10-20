@@ -315,14 +315,31 @@ async function fetchSophiaModa() {
   
   try {
     const res = await fetch(SOPHIA_URL, {
+      method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        'Referer': 'https://sophiamoda.com.br/c/atacado',
+        'X-Requested-With': 'XMLHttpRequest'
       }
     });
     
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    
+    const text = await res.text();
+    
+    if (!text || text.trim() === '') {
+      throw new Error("O site da Sophia retornou uma resposta vazia (bloqueio anti-robô).");
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      throw new Error("Resposta não é um JSON válido. O site pode ter mudado ou bloqueado.");
+    }
+
     const produtos = data.produtos || [];
     console.log(`Sophia: ${produtos.length} roupas encontradas.`);
 
