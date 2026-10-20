@@ -1,7 +1,7 @@
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
- * Versão Final: Regras fixas, Meryam, Kit Miniatura 9 e anti-duplicação respeitando "Caixa".
+ * Versão: Kit 9=Vulcan, anti-dup Armaf, óleos→Óleos, Tabaco, precoManual protegido, BODY SPLASH.
  */
 
 import fs from 'fs';
@@ -16,7 +16,7 @@ const BRAND_BASE = 'https://brandcollectionpy.com.br';
 const BRAND_SELLER = 'darlanaugusto';
 
 const BRAND_ALLOWED_SESSIONS = [
-  'ARABIC COLLECTION', 'BEAUTY BRAND', 'BODY SPLAHS', 'BODY SPLASH',
+  'ARABIC COLLECTION', 'BEAUTY BRAND', 'BODY SPLASH', 'BODY SPLAHS',
   'COLEÇÂO DREAM', 'COLECAO DREAM', 'COLEÇÃO BRAND', 'COLECAO BRAND',
   'DREAM BRAND 80/100ML', 'DREAM BRAND', 'FLACONETE BRAND',
   'FLACONETE  BRAND', 'SAPATINHO GOOD GIRL',
@@ -24,7 +24,13 @@ const BRAND_ALLOWED_SESSIONS = [
 
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
-const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura', 'mini'];
+const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura armaf', 'miniatura', 'mini'];
+
+// Marcas no NOME que geravam duplicata (Mini Marshmellow vs Mini Armaf Marshmellow)
+const MARCAS_NO_NOME_MINI = [
+  'armaf', 'lattafa', 'orientica', 'afeer', 'clive dorris',
+  'french avenue', 'maison alhambra', 'al wataniah', 'only you', 'mais you', 'meryam',
+];
 
 // --- TABELA DE LIMPEZA PESADA ---
 const substituicoes = {
@@ -69,16 +75,43 @@ function limparParaComparacao(s) {
 
 function removerPrefixosMini(s) {
   let resultado = norm(s);
-  for (const prefixo of PREFIXOS_MINI_IMARAT) {
+  const prefixos = [...PREFIXOS_MINI_IMARAT].sort((a, b) => b.length - a.length);
+  for (const prefixo of prefixos) {
     const p = norm(prefixo);
-    if (resultado.startsWith(p + ' ')) resultado = resultado.substring(p.length + 1).trim();
+    if (resultado.startsWith(p + ' ')) resultado = resultado.slice(p.length).trim();
     else if (resultado === p) resultado = '';
   }
   return resultado;
 }
 
-function chaveComparacaoMini(nome) { 
-    return removerPrefixosMini(limparParaComparacao(nome)); 
+function removerMarcaDoNome(s) {
+  let resultado = norm(s);
+  const marcas = [...MARCAS_NO_NOME_MINI].sort((a, b) => b.length - a.length);
+  for (const marca of marcas) {
+    const m = norm(marca);
+    if (resultado.startsWith(m + ' ')) resultado = resultado.slice(m.length).trim();
+    if (resultado.endsWith(' ' + m)) resultado = resultado.slice(0, -(m.length + 1)).trim();
+  }
+  return resultado;
+}
+
+// Mini Marshmellow === Mini Armaf Marshmellow → "marshmellow"
+function chaveComparacaoMini(nome) {
+  return removerMarcaDoNome(removerPrefixosMini(limparParaComparacao(nome)));
+}
+
+function isOleo(nome) {
+  const n = norm(nome);
+  return n.startsWith('oleo') || n.includes(' oleo ');
+}
+
+function sanitizarNotas(s) {
+  if (!s) return '';
+  let t = limparTexto(String(s));
+  t = t.replace(/\bnotas?\s+de\s+tabaco\b/gi, 'notas amadeiradas defumadas');
+  t = t.replace(/\btabaco\b/gi, 'nota amadeirada defumada');
+  t = t.replace(/\btobacco\b/gi, 'smoky woody note');
+  return t;
 }
 
 function fmtBRL(n) { if (n == null || isNaN(n)) return '—'; return n.toFixed(2).replace('.', ','); }
@@ -184,7 +217,7 @@ function mapBrandSession(raw) {
   if (n.includes('beauty brand')) return 'BEAUTY BRAND';
   if (n.includes('body splah') || n.includes('body splash')) {
     if (n.includes('dream') || n.includes('maison') || n.includes('brand body')) return null;
-    return 'BODY SPLAHS';
+    return 'BODY SPLASH';
   }
   return null;
 }
@@ -317,13 +350,28 @@ async function main() {
 
         const disp = hit.inStock === true ? 'Sim' : 'Não';
         if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
+
+        // Notas: limpa UTF-8 + remove palavra Tabaco (Merchant Center)
+        if (it.notas) {
+          const notasLimpas = sanitizarNotas(it.notas);
+          if (notasLimpas !== it.notas) it.notas = notasLimpas;
+        }
         
         const precoVarejoOrig = (hit.priceCents || 0) / 100;
         const precoAtacadoOrig = hit.atacado && hit.atacado.precoCents != null ? hit.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
         const categoria = hit.categoria_nome || hit.categoria || '';
-        
-        const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-        if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) { it.varejo = prices.varejo; it.atacado = prices.atacado; priceChanged++; }
+
+        // precoManual: true no item → robô NÃO altera varejo/atacado
+        if (it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1) {
+          // mantém preços definidos manualmente
+        } else {
+          const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+          if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
+            it.varejo = prices.varejo;
+            it.atacado = prices.atacado;
+            priceChanged++;
+          }
+        }
       }
     }
   }
@@ -354,14 +402,32 @@ async function main() {
 
   if (ADD_IMARAT_NEW) {
     for (const p of imaratList) {
-      const nome = p.name; const brand = (p.brand || 'Outros').toUpperCase(); const volume = volumeFrom(p.sizeMl, nome); const categoria = p.categoria_nome || p.categoria || ''; const ehMini = isMiniatura(nome, volume, categoria);
+      const nome = limparTexto(p.name);
+      const brand = limparTexto((p.brand || 'Outros')).toUpperCase();
+      const volume = volumeFrom(p.sizeMl, nome);
+      const categoria = p.categoria_nome || p.categoria || '';
+      const ehOleo = isOleo(nome);
+      const ehMini = isMiniatura(nome, volume, categoria) && !ehOleo;
       let duplicado;
-      if (ehMini) { const chave = chaveComparacaoMini(nome); duplicado = indexMiniImarat.has(`${chave}|${norm(brand)}`) || indexMiniImarat.has(chave); }
-      else { duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(brand)}`) || indexNormal.has(limparParaComparacao(nome)); }
+      if (ehMini) {
+        const chave = chaveComparacaoMini(nome);
+        duplicado =
+          indexMiniImarat.has(chave) ||
+          indexMiniImarat.has(`${chave}|${norm(brand)}`) ||
+          indexMiniImarat.has(`${chave}|armaf`) ||
+          indexMiniImarat.has(`${chave}|outros`) ||
+          indexMiniImarat.has(`${chave}|outra`);
+      } else {
+        duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(brand)}`) || indexNormal.has(limparParaComparacao(nome));
+      }
       if (duplicado) continue;
 
       let notas = '';
-      if (p.slug) { const detail = await fetchImaratDetail(p.slug); if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400); }
+      if (p.slug) {
+        const detail = await fetchImaratDetail(p.slug);
+        if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
+      }
+      notas = sanitizarNotas(notas);
       
       const precoVarejoOrig = (p.priceCents || 0) / 100; 
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
@@ -369,7 +435,7 @@ async function main() {
       
       const line = genderLine(p.gender); 
       const foto = p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : ''; 
-      const cat = ehMini ? 'Miniaturas' : 'Perfumes';
+      const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
       
       const group = ensureBrandGroup(DATA, line, brand, cat);
       group.items.push({ 
@@ -382,7 +448,12 @@ async function main() {
           foto 
       });
       
-      indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`); if (ehMini) { const chave = chaveComparacaoMini(nome); indexMiniImarat.add(`${chave}|${norm(brand)}`); }
+      indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
+      if (ehMini) {
+        const chave = chaveComparacaoMini(nome);
+        indexMiniImarat.add(chave);
+        indexMiniImarat.add(`${chave}|${norm(brand)}`);
+      }
       addedImarat++;
     }
   }
