@@ -654,16 +654,9 @@ function buildDetailsNavList() {
         varejo: item.varejo,
         atacado: item.atacado,
         foto: item.foto,
-        fotos: item.fotos || (item.foto ? [item.foto] : []),
         notas: item.notas,
-        disponivel: (lookupLiveStock(item, g.brand, g.cat) || item.disponivel || 'Sim'),
-        badge: item.badge || '',
-        line: g.line || '',
-        cat: g.cat || '',
-        fonte: item.fonte || '',
-        id_origem: item.id_origem || '',
-        variacoes: item.variacoes || [],
-        total_estoque: item.total_estoque
+        disponivel: (lookupLiveStock(item, typeof g !== 'undefined' ? g.brand : item.brand, typeof g !== 'undefined' ? g.cat : item.cat) || item.disponivel || 'Sim'),
+        badge: item.badge || ''
       });
     }
   }
@@ -696,48 +689,6 @@ function showDetailsAt(index, direction) {
 }
 
 
-function isRoupasProduct(p) {
-  return (p.line || '').toLowerCase() === 'roupas' || (p.fonte || '') === 'roupas' || (p.fonte || '') === 'sophiamoda';
-}
-
-function buildPhotoGallery(p) {
-  const fotos = Array.isArray(p.fotos) && p.fotos.length
-    ? p.fotos
-    : (p.foto ? [p.foto] : []);
-  if (!fotos.length) {
-    return { html: 'SEM FOTO', isEmpty: true };
-  }
-  const main = fotos[0];
-  const thumbs = fotos.map((src, i) =>
-    `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-src="${src}" aria-label="Foto ${i + 1}">
-      <img src="${src}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.style.display='none'">
-    </button>`
-  ).join('');
-  const html = `
-    <div class="gallery">
-      <div class="gallery-main">
-        <img id="galleryMainImg" src="${main}" alt="${(p.nome || '').replace(/"/g, '&quot;')}" loading="eager" referrerpolicy="no-referrer"
-          onerror="this.onerror=null;this.parentElement.parentElement.classList.add('no-img');this.parentElement.innerHTML='SEM FOTO'">
-      </div>
-      ${fotos.length > 1 ? `<div class="gallery-thumbs">${thumbs}</div>` : ''}
-    </div>`;
-  return { html, isEmpty: false };
-}
-
-function buildVariacoesHtml(p) {
-  const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
-  if (!vars.length) return '';
-  const rows = vars.map(v => {
-    const qty = Number(v.estoque) || 0;
-    const ok = qty > 0;
-    return `<div class="var-row ${ok ? 'var-ok' : 'var-out'}">
-      <span class="var-name">${v.nome || '—'}</span>
-      <span class="var-stock">${ok ? qty + ' un.' : 'Esgotado'}</span>
-    </div>`;
-  }).join('');
-  return `<div class="variacoes-box"><strong>Variações e estoque</strong>${rows}</div>`;
-}
-
 function openDetails(p, opts = {}) {
   const live = lookupLiveStock(p, p.brand, p.cat);
   if (live) p = { ...p, disponivel: live };
@@ -752,11 +703,9 @@ function openDetails(p, opts = {}) {
   overlay.classList.remove('closing');
   const avail = isAvailable(p);
   const isScoop = (p.badge === 'Scoop') || (p.nome || '').toLowerCase().includes('scoop');
-  const roupas = isRoupasProduct(p);
-
   document.getElementById('modalName').textContent = p.nome;
   document.getElementById('modalMeta').textContent =
-    `${p.brand || 'Empório A.R'}${p.volume && p.volume !== '—' && !isScoop && !roupas ? ' · ' + p.volume : ''}${roupas && p.cat ? ' · ' + p.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
+    `${p.brand}${p.volume && p.volume !== '—' && !isScoop ? ' · ' + p.volume : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
   document.getElementById('modalVarejo').textContent = p.varejo ? `R$ ${p.varejo}` : '—';
   document.getElementById('modalAtacado').textContent = p.atacado && p.atacado !== '—' ? `R$ ${p.atacado}` : '—';
 
@@ -767,47 +716,23 @@ function openDetails(p, opts = {}) {
   } else {
     photo.style.display = '';
     photo.classList.remove('no-img');
-    const gallery = buildPhotoGallery(p);
-    if (gallery.isEmpty) {
+    if (p.foto) {
+      photo.innerHTML = `<img src="${p.foto}" alt="${p.nome}" loading="eager" referrerpolicy="no-referrer" onerror="this.onerror=null;this.parentElement.classList.add('no-img');this.parentElement.innerHTML='SEM FOTO'">`;
+    } else {
       photo.classList.add('no-img');
       photo.innerHTML = 'SEM FOTO';
-    } else {
-      photo.innerHTML = gallery.html;
-      // thumbs click
-      photo.querySelectorAll('.gallery-thumb').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const src = btn.getAttribute('data-src');
-          const mainImg = photo.querySelector('#galleryMainImg');
-          if (mainImg && src) mainImg.src = src;
-          photo.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
-          btn.classList.add('active');
-        });
-      });
     }
   }
 
-  // Descrição / Notas + variações (Roupas)
   const notasEl = document.getElementById('modalNotas');
-  let notasHtml = '';
   if (p.notas) {
-    const titulo = (roupas || isScoop) ? 'Descrição' : 'Notas olfativas';
-    notasHtml += `<strong>${titulo}</strong><br>${String(p.notas).replace(/\n/g, '<br>')}`;
-  }
-  if (roupas) {
-    notasHtml += buildVariacoesHtml(p);
-  }
-  if (notasHtml) {
     notasEl.style.display = 'block';
-    notasEl.innerHTML = notasHtml;
-  } else {
-    notasEl.style.display = 'none';
-    notasEl.innerHTML = '';
-  }
-
-  // Estoque ao vivo para Roupas (melhor esforço)
-  if (roupas && p.id_origem) {
-    refreshRoupasStock(p).catch(() => {});
-  }
+    if (isScoop) {
+      notasEl.innerHTML = `<strong>Descrição</strong><br>${p.notas}`;
+    } else {
+      notasEl.innerHTML = `<strong>Notas olfativas</strong><br>${p.notas}`;
+    }
+  } else notasEl.style.display = 'none';
 
   const btnAdd = document.getElementById('modalAddCart');
   const btnBuy = document.getElementById('modalBuy');
@@ -829,6 +754,7 @@ function openDetails(p, opts = {}) {
   const ov = document.getElementById('modal');
   setProductUrl(p);
   if (opts.fromNav) {
+    // troca de produto: mantém modal aberto (sem piscada do overlay)
     ov.classList.remove('closing');
     ov.classList.add('open');
   } else {
@@ -840,44 +766,6 @@ function openDetails(p, opts = {}) {
         history.pushState({ emporioModal: true }, '');
       }
     } catch (e) {}
-  }
-}
-
-/** Atualiza estoque/variações de Roupas via proxy Netlify (se disponível) */
-async function refreshRoupasStock(p) {
-  if (!p || !p.id_origem) return;
-  try {
-    const url = `/api/roupas-stock?id=${encodeURIComponent(p.id_origem)}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data || !Array.isArray(data.variacoes)) return;
-
-    // Atualiza produto atual se ainda estiver aberto
-    if (currentProduct && currentProduct.id_origem === p.id_origem) {
-      currentProduct.variacoes = data.variacoes;
-      currentProduct.total_estoque = data.total_estoque;
-      currentProduct.disponivel = (data.total_estoque > 0) ? 'Sim' : 'Não';
-
-      const notasEl = document.getElementById('modalNotas');
-      if (notasEl) {
-        let html = '';
-        if (currentProduct.notas) {
-          html += `<strong>Descrição</strong><br>${String(currentProduct.notas).replace(/\n/g, '<br>')}`;
-        }
-        html += buildVariacoesHtml(currentProduct);
-        if (html) {
-          notasEl.style.display = 'block';
-          notasEl.innerHTML = html;
-        }
-      }
-
-      const avail = isAvailable(currentProduct);
-      document.getElementById('modalMeta').textContent =
-        `${currentProduct.brand || 'Empório A.R'}${currentProduct.cat ? ' · ' + currentProduct.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
-    }
-  } catch (e) {
-    // silencioso — mantém snapshot
   }
 }
 
@@ -964,22 +852,9 @@ function render() {
         const varejoShow = item.varejo ? `R$ ${item.varejo}` : '—';
         const atacadoShow = item.atacado && item.atacado !== '—' ? `R$ ${item.atacado}` : '—';
         const pdata = encodeURIComponent(JSON.stringify({
-          nome: item.nome,
-          brand: b.brand,
-          volume: item.volume,
-          varejo: item.varejo,
-          atacado: item.atacado,
-          foto: item.foto,
-          fotos: item.fotos || (item.foto ? [item.foto] : []),
-          notas: item.notas,
-          disponivel: (lookupLiveStock(item, b.brand, g.cat) || item.disponivel || 'Sim'),
-          badge: item.badge || '',
-          line: b.line || g.line || '',
-          cat: g.cat || item.cat || '',
-          fonte: item.fonte || '',
-          id_origem: item.id_origem || '',
-          variacoes: item.variacoes || [],
-          total_estoque: item.total_estoque
+          nome: item.nome, brand: b.brand, volume: item.volume,
+          varejo: item.varejo, atacado: item.atacado, foto: item.foto, notas: item.notas,
+          disponivel: (lookupLiveStock(item, typeof g !== 'undefined' ? g.brand : item.brand, typeof g !== 'undefined' ? g.cat : item.cat) || item.disponivel || 'Sim'), badge: item.badge || ''
         }));
         const photoHtml = isScoop
           ? ''
