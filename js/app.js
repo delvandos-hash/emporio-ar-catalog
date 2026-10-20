@@ -25,7 +25,59 @@ async function loadCatalogData() {
 }
 
 const dadosDoServidor = await loadCatalogData();
+
 const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
+
+/** ID estável do produto (deep link ?produto= e feed Google) */
+function normId(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+function productId(p) {
+  if (!p) return '';
+  return `${normId(p.brand)}-${normId(p.nome)}-${normId(p.volume)}`;
+}
+function findProductById(id) {
+  if (!id || !DATA) return null;
+  const want = String(id).toLowerCase();
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      for (const it of g.items || []) {
+        const p = { ...it, brand: g.brand, cat: g.cat, line };
+        if (productId(p) === want) return p;
+      }
+    }
+  }
+  return null;
+}
+function setProductUrl(p) {
+  try {
+    const url = new URL(window.location.href);
+    if (p) {
+      url.searchParams.set('produto', productId(p));
+    } else {
+      url.searchParams.delete('produto');
+    }
+    history.replaceState(history.state || {}, '', url.pathname + url.search + url.hash);
+  } catch (e) {}
+}
+function openProductFromUrl() {
+  try {
+    const id = new URLSearchParams(window.location.search).get('produto');
+    if (!id) return false;
+    const p = findProductById(id);
+    if (p) {
+      openDetails(p);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 
 const state = {
   gender: 'Todos',
@@ -690,6 +742,7 @@ function openDetails(p, opts = {}) {
     btnBuy.textContent = 'Esgotado — indisponível';
   }
   const ov = document.getElementById('modal');
+  setProductUrl(p);
   if (opts.fromNav) {
     // troca de produto: mantém modal aberto (sem piscada do overlay)
     ov.classList.remove('closing');
@@ -714,6 +767,7 @@ function closeModal() {
   const done = () => {
     overlay.classList.remove('open', 'closing');
     currentProduct = null;
+    setProductUrl(null);
   };
   setTimeout(done, 380);
 }
@@ -1122,4 +1176,7 @@ updateCartUI();
 render();
 syncStockFromRoot().then((ok) => {
   if (ok) render();
+  openProductFromUrl();
 });
+// Deep link mesmo sem esperar estoque (fallback)
+setTimeout(() => openProductFromUrl(), 400);
