@@ -195,7 +195,7 @@ function render() {
       });
 
       if (roupasFiltradas.length > 0) {
-          roupasHtml += `<div class="category cat-fem"><div class="category-title">Roupas</div><div class="brand-group"><div class="brand-name">Sophia Moda</div><div class="products">`;
+          roupasHtml += `<div class="category cat-fem"><div class="category-title">Roupas</div><div class="brand-group"><div class="brand-name">Empório A.R</div><div class="products">`;
           
           roupasFiltradas.forEach(roupa => {
               const cardClass = roupa.estoqueTotal > 0 ? 'card' : 'card esgotado';
