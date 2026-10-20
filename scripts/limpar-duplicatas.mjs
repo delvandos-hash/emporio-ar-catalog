@@ -84,7 +84,7 @@ async function main() {
   // Envia para o GitHub Gist
   console.log('Enviando dados para o GitHub Gist...');
   try {
-    const gistId = "bac3a717b309d02379455e971c9a9103";
+    const gistId = "11918b7196b3ee6a0d8a91739167b312";
     const githubToken = process.env.GIST_TOKEN;
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
 

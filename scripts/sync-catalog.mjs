@@ -311,6 +311,202 @@ async function fetchBrandList() {
   return all;
 }
 
+// ========== SOPHIA MODA (ROUPAS) ==========
+const SOPHIA_BASE = 'https://sophiamoda.com.br';
+const SOPHIA_LOJA = '62982459275';
+const SOPHIA_CATEGORIES = [
+  { id: '108042', nome: 'VESTIDOS' },
+  { id: '108328', nome: 'MACACÃO/MACAQUINHOS' },
+  { id: '108333', nome: 'CONJUNTOS' },
+  { id: '108339', nome: 'BLUSA/CAMISA/CROPPED' },
+  { id: '108338', nome: 'CALÇA/SHORT' },
+  { id: '379539', nome: 'URBANA JEANS' },
+];
+const ADD_ROUPAS = process.env.ADD_ROUPAS !== '0';
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function calcPrecosRoupas(precoBase) {
+  const base = Number(String(precoBase).replace(',', '.')) || 0;
+  let atacado, varejo;
+  if (base > 50) {
+    atacado = base + 50;
+    varejo = base + 70;
+  } else {
+    atacado = base + 40;
+    varejo = base + 60;
+  }
+  const fmt = (n) => n.toFixed(2).replace('.', ',');
+  return { atacado: fmt(atacado), varejo: fmt(varejo), base };
+}
+
+function limparDescricaoSophia(html) {
+  if (!html) return '';
+  return String(html)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+async function fetchSophiaWithRetry(url, options, retries = 3) {
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      if (!text || text.trim().length < 10) {
+        throw new Error('resposta vazia (bloqueio anti-robô)');
+      }
+      // HTML em vez de JSON = bloqueio
+      if (text.trimStart().startsWith('<!') || text.includes('<html')) {
+        throw new Error('HTML recebido em vez de JSON (bloqueio anti-robô)');
+      }
+      const data = JSON.parse(text);
+      return { res, data };
+    } catch (e) {
+      lastErr = e;
+      const wait = 1500 * (i + 1) + Math.floor(Math.random() * 800);
+      console.log(`  ⏳ Sophia retry ${i + 1}/${retries} em ${wait}ms: ${e.message}`);
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
+
+async function fetchSophiaRoupas() {
+  const UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+  // Warm-up: pega cookie de sessão
+  let cookie = '';
+  try {
+    const warm = await fetch(`${SOPHIA_BASE}/c/atacado/${SOPHIA_LOJA}`, {
+      headers: {
+        'User-Agent': UA,
+        Accept: 'text/html,application/xhtml+xml',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+      },
+    });
+    const setCookie = warm.headers.getSetCookie?.() || [];
+    // Node fetch may expose getSetCookie; fallback parse
+    if (setCookie.length) {
+      cookie = setCookie.map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
+    } else {
+      const sc = warm.headers.get('set-cookie') || '';
+      cookie = sc
+        .split(/,(?=[^;]+?=)/)
+        .map((c) => c.split(';')[0].trim())
+        .filter(Boolean)
+        .join('; ');
+    }
+    await warm.text().catch(() => {});
+  } catch (e) {
+    console.log('  ⚠ Warm-up Sophia falhou (seguindo sem cookie):', e.message);
+  }
+
+  const headers = {
+    'User-Agent': UA,
+    Accept: 'application/json, text/javascript, */*; q=0.01',
+    'Content-Type': 'application/json',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+    Origin: SOPHIA_BASE,
+    Referer: `${SOPHIA_BASE}/c/atacado/${SOPHIA_LOJA}`,
+    'X-Requested-With': 'XMLHttpRequest',
+    ...(cookie ? { Cookie: cookie } : {}),
+  };
+
+  const groups = [];
+
+  for (const cat of SOPHIA_CATEGORIES) {
+    console.log(`  Categoria Roupas: ${cat.nome}`);
+    const items = [];
+    for (let page = 1; page <= 8; page++) {
+      const url = `${SOPHIA_BASE}/c/atacado/carregar_produtos/${page}/${cat.id}/${SOPHIA_LOJA}?mobile=0`;
+      try {
+        const { data } = await fetchSophiaWithRetry(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ pagina_especifica: 'categoria' }),
+        });
+
+        const produtos = data.produtos || [];
+        if (!produtos.length || data.acao === 'sem_mais_produtos') break;
+
+        for (const p of produtos) {
+          const precoBase =
+            p.preco_por ?? p.preco ?? p.preco_de ?? p.valor ?? 0;
+          const { atacado, varejo } = calcPrecosRoupas(precoBase);
+
+          const imagens = Array.isArray(p.imagens)
+            ? p.imagens.map((img) => img.url || img).filter(Boolean)
+            : [];
+          const foto = imagens[0] || p.imagem || p.foto || '';
+
+          const estoqueMap = p.estoque || {};
+          const varDict = p.variacoes || {};
+          const variacoes = Object.entries(varDict).map(([vid, vinfo]) => ({
+            id: String(vid),
+            nome: limparTexto((vinfo && vinfo.nome) || '').trim() || String(vid),
+            cor: (vinfo && vinfo.cor) || null,
+            estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
+          }));
+          const totalEstoque =
+            Number(p.total_estoque) ||
+            variacoes.reduce((s, v) => s + v.estoque, 0);
+
+          const descricao = limparDescricaoSophia(
+            p.descricao || p.descricao_completa || p.informacoes || ''
+          );
+
+          items.push({
+            nome: limparTexto(p.nome || p.titulo || 'Produto'),
+            volume: '—',
+            varejo,
+            atacado,
+            disponivel: totalEstoque > 0 ? 'Sim' : 'Não',
+            notas: descricao,
+            foto,
+            fotos: imagens.length ? imagens : foto ? [foto] : [],
+            badge: '',
+            fonte: 'roupas',
+            id_origem: String(p.id || ''),
+            total_estoque: totalEstoque,
+            variacoes,
+          });
+        }
+
+        console.log(`    página ${page}: +${produtos.length}`);
+        await sleep(600 + Math.floor(Math.random() * 400));
+      } catch (e) {
+        console.log(`    ❌ página ${page}: ${e.message}`);
+        break;
+      }
+    }
+
+    if (items.length) {
+      groups.push({
+        cat: cat.nome,
+        cat_id: cat.id,
+        brand: 'Empório A.R',
+        items,
+      });
+    }
+    await sleep(800);
+  }
+
+  return groups;
+}
+
 async function main() {
   console.log('Carregando data.js...');
   let raw = fs.readFileSync(dataPath, 'utf8');
@@ -318,7 +514,7 @@ async function main() {
   if (!m) throw new Error('DATA não encontrado');
   const DATA = JSON.parse(m[1]);
 
-  console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW}`);
+  console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW} ADD_ROUPAS=${ADD_ROUPAS}`);
 
   console.log('Buscando Imarat...');
   const imaratList = await fetchImaratList();
@@ -498,24 +694,46 @@ async function main() {
     }
   }
 
+  // ----- Roupas (Sophia Moda) -----
+  let roupasCount = 0;
+  if (ADD_ROUPAS) {
+    console.log('Buscando Roupas na Sophia Moda...');
+    try {
+      const roupasGroups = await fetchSophiaRoupas();
+      roupasCount = roupasGroups.reduce((s, g) => s + g.items.length, 0);
+      if (roupasCount > 0) {
+        DATA.roupas = roupasGroups;
+        console.log(`Roupas Sophia: ${roupasCount} produtos em ${roupasGroups.length} categorias`);
+      } else {
+        console.log('Roupas Sophia: 0 (mantendo dados anteriores de DATA.roupas se existirem)');
+      }
+    } catch (e) {
+      console.log(`❌ Erro ao buscar Sophia Moda: ${e.message}`);
+      console.log('Roupas Sophia: 0 (mantendo snapshot anterior)');
+    }
+  } else {
+    console.log('ADD_ROUPAS=0 — pulando Sophia Moda');
+  }
+
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
   }
 
-  const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
+  const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount} Roupas | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
   fs.writeFileSync(dataPath, out, 'utf8');
 
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
   console.log(`Novos Brand: ${addedBrand}`);
+  console.log(`Roupas Sophia: ${roupasCount}`);
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log(`Preços alterados: ${priceChanged}`);
   console.log('data.js atualizado localmente (com correção forçada).');
 
   console.log('Enviando dados para o GitHub Gist...');
   try {
-    const gistId = "bac3a717b309d02379455e971c9a9103";
+    const gistId = "11918b7196b3ee6a0d8a91739167b312";
     const githubToken = process.env.GIST_TOKEN;
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
     const dadosParaSite = { DATA: DATA, WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
