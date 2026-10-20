@@ -309,7 +309,7 @@ async function fetchBrandList() {
 // ==========================================
 // NOVA FUNÇÃO: SOPHIA MODA (ROUPAS)
 // ==========================================
-async function fetchSophiaModa() {
+async function () {
   console.log("👗 Buscando Roupas na Sophia Moda...");
   const produtosFormatados = [];
   
