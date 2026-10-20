@@ -700,10 +700,20 @@ function isRoupasProduct(p) {
   return (p.line || '').toLowerCase() === 'roupas' || (p.fonte || '') === 'roupas' || (p.fonte || '') === 'sophiamoda';
 }
 
+function absSophiaImg(u) {
+  if (!u) return '';
+  const s = String(u).trim();
+  if (!s) return '';
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  // caminhos relativos vindos da Sophia/FacilZap
+  return 'https://arquivos-cdn.facilzap.app.br/' + s.replace(/^\//, '');
+}
+
 function buildPhotoGallery(p) {
-  const fotos = Array.isArray(p.fotos) && p.fotos.length
+  const raw = Array.isArray(p.fotos) && p.fotos.length
     ? p.fotos
     : (p.foto ? [p.foto] : []);
+  const fotos = raw.map(absSophiaImg).filter(Boolean);
   if (!fotos.length) {
     return { html: 'SEM FOTO', isEmpty: true };
   }
@@ -981,10 +991,11 @@ function render() {
           variacoes: item.variacoes || [],
           total_estoque: item.total_estoque
         }));
+        const fotoCard = absSophiaImg(item.foto);
         const photoHtml = isScoop
           ? ''
-          : (item.foto
-            ? `<div class="photo photo-click loaded" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes"><img src="${item.foto}" alt="${item.nome}" width="80" height="80" decoding="async" referrerpolicy="no-referrer" loading="lazy" onload="this.classList.add('is-loaded');this.parentElement.classList.add('loaded')" onerror="this.onerror=null;this.style.opacity='0.3';this.parentElement.classList.add('placeholder')"></div>`
+          : (fotoCard
+            ? `<div class="photo photo-click loaded" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes"><img src="${fotoCard}" alt="${item.nome}" width="80" height="80" decoding="async" referrerpolicy="no-referrer" loading="lazy" onload="this.classList.add('is-loaded');this.parentElement.classList.add('loaded')" onerror="this.onerror=null;this.style.opacity='0.3';this.parentElement.classList.add('placeholder')"></div>`
             : `<div class="photo placeholder photo-click" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes">SEM<br>FOTO</div>`);
         const badgeEsg = avail ? '' : '<span class="badge-esgotado">ESGOTADO</span>';
         const cardClass = avail ? 'card' : 'card esgotado';
