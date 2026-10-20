@@ -715,23 +715,78 @@ function buildPhotoGallery(p) {
     : (p.foto ? [p.foto] : []);
   const fotos = raw.map(absSophiaImg).filter(Boolean);
   if (!fotos.length) {
-    return { html: 'SEM FOTO', isEmpty: true };
+    return { html: 'SEM FOTO', isEmpty: true, fotos: [] };
   }
   const main = fotos[0];
+  const multi = fotos.length > 1;
   const thumbs = fotos.map((src, i) =>
-    `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-src="${src}" aria-label="Foto ${i + 1}">
+    `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-idx="${i}" data-src="${src}" aria-label="Foto ${i + 1}">
       <img src="${src}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.style.display='none'">
     </button>`
   ).join('');
   const html = `
-    <div class="gallery">
+    <div class="gallery" data-count="${fotos.length}">
       <div class="gallery-main">
+        ${multi ? `<button type="button" class="gallery-nav gallery-prev" aria-label="Foto anterior">‹</button>` : ''}
         <img id="galleryMainImg" src="${main}" alt="${(p.nome || '').replace(/"/g, '&quot;')}" loading="eager" referrerpolicy="no-referrer"
           onerror="this.onerror=null;this.parentElement.parentElement.classList.add('no-img');this.parentElement.innerHTML='SEM FOTO'">
+        ${multi ? `<button type="button" class="gallery-nav gallery-next" aria-label="Próxima foto">›</button>` : ''}
+        ${multi ? `<span class="gallery-counter" id="galleryCounter">1 / ${fotos.length}</span>` : ''}
       </div>
-      ${fotos.length > 1 ? `<div class="gallery-thumbs">${thumbs}</div>` : ''}
+      ${multi ? `<div class="gallery-thumbs">${thumbs}</div>` : ''}
     </div>`;
-  return { html, isEmpty: false };
+  return { html, isEmpty: false, fotos };
+}
+
+function bindPhotoGallery(photoEl, fotos) {
+  if (!photoEl || !fotos || fotos.length < 2) return;
+  let idx = 0;
+  const mainImg = photoEl.querySelector('#galleryMainImg');
+  const counter = photoEl.querySelector('#galleryCounter');
+  const thumbs = () => Array.from(photoEl.querySelectorAll('.gallery-thumb'));
+
+  const show = (i) => {
+    idx = (i + fotos.length) % fotos.length;
+    if (mainImg) mainImg.src = fotos[idx];
+    if (counter) counter.textContent = `${idx + 1} / ${fotos.length}`;
+    thumbs().forEach((t, ti) => t.classList.toggle('active', ti === idx));
+    const active = thumbs()[idx];
+    if (active) active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  };
+
+  photoEl.querySelector('.gallery-prev')?.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    show(idx - 1);
+  });
+  photoEl.querySelector('.gallery-next')?.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    show(idx + 1);
+  });
+  // toque/clique na foto principal também avança
+  mainImg?.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    show(idx + 1);
+  });
+  thumbs().forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const i = Number(btn.getAttribute('data-idx') || 0);
+      show(i);
+    });
+  });
+
+  // swipe simples
+  let startX = 0;
+  const main = photoEl.querySelector('.gallery-main');
+  main?.addEventListener('touchstart', (e) => {
+    startX = e.changedTouches[0].screenX;
+  }, { passive: true });
+  main?.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].screenX - startX;
+    if (Math.abs(dx) < 40) return;
+    if (dx < 0) show(idx + 1);
+    else show(idx - 1);
+  }, { passive: true });
 }
 
 function buildVariacoesHtml(p) {
@@ -783,16 +838,7 @@ function openDetails(p, opts = {}) {
       photo.innerHTML = 'SEM FOTO';
     } else {
       photo.innerHTML = gallery.html;
-      // thumbs click
-      photo.querySelectorAll('.gallery-thumb').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const src = btn.getAttribute('data-src');
-          const mainImg = photo.querySelector('#galleryMainImg');
-          if (mainImg && src) mainImg.src = src;
-          photo.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
-          btn.classList.add('active');
-        });
-      });
+      bindPhotoGallery(photo, gallery.fotos || []);
     }
   }
 
