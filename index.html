@@ -654,6 +654,68 @@
   .modal-photo .gallery-thumb.active {
     border-color: #8b6914;
   }
+  /* Seletor de variação / tamanho */
+  .variacoes-box {
+    margin-top: 0.75rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid #e8e2d6;
+  }
+  .variacoes-box strong {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: #3d3426;
+    font-size: 0.9rem;
+  }
+  .var-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .var-chip {
+    border: 1.5px solid #d4cbb8;
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.4rem 0.65rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 72px;
+    transition: border-color .15s, background .15s, box-shadow .15s;
+  }
+  .var-chip-name {
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: #1f2937;
+  }
+  .var-chip-stock {
+    font-size: 0.72rem;
+    color: #166534;
+    margin-top: 2px;
+  }
+  .var-chip.selected {
+    border-color: #8b6914;
+    background: #faf6ee;
+    box-shadow: 0 0 0 1px #8b6914;
+  }
+  .var-chip-out,
+  .var-chip:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #f3f4f6;
+  }
+  .var-chip-out .var-chip-stock {
+    color: #b91c1c;
+  }
+  .var-hint {
+    margin: 0.45rem 0 0;
+    font-size: 0.78rem;
+    color: #6b7280;
+  }
+  .var-hint.ok {
+    color: #166534;
+    font-weight: 600;
+  }
   .modal-meta {
     text-align: center;
     margin-bottom: .8rem;
