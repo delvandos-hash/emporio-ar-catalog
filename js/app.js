@@ -5,7 +5,7 @@
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 
 const GIST_CATALOG_URL =
-  'https://gist.githubusercontent.com/delvandos-hash/bac3a717b309d02379455e971c9a9103/raw/catalogo.json';
+  'https://gist.github.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json';
 
 async function loadCatalogData() {
   const urls = ['/api/catalogo', GIST_CATALOG_URL];
