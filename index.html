@@ -550,26 +550,109 @@
   }
   .modal-photo {
     width: 100%;
-    max-width: 280px;
-    height: 280px;
+    max-width: 320px;
+    height: auto;
+    min-height: 200px;
     margin: 0 auto 1.15rem;
     border-radius: 14px;
     background: linear-gradient(145deg, #f8f8f8, #efefef);
     border: 1px solid #e8e8e8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    display: block;
+    overflow: visible;
   }
   .modal-photo img {
-    width: 100%;
-    height: 100%;
+    max-width: 100%;
+    max-height: 280px;
     object-fit: contain;
   }
   .modal-photo.no-img {
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: .85rem;
     color: #9CA3AF;
     font-weight: 600;
+  }
+  /* Galeria Roupas — setas, contador e thumbs (no index para vencer o CSS antigo) */
+  .modal-photo .gallery { width: 100%; }
+  .modal-photo .gallery-main {
+    position: relative !important;
+    width: 100%;
+    height: 280px;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #f5f2eb;
+    margin-bottom: 0.5rem;
+  }
+  .modal-photo .gallery-main > img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .modal-photo .gallery-nav {
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 5 !important;
+    width: 40px !important;
+    height: 40px !important;
+    border: none !important;
+    border-radius: 50% !important;
+    background: rgba(0,0,0,0.55) !important;
+    color: #fff !important;
+    font-size: 1.6rem !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .modal-photo .gallery-prev { left: 8px !important; right: auto !important; }
+  .modal-photo .gallery-next { right: 8px !important; left: auto !important; }
+  .modal-photo .gallery-counter {
+    position: absolute !important;
+    bottom: 8px !important;
+    right: 10px !important;
+    z-index: 5 !important;
+    background: rgba(0,0,0,0.6) !important;
+    color: #fff !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    padding: 4px 9px !important;
+    border-radius: 999px !important;
+  }
+  .modal-photo .gallery-thumbs {
+    display: flex !important;
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding: 0.2rem 0 0.4rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-photo .gallery-thumb {
+    flex: 0 0 56px;
+    width: 56px;
+    height: 56px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 0;
+    background: #f5f2eb;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .modal-photo .gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .modal-photo .gallery-thumb.active {
+    border-color: #8b6914;
   }
   .modal-meta {
     text-align: center;
