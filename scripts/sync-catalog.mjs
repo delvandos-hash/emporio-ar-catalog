@@ -1,6 +1,7 @@
 /**
- * Sincroniza estoque + novos produtos (Imarat + Brand filtrado + Sophia Moda)
+ * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
+ * Versão: Kit 9=Vulcan, anti-dup Armaf, óleos→Óleos, Tabaco, precoManual protegido, BODY SPLASH.
  */
 
 import fs from 'fs';
@@ -13,8 +14,6 @@ const IMARAT_API = 'https://imaratperfumaria.com/api/products';
 const IMARAT_ORIGIN = 'https://imaratperfumaria.com';
 const BRAND_BASE = 'https://brandcollectionpy.com.br';
 const BRAND_SELLER = 'darlanaugusto';
-const SOPHIA_URL = 'https://sophiamoda.com.br/c/atacado/carregar_produtos/1/todas/62982459275';
-const SOPHIA_CDN = 'https://arquivos-cdn.facilzap.app.br';
 
 const BRAND_ALLOWED_SESSIONS = [
   'ARABIC COLLECTION', 'BEAUTY BRAND', 'BODY SPLASH', 'BODY SPLAHS',
@@ -27,11 +26,13 @@ const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
 const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura armaf', 'miniatura', 'mini'];
 
+// Marcas no NOME que geravam duplicata (Mini Marshmellow vs Mini Armaf Marshmellow)
 const MARCAS_NO_NOME_MINI = [
   'armaf', 'lattafa', 'orientica', 'afeer', 'clive dorris',
   'french avenue', 'maison alhambra', 'al wataniah', 'only you', 'mais you', 'meryam',
 ];
 
+// --- TABELA DE LIMPEZA PESADA ---
 const substituicoes = {
   'ÃƒÂ±': 'ñ', 'ÃƒÂ§': 'ç', 'ÃƒÂ£': 'ã', 'ÃƒÂµ': 'õ', 'ÃƒÂ¡': 'á', 'ÃƒÂ©': 'é', 'ÃƒÂ­': 'í', 'ÃƒÂ³': 'ó', 'ÃƒÂº': 'ú',
   'ÃƒÆ’Ã‚Â': 'Í', 'Ãƒâ€š': 'Â', 'ÃƒÆ’': '',
@@ -59,11 +60,13 @@ function limparTexto(str) {
   }
   return resultado;
 }
+// --------------------------------
 
 function norm(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
 
+// Remove apenas volumes, MANTENDO a palavra "caixa" e outras nomenclaturas.
 function limparParaComparacao(s) { 
     return norm(s)
       .replace(/\s*\d+\s*(ml|g)\b/gi, '')
@@ -92,6 +95,7 @@ function removerMarcaDoNome(s) {
   return resultado;
 }
 
+// Mini Marshmellow === Mini Armaf Marshmellow → "marshmellow"
 function chaveComparacaoMini(nome) {
   return removerMarcaDoNome(removerPrefixosMini(limparParaComparacao(nome)));
 }
@@ -136,10 +140,12 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
   
   const n = norm(nome); const b = norm(brand);
   
+  // --- REGRAS DE PREÇO FIXO ---
   if (isKit2em1(nome)) return { varejo: fmtBRL(85), atacado: fmtBRL(55) };
   if (isMiniaturaBolsa(nome)) return { varejo: fmtBRL(65), atacado: fmtBRL(45) };
   if (isOleoCliveDorris(nome, brand)) return { varejo: fmtBRL(55), atacado: fmtBRL(44) };
   
+  // --- REGRAS DE ACRÉSCIMO ---
   if (isKitVulcanOuMiniatura9(nome)) return { varejo: fmtBRL(precoVarejoOrig + 130), atacado: fmtBRL(precoAtacadoOrig + 125) };
   if (isKitMusaman(nome)) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 65) };
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
@@ -305,90 +311,6 @@ async function fetchBrandList() {
   return all;
 }
 
-async function fetchSophiaModa() {
-  console.log("👗 Buscando Roupas na Sophia Moda...");
-  const produtosFormatados = [];
-  
-  try {
-    const res = await fetch(SOPHIA_URL, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-        'Referer': 'https://sophiamoda.com.br/c/atacado',
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    });
-    
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    
-    const text = await res.text();
-    
-    if (!text || text.trim() === '') {
-      throw new Error("O site da Sophia retornou uma resposta vazia (bloqueio anti-robô).");
-    }
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      throw new Error("Resposta não é um JSON válido. O site pode ter mudado ou bloqueado.");
-    }
-
-    const produtos = data.produtos || [];
-    console.log(`Sophia: ${produtos.length} roupas encontradas.`);
-
-    for (const prod of produtos) {
-      const precoCheio = Number(prod.preco);
-      let precoAtacado, precoVarejo;
-
-      if (precoCheio <= 50.00) {
-        precoAtacado = precoCheio + 40.00;
-        precoVarejo = precoAtacado + 40.00;
-      } else {
-        precoAtacado = precoCheio + 50.00;
-        precoVarejo = precoAtacado + 40.00;
-      }
-
-      const imagens = (prod.imagens || []).map(img => `${SOPHIA_CDN}/${img}`);
-      const variacoes = [];
-      
-      for (const [idVar, dadosVar] of Object.entries(prod.variacoes || {})) {
-        variacoes.push({
-          id: idVar,
-          nome: String(dadosVar.nome).trim(),
-          cor: dadosVar.cor || "Única",
-          estoque: prod.estoque[idVar] || 0,
-          sku: prod.sku_variacoes[idVar]
-        });
-      }
-
-      produtosFormatados.push({
-        id: `sophia-${prod.id}`,
-        idOriginal: prod.id,
-        nome: prod.nome,
-        categoria: "Roupas",
-        subcategoria: prod.categoria_nome || "Geral",
-        descricao: prod.descricao,
-        precoCheio: precoCheio,
-        precoPromocional: Number(prod.precos_produto.promocional) || precoCheio,
-        precoAtacado: precoAtacado,
-        precoVarejo: precoVarejo,
-        imagens: imagens,
-        variacoes: variacoes,
-        estoqueTotal: prod.total_estoque,
-        precoManual: false,
-        fonte: "sophiamoda"
-      });
-    }
-  } catch (err) {
-    console.error("❌ Erro ao buscar Sophia Moda:", err.message);
-  }
-
-  return produtosFormatados;
-}
-
 async function main() {
   console.log('Carregando data.js...');
   let raw = fs.readFileSync(dataPath, 'utf8');
@@ -429,6 +351,7 @@ async function main() {
         const disp = hit.inStock === true ? 'Sim' : 'Não';
         if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
 
+        // Notas: limpa UTF-8 + remove palavra Tabaco (Merchant Center)
         if (it.notas) {
           const notasLimpas = sanitizarNotas(it.notas);
           if (notasLimpas !== it.notas) it.notas = notasLimpas;
@@ -438,8 +361,9 @@ async function main() {
         const precoAtacadoOrig = hit.atacado && hit.atacado.precoCents != null ? hit.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
         const categoria = hit.categoria_nome || hit.categoria || '';
 
+        // precoManual: true no item → robô NÃO altera varejo/atacado
         if (it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1) {
-          // mantém preços manuais
+          // mantém preços definidos manualmente
         } else {
           const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
           if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
@@ -452,6 +376,7 @@ async function main() {
     }
   }
 
+  // Filtro de segurança (remove duplicatas exatas dentro do mesmo grupo)
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
         const vistos = new Set();
@@ -581,30 +506,19 @@ async function main() {
   const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
   fs.writeFileSync(dataPath, out, 'utf8');
 
-  const roupasSophia = await fetchSophiaModa();
-
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
   console.log(`Novos Brand: ${addedBrand}`);
-  console.log(`Roupas Sophia: ${roupasSophia.length}`);
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log(`Preços alterados: ${priceChanged}`);
-  console.log('data.js atualizado localmente.');
+  console.log('data.js atualizado localmente (com correção forçada).');
 
   console.log('Enviando dados para o GitHub Gist...');
   try {
-    const gistId = "11918b7196b3ee6a0d8a91739167b312";
+    const gistId = "bac3a717b309d02379455e971c9a9103";
     const githubToken = process.env.GIST_TOKEN;
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
-    
-    const dadosParaSite = { 
-      DATA: DATA, 
-      ROUPAS: roupasSophia,
-      WHATSAPP: "5562991134488", 
-      BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, 
-      ultimaAtualizacao: new Date().toISOString() 
-    };
-    
+    const dadosParaSite = { DATA: DATA, WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
     const response = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },

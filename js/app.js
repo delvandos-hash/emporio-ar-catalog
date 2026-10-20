@@ -1,32 +1,42 @@
 /**
  * Empório A.R - Catálogo Digital
- * Dados: Gist (via /api/catalogo ou URL direta) + estoque ao vivo (stock-sync)
+ * Dados: Gist (principal) + fallback local data.js + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
+import { DATA as LOCAL_DATA, WHATSAPP as LOCAL_WHATSAPP, BRAND as LOCAL_BRAND } from './data.js';
 
+// Novo Gist (20/10/2026)
 const GIST_CATALOG_URL =
   'https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json';
 
 async function loadCatalogData() {
-  const urls = ['/api/catalogo', GIST_CATALOG_URL];
-  let lastErr;
+  // 1) Gist primeiro (permite atualizar produtos sem deploy)
+  // 2) Depois API local
+  // 3) Fallback: data.js embutido
+  const urls = [GIST_CATALOG_URL, '/api/catalogo'];
+
   for (const url of urls) {
     try {
       const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) continue;
       const j = await res.json();
       if (j && j.DATA) return j;
-      if (j && j.erro) throw new Error(j.erro);
     } catch (e) {
-      lastErr = e;
+      // tenta o próximo
     }
   }
-  throw lastErr || new Error('Falha ao carregar catálogo');
+
+  // Fallback local
+  return {
+    DATA: LOCAL_DATA,
+    WHATSAPP: LOCAL_WHATSAPP,
+    BRAND: LOCAL_BRAND
+  };
 }
 
 const dadosDoServidor = await loadCatalogData();
-// Adicionando a chave ROUPAS com fallback para array vazio caso não exista
-const { DATA, ROUPAS = [], WHATSAPP, BRAND } = dadosDoServidor;
+
+const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
 
 /** ID estável do produto (deep link ?produto= e feed Google) */
 function normId(s) {
@@ -93,7 +103,7 @@ const ADMIN_KEY = 'emporio_ar_admin';
 const OVERRIDES_KEY = 'emporio_ar_overrides';
 const SECTIONS_KEY = 'emporio_ar_sections';
 const ADMIN_PASS = '172812ds';
-let isAdmin = false;
+let isAdmin = false; // versão final sem Admin
 
 function loadOverrides() {
   try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}'); }
@@ -123,12 +133,8 @@ function getAllCategories() {
       if (g.cat) set.add(g.cat);
     }
   }
-  // Adiciona Roupas se existir
-  if (ROUPAS.length > 0) set.add('Roupas');
   return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
-
-// ... (Funções do Admin: openSectionsAdmin, saveSectionsAdmin, refreshCategoryFilterVisibility) ...
 function openSectionsAdmin() {
   const box = document.getElementById('sectionsModal');
   if (!box) return;
@@ -172,6 +178,7 @@ function saveSectionsAdmin() {
   const q = document.getElementById('q');
   if (q) q.value = '';
   document.querySelectorAll('#genderFilters .fbtn').forEach(b => b.classList.toggle('active', b.dataset.value === 'Todos'));
+  // rebuild category filter buttons active state
   document.querySelectorAll('#categoryFilters .fbtn').forEach(b => {
     b.classList.toggle('active', b.dataset.value === 'Todos');
   });
@@ -190,9 +197,11 @@ function refreshCategoryFilterVisibility() {
       return;
     }
     btn.style.display = sectionActive(v) ? '' : 'none';
+    // update label
     if (v && v !== 'Todos') btn.textContent = sectionDisplayName(v).replace(/^Brand ·\s*/, '');
   });
 }
+
 
 function applyOverride(item, brand) {
   const key = `${brand}|${item.nome}|${item.volume || ''}`;
@@ -225,12 +234,19 @@ function isAvailable(item) {
   return (item.disponivel || 'Sim') === 'Sim';
 }
 
+
 const STOCK_CACHE_KEY = 'emporio_ar_stock_cache';
 const STOCK_CACHE_TTL_MS = 30 * 60 * 1000;
 let stockLiveMap = null;
 
 function normStockKey(s) {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 function lookupLiveStock(item, brand, cat) {
@@ -300,6 +316,7 @@ async function syncStockFromRoot() {
   return false;
 }
 
+
 function inPriceRange(varejo) {
   if (state.price === 'Todos') return true;
   const v = parsePrice(varejo);
@@ -324,14 +341,17 @@ function sortItems(items, brand) {
   return list;
 }
 
+
 function ensureBrandCategoryFilters() {
   const el = document.getElementById('categoryFilters');
   if (!el) return;
+  // Remove old "Brand · ..." filter chips if any
   el.querySelectorAll('.fbtn').forEach(btn => {
     const v = btn.dataset.value || '';
     if (v.startsWith('Brand ·')) btn.remove();
   });
   if (el.dataset.brandReady) return;
+  // Check if DATA has Brand category
   let hasBrand = false;
   for (const line of Object.keys(DATA)) {
     for (const g of (DATA[line] || [])) {
@@ -356,29 +376,13 @@ function ensureBrandCategoryFilters() {
     });
     el.appendChild(btn);
   }
-  
-  // Adicionar botão Roupas se houver dados
-  if (ROUPAS.length > 0 && !existing.has('Roupas')) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'fbtn';
-    btn.dataset.filter = 'category';
-    btn.dataset.value = 'Roupas';
-    btn.textContent = 'Roupas';
-    btn.addEventListener('click', () => {
-      el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.category = 'Roupas';
-      render();
-    });
-    el.appendChild(btn);
-  }
-  
   el.dataset.brandReady = '1';
 }
 
+
+
 function allGroups() {
-  const genderOrder = ['feminino', 'masculino', 'unissex'];
+  const genderOrder = ['feminino', 'masculino', 'unissex', 'roupas'];
   const lines = state.gender === 'Todos' ? genderOrder : [state.gender.toLowerCase()];
   const result = [];
   for (const line of lines) {
@@ -544,6 +548,8 @@ function renderCart() {
   });
 }
 
+
+/** Gestos: descer fecha | lateral troca produto */
 function initSwipeToClose() {
   const overlay = document.getElementById('modal');
   if (!overlay || overlay.dataset.swipeReady) return;
@@ -625,6 +631,8 @@ function initSwipeToClose() {
   modal.addEventListener('touchcancel', onEnd, { passive: true });
 }
 
+
+/** Lista plana dos produtos visíveis (para deslize lateral nos detalhes) */
 let detailsNavList = [];
 let detailsNavIndex = -1;
 
@@ -652,6 +660,7 @@ function buildDetailsNavList() {
       });
     }
   }
+  // ordem aproximada da tela (Scoop fixo se categoria)
   return list;
 }
 
@@ -679,123 +688,8 @@ function showDetailsAt(index, direction) {
   }
 }
 
-// ==========================================
-// MÓDULO DE ROUPAS
-// ==========================================
-async function verificarEstoqueSophia(idProdutoOriginal) {
-    try {
-        const url = `https://sophiamoda.com.br/c/atacado/carregar_produtos/1/todas/62982459275`;
-        const response = await fetch(url);
-        const data = await response.json();
-        const produto = data.produtos.find(p => p.id == idProdutoOriginal);
-        if (produto) {
-            return produto.estoque; 
-        }
-        return null;
-    } catch (error) {
-        console.error("Erro ao checar estoque em tempo real:", error);
-        return null; 
-    }
-}
-
-function gerarLinkWhatsAppRoupa(produto, variacaoSelecionada) {
-    const meuNumero = "5562991134488"; 
-    const mensagem = `Olá! Vi no site Empório A.R e quero comprar a seguinte roupa:\n\n` +
-                     `*Produto:* ${produto.nome}\n` +
-                     `*Variação:* ${variacaoSelecionada.nome}\n` +
-                     `*Preço Varejo:* R$ ${produto.precoVarejo.toFixed(2).replace('.', ',')}\n` +
-                     `*Preço Atacado:* R$ ${produto.precoAtacado.toFixed(2).replace('.', ',')}\n` +
-                     `*SKU:* ${variacaoSelecionada.sku || 'N/A'}\n\n` +
-                     `Pode me ajudar com a compra?`;
-    return `https://wa.me/${meuNumero}?text=${encodeURIComponent(mensagem)}`;
-}
-
-function abrirDetalhesRoupa(produto) {
-    const overlay = document.getElementById('modal');
-    overlay.classList.remove('closing');
-    
-    document.getElementById('modalName').textContent = produto.nome;
-    document.getElementById('modalMeta').textContent = `Roupas · ${produto.subcategoria}`;
-    document.getElementById('modalVarejo').textContent = `R$ ${produto.precoVarejo.toFixed(2).replace('.', ',')}`;
-    document.getElementById('modalAtacado').textContent = `R$ ${produto.precoAtacado.toFixed(2).replace('.', ',')}`;
-
-    const photoDiv = document.getElementById('modalPhoto');
-    if (produto.imagens && produto.imagens.length > 0) {
-        photoDiv.style.display = '';
-        photoDiv.innerHTML = `<img src="${produto.imagens[0]}" alt="${produto.nome}" loading="eager" referrerpolicy="no-referrer">`;
-    } else {
-        photoDiv.style.display = '';
-        photoDiv.classList.add('no-img');
-        photoDiv.innerHTML = 'SEM FOTO';
-    }
-
-    const notasEl = document.getElementById('modalNotas');
-    if (produto.descricao) {
-        notasEl.style.display = 'block';
-        notasEl.innerHTML = `<strong>Descrição</strong><br>${produto.descricao}`;
-    } else {
-        notasEl.style.display = 'none';
-    }
-
-    const btnAdd = document.getElementById('modalAddCart');
-    const btnBuy = document.getElementById('modalBuy');
-    btnAdd.style.display = 'none';
-    btnBuy.style.display = 'none';
-    
-    // Remove container antigo se houver
-    const oldContainer = document.getElementById('variacoes-container');
-    if (oldContainer) oldContainer.remove();
-
-    let variacoesHtml = `<div id="variacoes-container" style="margin-top:15px; display:flex; flex-direction:column; gap:8px;">
-        <strong>Escolha a Variação:</strong>
-        <p id="loading-estoque" style="font-size:12px; color:#888;">Verificando estoque em tempo real...</p>
-    </div>`;
-    
-    notasEl.insertAdjacentHTML('afterend', variacoesHtml);
-
-    overlay.classList.remove('closing', 'open');
-    void overlay.offsetWidth;
-    requestAnimationFrame(() => overlay.classList.add('open'));
-
-    verificarEstoqueSophia(produto.idOriginal).then(estoqueAtualizado => {
-        const loading = document.getElementById('loading-estoque');
-        if (loading) loading.remove();
-        
-        const container = document.getElementById('variacoes-container');
-        if (!container) return;
-
-        produto.variacoes.forEach(variacao => {
-            const qtd = estoqueAtualizado ? (estoqueAtualizado[variacao.id] || 0) : variacao.estoque;
-            
-            const btn = document.createElement('button');
-            btn.className = 'btn-sm ' + (qtd > 0 ? 'btn-add' : 'btn-disabled');
-            btn.disabled = qtd <= 0;
-            btn.style.width = '100%';
-            btn.style.marginBottom = '5px';
-            
-            btn.innerHTML = qtd > 0 
-                ? `${variacao.nome} (Estoque: ${qtd})`
-                : `${variacao.nome} (Esgotado)`;
-                
-            if (qtd > 0) {
-                btn.onclick = () => {
-                    const link = gerarLinkWhatsAppRoupa(produto, variacao);
-                    window.open(link, '_blank');
-                };
-            }
-            
-            container.appendChild(btn);
-        });
-    });
-}
-// ==========================================
 
 function openDetails(p, opts = {}) {
-  if (p.categoria === 'Roupas') {
-      abrirDetalhesRoupa(p);
-      return;
-  }
-
   const live = lookupLiveStock(p, p.brand, p.cat);
   if (live) p = { ...p, disponivel: live };
   currentProduct = p;
@@ -842,12 +736,6 @@ function openDetails(p, opts = {}) {
 
   const btnAdd = document.getElementById('modalAddCart');
   const btnBuy = document.getElementById('modalBuy');
-  btnAdd.style.display = '';
-  btnBuy.style.display = '';
-  
-  const oldContainer = document.getElementById('variacoes-container');
-  if (oldContainer) oldContainer.remove();
-
   if (avail) {
     btnAdd.disabled = false;
     btnAdd.classList.remove('btn-disabled');
@@ -866,6 +754,7 @@ function openDetails(p, opts = {}) {
   const ov = document.getElementById('modal');
   setProductUrl(p);
   if (opts.fromNav) {
+    // troca de produto: mantém modal aberto (sem piscada do overlay)
     ov.classList.remove('closing');
     ov.classList.add('open');
   } else {
@@ -880,6 +769,7 @@ function openDetails(p, opts = {}) {
   }
 }
 
+
 function closeModal() {
   const overlay = document.getElementById('modal');
   if (!overlay.classList.contains('open')) return;
@@ -888,11 +778,10 @@ function closeModal() {
     overlay.classList.remove('open', 'closing');
     currentProduct = null;
     setProductUrl(null);
-    const oldContainer = document.getElementById('variacoes-container');
-    if (oldContainer) oldContainer.remove();
   };
   setTimeout(done, 380);
 }
+
 
 function render() {
   if (state.category !== 'Todos' && !sectionActive(state.category)) {
@@ -1007,58 +896,13 @@ function render() {
     }
     html += `</div>`;
   }
-  
-  // RENDERIZA AS ROUPAS
-  if (ROUPAS.length > 0 && (state.category === 'Todos' || state.category === 'Roupas')) {
-      const roupasFiltradas = ROUPAS.filter(roupa => {
-          if (state.search) {
-              const q = state.search.toLowerCase();
-              if (!roupa.nome.toLowerCase().includes(q) && !roupa.subcategoria.toLowerCase().includes(q)) return false;
-          }
-          return true;
-      });
-
-      if (roupasFiltradas.length > 0) {
-          html += `<div class="category cat-fem"><div class="category-title">Roupas</div><div class="brand-group"><div class="brand-name">Empório A.R</div><div class="products">`;
-          
-          roupasFiltradas.forEach(roupa => {
-              const cardClass = roupa.estoqueTotal > 0 ? 'card' : 'card esgotado';
-              const foto = roupa.imagens && roupa.imagens.length > 0 ? roupa.imagens[0] : '';
-              const pdata = encodeURIComponent(JSON.stringify(roupa));
-              
-              html += `
-                <div class="${cardClass}">
-                  ${foto ? `<div class="photo photo-click" role="button" tabindex="0" data-p='${pdata}'><img src="${foto}" alt="${roupa.nome}" loading="lazy"></div>` : ''}
-                  <div class="info">
-                    <div class="name">${roupa.nome}</div>
-                    <div class="meta">${roupa.subcategoria} · ${roupa.estoqueTotal > 0 ? 'Disponível' : 'Esgotado'}</div>
-                    <div class="prices">
-                      <div><span class="price-label">Varejo</span><span class="price-v">R$ ${roupa.precoVarejo.toFixed(2).replace('.', ',')}</span></div>
-                      <div><span class="price-label">Atacado</span><span class="price-a">R$ ${roupa.precoAtacado.toFixed(2).replace('.', ',')}</span></div>
-                    </div>
-                    <div class="card-actions">
-                      <button class="btn-sm btn-details" data-p='${pdata}'>Ver Variações</button>
-                    </div>
-                  </div>
-                </div>`;
-          });
-          html += `</div></div></div>`;
-      }
-  }
-
   main.innerHTML = html;
-  
-  main.querySelectorAll('.btn-details, .photo-click').forEach(el => {
+main.querySelectorAll('.btn-details, .photo-click').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       try {
-        const p = JSON.parse(decodeURIComponent(el.dataset.p));
-        if (p.categoria === 'Roupas') {
-            abrirDetalhesRoupa(p);
-        } else {
-            openDetails(p);
-        }
+        openDetails(JSON.parse(decodeURIComponent(el.dataset.p)));
       } catch (err) { console.warn(err); }
     });
   });
@@ -1075,10 +919,9 @@ function render() {
   });
 }
 
-// ... (Mantenha o restante das funções: downloadCatalogPDF, event listeners, etc.) ...
 function downloadCatalogPDF() {
   const rows = [];
-  for (const line of ['feminino', 'masculino', 'unissex']) {
+  for (const line of ['feminino', 'masculino', 'unissex', 'roupas']) {
     for (const g of (DATA[line] || [])) {
       for (const item of g.items) {
         rows.push({
@@ -1241,6 +1084,7 @@ document.getElementById('logoHome').addEventListener('click', e => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
+
 function toggleAdmin() {
   const btnSec = document.getElementById('btnSections');
   if (isAdmin) {
@@ -1291,6 +1135,7 @@ function exportOverrides() {
   a.click();
 }
 
+
 function updateShareLink() {
   const text = encodeURIComponent(
     'Confira o Catálogo Digital Empório A.R — Perfumes com preços de varejo e atacado!\n\n' +
@@ -1299,6 +1144,7 @@ function updateShareLink() {
   const link = document.getElementById('shareWa');
   if (link) link.href = `https://wa.me/?text=${text}`;
 }
+
 
 initSwipeToClose();
 document.getElementById('btnPdf').addEventListener('click', downloadCatalogPDF);
@@ -1342,4 +1188,5 @@ syncStockFromRoot().then((ok) => {
   if (ok) render();
   openProductFromUrl();
 });
+// Deep link mesmo sem esperar estoque (fallback)
 setTimeout(() => openProductFromUrl(), 400);
