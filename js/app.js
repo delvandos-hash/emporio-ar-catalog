@@ -382,7 +382,7 @@ function ensureBrandCategoryFilters() {
 
 
 function allGroups() {
-  const genderOrder = ['feminino', 'masculino', 'unissex', 'roupas'];
+  const genderOrder = ['feminino', 'masculino', 'unissex', 'roupas', 'acessorios'];
   const lines = state.gender === 'Todos' ? genderOrder : [state.gender.toLowerCase()];
   const result = [];
   for (const line of lines) {
@@ -404,12 +404,12 @@ function cartKey(p) {
 function buildWaMessage(p) {
   let msg = 'Olá! Gostaria de comprar o seguinte produto do Empório A.R:\n\n';
   msg += `*${p.nome}*\nMarca: ${p.brand}\n`;
-  if (p.volume && p.volume !== '—' && !isRoupasProduct(p)) msg += `Volume: ${p.volume}\n`;
+  if (p.volume && p.volume !== '—' && !isVariacaoCatalogProduct(p)) msg += `Volume: ${p.volume}\n`;
   const variacao = p.variacaoSelecionada || getSelectedVariacao();
   if (variacao && variacao.nome) {
     msg += `*Variação / Tamanho: ${variacao.nome}*\n`;
   }
-  if (p.cat && isRoupasProduct(p)) msg += `Categoria: ${p.cat}\n`;
+  if (p.cat && isVariacaoCatalogProduct(p)) msg += `Categoria: ${p.cat}\n`;
   msg += `Varejo: R$ ${p.varejo}\n`;
   if (p.atacado && p.atacado !== '—') msg += `Atacado (6+): R$ ${p.atacado}\n`;
   msg += '\nPode me informar a disponibilidade e formas de pagamento?';
@@ -452,7 +452,7 @@ function openWhatsApp(p) {
     alert('Este produto está esgotado no momento.');
     return;
   }
-  if (isRoupasProduct(p)) {
+  if (isVariacaoCatalogProduct(p)) {
     const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
     const hasAvailable = vars.some(v => (Number(v.estoque) || 0) > 0);
     if (vars.length && hasAvailable) {
@@ -474,7 +474,7 @@ function addToCart(p, qty = 1) {
     return;
   }
   let variacao = null;
-  if (isRoupasProduct(p)) {
+  if (isVariacaoCatalogProduct(p)) {
     const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
     const hasAvailable = vars.some(v => (Number(v.estoque) || 0) > 0);
     if (vars.length && hasAvailable) {
@@ -742,6 +742,13 @@ function showDetailsAt(index, direction) {
 function isRoupasProduct(p) {
   return (p.line || '').toLowerCase() === 'roupas' || (p.fonte || '') === 'roupas' || (p.fonte || '') === 'sophiamoda';
 }
+function isAcessoriosProduct(p) {
+  return (p.line || '').toLowerCase() === 'acessorios' || (p.fonte || '') === 'acessorios' || (p.fonte || '') === 'dande';
+}
+/** Produtos com descrição + variações + galeria (Roupas e Acessórios) */
+function isVariacaoCatalogProduct(p) {
+  return isRoupasProduct(p) || isAcessoriosProduct(p);
+}
 
 function absSophiaImg(u) {
   if (!u) return '';
@@ -905,10 +912,12 @@ function openDetails(p, opts = {}) {
   const avail = isAvailable(p);
   const isScoop = (p.badge === 'Scoop') || (p.nome || '').toLowerCase().includes('scoop');
   const roupas = isRoupasProduct(p);
+  const acessorios = isAcessoriosProduct(p);
+  const varCatalog = isVariacaoCatalogProduct(p);
 
   document.getElementById('modalName').textContent = p.nome;
   document.getElementById('modalMeta').textContent =
-    `${p.brand || 'Empório A.R'}${p.volume && p.volume !== '—' && !isScoop && !roupas ? ' · ' + p.volume : ''}${roupas && p.cat ? ' · ' + p.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
+    `${p.brand || 'Empório A.R'}${p.volume && p.volume !== '—' && !isScoop && !varCatalog ? ' · ' + p.volume : ''}${varCatalog && p.cat ? ' · ' + p.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
   document.getElementById('modalVarejo').textContent = p.varejo ? `R$ ${p.varejo}` : '—';
   document.getElementById('modalAtacado').textContent = p.atacado && p.atacado !== '—' ? `R$ ${p.atacado}` : '—';
 
@@ -933,10 +942,10 @@ function openDetails(p, opts = {}) {
   const notasEl = document.getElementById('modalNotas');
   let notasHtml = '';
   if (p.notas) {
-    const titulo = (roupas || isScoop) ? 'Descrição' : 'Notas olfativas';
+    const titulo = (varCatalog || isScoop) ? 'Descrição' : 'Notas olfativas';
     notasHtml += `<strong>${titulo}</strong><br>${String(p.notas).replace(/\n/g, '<br>')}`;
   }
-  if (roupas) {
+  if (varCatalog) {
     notasHtml += buildVariacoesHtml(p);
   }
   if (notasHtml) {
@@ -947,15 +956,17 @@ function openDetails(p, opts = {}) {
     notasEl.innerHTML = '';
   }
 
-  // seletor de variação (Roupas)
-  if (roupas) {
+  // seletor de variação (Roupas / Acessórios)
+  if (varCatalog) {
     p.variacaoSelecionada = null;
     bindVariacaoSelector();
   }
 
-  // Estoque ao vivo para Roupas (melhor esforço)
+  // Estoque ao vivo
   if (roupas && p.id_origem) {
     refreshRoupasStock(p).catch(() => {});
+  } else if (acessorios && p.id_origem) {
+    refreshDandeStock(p).catch(() => {});
   }
 
   const btnAdd = document.getElementById('modalAddCart');
@@ -1031,6 +1042,46 @@ async function refreshRoupasStock(p) {
     // silencioso — mantém snapshot
   }
 }
+
+/** Atualiza estoque/variações de Acessórios (Dande) via proxy Netlify */
+async function refreshDandeStock(p) {
+  if (!p || !p.id_origem) return;
+  try {
+    const url = `/api/dande-stock?id=${encodeURIComponent(p.id_origem)}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !Array.isArray(data.variacoes)) return;
+
+    if (currentProduct && currentProduct.id_origem === p.id_origem) {
+      currentProduct.variacoes = data.variacoes;
+      currentProduct.total_estoque = data.total_estoque;
+      currentProduct.disponivel = (data.total_estoque > 0) ? 'Sim' : 'Não';
+
+      const notasEl = document.getElementById('modalNotas');
+      if (notasEl) {
+        let html = '';
+        if (currentProduct.notas) {
+          html += `<strong>Descrição</strong><br>${String(currentProduct.notas).replace(/\n/g, '<br>')}`;
+        }
+        const prevSel = currentProduct.variacaoSelecionada?.id || null;
+        html += buildVariacoesHtml(currentProduct, prevSel);
+        if (html) {
+          notasEl.style.display = 'block';
+          notasEl.innerHTML = html;
+          bindVariacaoSelector();
+        }
+      }
+
+      const avail = isAvailable(currentProduct);
+      document.getElementById('modalMeta').textContent =
+        `${currentProduct.brand || 'Empório A.R'}${currentProduct.cat ? ' · ' + currentProduct.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
+    }
+  } catch (e) {
+    // silencioso
+  }
+}
+
 
 
 function closeModal() {
@@ -1198,7 +1249,7 @@ main.querySelectorAll('.btn-details, .photo-click').forEach(el => {
 
 function downloadCatalogPDF() {
   const rows = [];
-  for (const line of ['feminino', 'masculino', 'unissex', 'roupas']) {
+  for (const line of ['feminino', 'masculino', 'unissex', 'roupas', 'acessorios']) {
     for (const g of (DATA[line] || [])) {
       for (const item of g.items) {
         rows.push({
@@ -1300,9 +1351,75 @@ document.querySelectorAll('#genderFilters .fbtn').forEach(btn => {
     document.querySelectorAll('#genderFilters .fbtn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.gender = btn.dataset.value;
+    state.category = 'Todos';
+    updateCategoryFiltersForGender(state.gender);
     render();
   });
 });
+
+function updateCategoryFiltersForGender(gender) {
+  const el = document.getElementById('categoryFilters');
+  if (!el) return;
+  const g = String(gender || '').toLowerCase();
+  if (g === 'acessorios') {
+    const cats = new Set();
+    for (const group of (DATA.acessorios || [])) {
+      if (group.cat) cats.add(group.cat);
+    }
+    const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
+    for (const c of sorted) {
+      html += `<button class="fbtn" data-filter="category" data-value="${c}">${c}</button>`;
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.fbtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.category = btn.dataset.value;
+        render();
+      });
+    });
+  } else if (g === 'roupas') {
+    const cats = new Set();
+    for (const group of (DATA.roupas || [])) {
+      if (group.cat) cats.add(group.cat);
+    }
+    const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
+    for (const c of sorted) {
+      html += `<button class="fbtn" data-filter="category" data-value="${c}">${c}</button>`;
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.fbtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.category = btn.dataset.value;
+        render();
+      });
+    });
+  } else {
+    // filtros padrão de perfumes
+    el.innerHTML = `
+    <button class="fbtn active" data-filter="category" data-value="Todos">Todas</button>
+    <button class="fbtn" data-filter="category" data-value="Perfumes">Perfumes</button>
+    <button class="fbtn" data-filter="category" data-value="Miniaturas">Miniaturas</button>
+    <button class="fbtn" data-filter="category" data-value="Óleos">Óleos</button>
+    <button class="fbtn" data-filter="category" data-value="Outros">Outros</button>
+    <button class="fbtn" data-filter="category" data-value="Scoop Premiado">Scoop Premiado</button>
+    <button class="fbtn" data-filter="category" data-value="Brand">Brand</button>`;
+    el.querySelectorAll('.fbtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.category = btn.dataset.value;
+        render();
+      });
+    });
+  }
+}
+
 document.querySelectorAll('#categoryFilters .fbtn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#categoryFilters .fbtn').forEach(b => b.classList.remove('active'));

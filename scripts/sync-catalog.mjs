@@ -447,10 +447,18 @@ async function fetchSophiaRoupas() {
             p.preco_por ?? p.preco ?? p.preco_de ?? p.valor ?? 0;
           const { atacado, varejo } = calcPrecosRoupas(precoBase);
 
+          const SOPHIA_IMG_BASE = 'https://arquivos-cdn.facilzap.app.br/';
+          const toAbsImg = (u) => {
+            if (!u) return '';
+            const s = String(u.url || u).trim();
+            if (!s) return '';
+            if (s.startsWith('http://') || s.startsWith('https://')) return s;
+            return SOPHIA_IMG_BASE + s.replace(/^\//, '');
+          };
           const imagens = Array.isArray(p.imagens)
-            ? p.imagens.map((img) => img.url || img).filter(Boolean)
+            ? p.imagens.map(toAbsImg).filter(Boolean)
             : [];
-          const foto = imagens[0] || p.imagem || p.foto || '';
+          const foto = imagens[0] || toAbsImg(p.imagem) || toAbsImg(p.foto) || '';
 
           const estoqueMap = p.estoque || {};
           const varDict = p.variacoes || {};

@@ -21,6 +21,11 @@
   from = "/api/roupas-stock"
   to = "/.netlify/functions/roupas-stock"
   status = 200
+
+[[redirects]]
+  from = "/api/dande-stock"
+  to = "/.netlify/functions/dande-stock"
+  status = 200
   
 [[redirects]]
   from = "/feed.xml"
