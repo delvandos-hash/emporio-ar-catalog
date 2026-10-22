@@ -235,8 +235,8 @@ function isAvailable(item) {
 }
 
 
-const STOCK_CACHE_KEY = 'emporio_ar_stock_cache';
-const STOCK_CACHE_TTL_MS = 30 * 60 * 1000;
+const STOCK_CACHE_KEY = 'emporio_ar_stock_cache_v2';
+const STOCK_CACHE_TTL_MS = 5 * 60 * 1000;
 let stockLiveMap = null;
 
 function normStockKey(s) {
@@ -258,6 +258,10 @@ function lookupLiveStock(item, brand, cat) {
   const b = normStockKey(brand);
   const k1 = n + '|' + b;
   if (map[k1]) return map[k1];
+  // match by brand suffix in map keys
+  for (const [k, v] of Object.entries(map)) {
+    if (k.startsWith(n + '|')) return v;
+  }
   if (byName[n]) return byName[n];
   if (isBrand) {
     for (const [kn, v] of Object.entries(byName)) {
