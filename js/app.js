@@ -709,6 +709,7 @@ function buildDetailsNavList() {
         cat: g.cat || '',
         fonte: item.fonte || '',
         id_origem: item.id_origem || '',
+        url_origem: item.url_origem || '',
         variacoes: item.variacoes || [],
         total_estoque: item.total_estoque
       });
@@ -1011,11 +1012,22 @@ function openDetails(p, opts = {}) {
 async function refreshRoupasStock(p) {
   if (!p || !p.id_origem) return;
   try {
+    const metaEl = document.getElementById('modalMeta');
+    const metaPrev = metaEl ? metaEl.textContent : '';
+    if (metaEl && currentProduct && currentProduct.id_origem === p.id_origem) {
+      metaEl.textContent = (metaPrev || '') + ' · atualizando estoque…';
+    }
     const url = `/api/roupas-stock?id=${encodeURIComponent(p.id_origem)}`;
     const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
+      return;
+    }
     const data = await res.json();
-    if (!data || !Array.isArray(data.variacoes)) return;
+    if (!data || !Array.isArray(data.variacoes)) {
+      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
+      return;
+    }
 
     // Atualiza produto atual se ainda estiver aberto
     if (currentProduct && currentProduct.id_origem === p.id_origem) {
@@ -1051,11 +1063,23 @@ async function refreshRoupasStock(p) {
 async function refreshDandeStock(p) {
   if (!p || !p.id_origem) return;
   try {
-    const url = `/api/dande-stock?id=${encodeURIComponent(p.id_origem)}`;
+    const metaEl = document.getElementById('modalMeta');
+    const metaPrev = metaEl ? metaEl.textContent : '';
+    if (metaEl && currentProduct && currentProduct.id_origem === p.id_origem) {
+      metaEl.textContent = (metaPrev || '') + ' · atualizando estoque…';
+    }
+    let url = `/api/dande-stock?id=${encodeURIComponent(p.id_origem)}`;
+    if (p.url_origem) url += `&url=${encodeURIComponent(p.url_origem)}`;
     const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
+      return;
+    }
     const data = await res.json();
-    if (!data || !Array.isArray(data.variacoes)) return;
+    if (!data || !Array.isArray(data.variacoes)) {
+      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
+      return;
+    }
 
     if (currentProduct && currentProduct.id_origem === p.id_origem) {
       currentProduct.variacoes = data.variacoes;
@@ -1184,6 +1208,7 @@ function render() {
           cat: cat || item.cat || '',
           fonte: item.fonte || '',
           id_origem: item.id_origem || '',
+          url_origem: item.url_origem || '',
           variacoes: item.variacoes || [],
           total_estoque: item.total_estoque
         }));
