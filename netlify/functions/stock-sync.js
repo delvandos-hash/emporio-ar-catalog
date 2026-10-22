@@ -37,7 +37,12 @@ async function fetchImaratStock() {
     for (const p of products) {
       const disponivel = p.inStock === true ? 'Sim' : 'Não';
       map[`${norm(p.name)}|${norm(p.brand)}`] = disponivel;
-      if (byName[norm(p.name)] !== 'Não') byName[norm(p.name)] = disponivel;
+      // Preferir Sim se qualquer ocorrência do nome estiver em estoque
+      const nn = norm(p.name);
+      if (disponivel === 'Sim' || byName[nn] !== 'Sim') {
+        if (disponivel === 'Sim') byName[nn] = 'Sim';
+        else if (byName[nn] == null) byName[nn] = disponivel;
+      }
       fetched++;
     }
     if (fetched >= total || products.length < perPage) break;
@@ -92,7 +97,10 @@ async function fetchBrandStock() {
       }
       map[`${norm(name)}|${norm(cat)}`] = disponivel;
       const nn = norm(name);
-      if (byName[nn] !== 'Não') byName[nn] = disponivel;
+      if (disponivel === 'Sim' || byName[nn] !== 'Sim') {
+        if (disponivel === 'Sim') byName[nn] = 'Sim';
+        else if (byName[nn] == null) byName[nn] = disponivel;
+      }
       fetched++;
     }
   }
@@ -104,7 +112,7 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Cache-Control': 'public, max-age=300',
+    'Cache-Control': 'public, max-age=60',
   };
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers, body: '' };
