@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://catalogoemporioa.netlify.app/sitemap.xml
+Sitemap: https://emporioarcatalogo.netlify.app/sitemap.xml
