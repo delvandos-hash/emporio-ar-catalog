@@ -16,7 +16,7 @@ const BRAND_BASE = 'https://brandcollectionpy.com.br';
 const BRAND_SELLER = 'darlanaugusto';
 
 const BRAND_ALLOWED_SESSIONS = [
-  'ARABIC COLLECTION', 'BEAUTY BRAND', 'BODY SPLASH', 'BODY SPLAHS',
+  'ARABIC COLLECTION', 'BEAUTY BRAND', 'BODY SPLASH',
   'COLEÇÂO DREAM', 'COLECAO DREAM', 'COLEÇÃO BRAND', 'COLECAO BRAND',
   'DREAM BRAND 80/100ML', 'DREAM BRAND', 'FLACONETE BRAND',
   'FLACONETE  BRAND', 'SAPATINHO GOOD GIRL',
@@ -515,6 +515,474 @@ async function fetchSophiaRoupas() {
   return groups;
 }
 
+
+// ========== FRANNY (ROUPAS) ==========
+const FRANNY_BASE = 'https://frannyloja.com.br';
+const FRANNY_LOJA = '62999336607';
+const FRANNY_CATEGORIES = [
+  { id: '265229', nome: 'VESTIDOS' },
+  { id: '265231', nome: 'CONJUNTOS' },
+  { id: '347434', nome: 'BLUSA/CAMISA/CROPPED' },
+  { id: '265225', nome: 'BLUSA/CAMISA/CROPPED' },
+  { id: '304447', nome: 'CALÇA/SHORT' },
+  { id: '265226', nome: 'CALÇA/SHORT' },
+  { id: '265230', nome: 'CALÇA/SHORT' },
+  { id: '265227', nome: 'SAIAS' },
+  { id: '265228', nome: 'BODY' },
+  { id: '266049', nome: 'JAQUETAS' },
+];
+const ADD_FRANNY = process.env.ADD_FRANNY !== '0';
+const ADD_ACESSORIOS = process.env.ADD_ACESSORIOS !== '0';
+
+const FACILZAP_IMG = 'https://arquivos-cdn.facilzap.app.br/';
+
+function toAbsFacilImg(u) {
+  if (!u) return '';
+  const s = String(u.url || u).trim();
+  if (!s) return '';
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  return FACILZAP_IMG + s.replace(/^\//, '');
+}
+
+function limparDescricaoHtml(html) {
+  if (!html) return '';
+  return String(html)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&ccedil;/gi, 'ç')
+    .replace(/&atilde;/gi, 'ã')
+    .replace(/&aacute;/gi, 'á')
+    .replace(/&eacute;/gi, 'é')
+    .replace(/&iacute;/gi, 'í')
+    .replace(/&oacute;/gi, 'ó')
+    .replace(/&uacute;/gi, 'ú')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+async function warmFacilZap(base, loja) {
+  const UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+  const res = await fetch(`${base}/c/atacado/${loja}`, {
+    headers: { 'User-Agent': UA, Accept: 'text/html' },
+  });
+  const cookies = [];
+  const list = res.headers.getSetCookie?.() || [];
+  for (const c of list) cookies.push(c.split(';')[0]);
+  if (!cookies.length) {
+    const one = res.headers.get('set-cookie');
+    if (one) cookies.push(one.split(';')[0]);
+  }
+  await res.text().catch(() => {});
+  return cookies.join('; ');
+}
+
+async function fetchFacilZapPage(base, loja, catId, page, cookie) {
+  const UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+  const url = `${base}/c/atacado/carregar_produtos/${page}/${catId}/${loja}?mobile=0`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'User-Agent': UA,
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      Origin: base,
+      Referer: `${base}/c/atacado/${loja}`,
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: 'application/json, text/javascript, */*; q=0.01',
+      Cookie: cookie || '',
+    },
+    body: '',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  if (!text || text.trimStart().startsWith('<!')) throw new Error('HTML em vez de JSON');
+  return JSON.parse(text);
+}
+
+function normalizeFacilZapProduct(p, idPrefix = '') {
+  const precoBase = p.preco_por ?? p.preco ?? p.preco_de ?? p.valor ?? 0;
+  const { atacado, varejo } = calcPrecosRoupas(precoBase);
+  const imagens = Array.isArray(p.imagens) ? p.imagens.map(toAbsFacilImg).filter(Boolean) : [];
+  const foto = imagens[0] || toAbsFacilImg(p.imagem) || toAbsFacilImg(p.foto) || '';
+  const estoqueMap = p.estoque || {};
+  const varDict = p.variacoes || {};
+  const variacoes = Object.entries(varDict).map(([vid, vinfo]) => ({
+    id: String(vid),
+    nome: limparTexto((vinfo && vinfo.nome) || '').trim() || String(vid),
+    cor: (vinfo && vinfo.cor) || null,
+    estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
+  }));
+  const totalEstoque =
+    Number(p.total_estoque) || variacoes.reduce((s, v) => s + v.estoque, 0);
+  const id = String(p.id || '');
+  return {
+    nome: limparTexto(p.nome || p.titulo || 'Produto'),
+    volume: '—',
+    varejo,
+    atacado,
+    disponivel: totalEstoque > 0 ? 'Sim' : 'Não',
+    notas: limparDescricaoHtml(p.descricao || p.descricao_completa || ''),
+    foto,
+    fotos: imagens.length ? imagens : foto ? [foto] : [],
+    badge: '',
+    fonte: 'roupas',
+    id_origem: idPrefix ? `${idPrefix}${id}` : id,
+    total_estoque: totalEstoque,
+    variacoes,
+  };
+}
+
+async function fetchFrannyRoupas() {
+  console.log('  Warm-up Franny...');
+  let cookie = await warmFacilZap(FRANNY_BASE, FRANNY_LOJA);
+  const byId = new Map();
+  for (const cat of FRANNY_CATEGORIES) {
+    console.log(`  Franny cat ${cat.nome} (${cat.id})`);
+    for (let page = 1; page <= 30; page++) {
+      try {
+        const data = await fetchFacilZapPage(FRANNY_BASE, FRANNY_LOJA, cat.id, page, cookie);
+        const produtos = data.produtos || [];
+        if (!produtos.length) break;
+        let novo = 0;
+        for (const p of produtos) {
+          const id = String(p.id || '');
+          if (!id || byId.has(id)) continue;
+          const item = normalizeFacilZapProduct(p, 'franny-');
+          item.cat = cat.nome;
+          byId.set(id, item);
+          novo++;
+        }
+        console.log(`    p${page}: +${novo}`);
+        if (produtos.length < 5) break;
+        await sleep(400 + Math.floor(Math.random() * 300));
+      } catch (e) {
+        console.log(`    Franny erro p${page}: ${e.message}`);
+        try { cookie = await warmFacilZap(FRANNY_BASE, FRANNY_LOJA); } catch (_) {}
+        break;
+      }
+    }
+    await sleep(500);
+  }
+  const byCat = new Map();
+  for (const item of byId.values()) {
+    const cat = item.cat || 'OUTROS';
+    delete item.cat;
+    if (!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat).push(item);
+  }
+  const groups = [];
+  for (const [cat, items] of byCat) {
+    items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    groups.push({ cat, brand: 'Empório A.R', items });
+  }
+  console.log(`  Franny total: ${byId.size} produtos`);
+  return groups;
+}
+
+/** Mescla grupos de roupas por categoria; itens por id_origem (não apaga Franny) */
+function mergeRoupasGroups(listOfGroupArrays) {
+  const byCat = new Map();
+  const seenIds = new Set();
+  for (const groups of listOfGroupArrays) {
+    for (const g of groups || []) {
+      const cat = g.cat || 'OUTROS';
+      if (!byCat.has(cat)) {
+        byCat.set(cat, { cat, brand: 'Empório A.R', cat_id: g.cat_id, items: [] });
+      }
+      const bucket = byCat.get(cat);
+      for (const it of g.items || []) {
+        const oid = String(it.id_origem || '');
+        if (oid && seenIds.has(oid)) continue;
+        if (oid) seenIds.add(oid);
+        bucket.items.push(it);
+      }
+    }
+  }
+  const out = [...byCat.values()];
+  for (const g of out) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  out.sort((a, b) => a.cat.localeCompare(b.cat, 'pt-BR'));
+  return out;
+}
+
+// ========== DANDE (ACESSÓRIOS) ==========
+const DANDE_BASE = 'https://dandejoias.com';
+const DANDE_CATEGORIES = [
+  { path: '/acessorios-de-cabelo/', nome: 'Acessórios de Cabelo' },
+  { path: '/aneis/', nome: 'Anéis' },
+  { path: '/braceletes/', nome: 'Braceletes' },
+  { path: '/brincos/', nome: 'Brincos' },
+  { path: '/colares/', nome: 'Colares' },
+  { path: '/conjuntos/', nome: 'Conjuntos' },
+  { path: '/lancamentos/', nome: 'Lançamentos' },
+  { path: '/masculinos/', nome: 'Masculinos' },
+  { path: '/prata-925/', nome: 'Prata 925' },
+  { path: '/pulseiras/', nome: 'Pulseiras' },
+  { path: '/semijoia-italiana/', nome: 'Semijoia Italiana' },
+  { path: '/tornozeleiras/', nome: 'Tornozeleiras' },
+];
+
+function calcPrecosAcessorios(precoBase) {
+  const base = Number(String(precoBase).replace(',', '.')) || 0;
+  const fmt = (n) => n.toFixed(2).replace('.', ',');
+  if (base >= 50) {
+    return { atacado: fmt(base * 2.5), varejo: fmt(base * 3), base };
+  }
+  return { atacado: fmt(base * 3.5), varejo: fmt(base * 5), base };
+}
+
+function decodeEntities(s) {
+  return String(s || '')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+}
+
+function upgradeDandeImg(u) {
+  if (!u) return '';
+  let s = String(u).trim();
+  if (!s) return '';
+  if (s.startsWith('//')) s = 'https:' + s;
+  s = s.replace('http://', 'https://');
+  // prefer larger size
+  s = s.replace(/-\d+-\d+(\.(?:jpg|jpeg|png|webp))/i, '-1024-1024$1');
+  return s;
+}
+
+async function fetchDandeCategoryPage(path, page = 1) {
+  const UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+  const url = page <= 1
+    ? `${DANDE_BASE}${path}`
+    : `${DANDE_BASE}${path}?page=${page}`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'pt-BR,pt;q=0.9' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.text();
+}
+
+function parseDandeListProducts(html) {
+  const products = [];
+  // data-product-id + nearby data-variants / links
+  const re = /data-product-id=["'](\d+)["']/gi;
+  const seen = new Set();
+  let m;
+  while ((m = re.exec(html))) {
+    const id = m[1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const start = Math.max(0, m.index - 200);
+    const chunk = html.slice(start, m.index + 6000);
+    const nameM = chunk.match(/data-product-name=["']([^"']+)["']/i)
+      || chunk.match(/itemprop=["']name["'][^>]*content=["']([^"']+)["']/i)
+      || chunk.match(/<h[23][^>]*class="[^"]*item-name[^"]*"[^>]*>([^<]+)/i);
+    const hrefM = chunk.match(/href=["'](https?:\/\/dandejoias\.com\/produtos\/[^"']+|\/produtos\/[^"']+)["']/i);
+    const priceM = chunk.match(/data-product-price=["']([^"']+)["']/i)
+      || chunk.match(/itemprop=["']price["'][^>]*content=["']([^"']+)["']/i);
+    let variants = [];
+    const vm = chunk.match(/data-variants=["']([^"']*)["']/i);
+    if (vm) {
+      try { variants = JSON.parse(decodeEntities(vm[1])); } catch (_) {}
+    }
+    let url = hrefM ? hrefM[1] : '';
+    if (url && url.startsWith('/')) url = DANDE_BASE + url;
+    const nome = limparTexto(nameM ? decodeEntities(nameM[1]) : '');
+    const preco = priceM ? Number(String(priceM[1]).replace(',', '.')) : 0;
+    products.push({ id, nome, url, preco, variants });
+  }
+  return products;
+}
+
+async function fetchDandeProductDetail(url) {
+  const UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+  const res = await fetch(url, {
+    headers: { 'User-Agent': UA, Accept: 'text/html' },
+  });
+  if (!res.ok) return null;
+  const html = await res.text();
+  let variants = [];
+  const all = [...html.matchAll(/data-variants="([^"]*)"/g)];
+  for (const mm of all) {
+    try {
+      const v = JSON.parse(decodeEntities(mm[1]));
+      if (Array.isArray(v) && v.length) { variants = v; break; }
+    } catch (_) {}
+  }
+  const descM = html.match(/itemprop=["']description["'][^>]*content=["']([^"']*)["']/i)
+    || html.match(/<div[^>]*id=["']product-description["'][^>]*>([\s\S]*?)<\/div>/i);
+  const desc = descM ? limparDescricaoHtml(decodeEntities(descM[1])) : '';
+  const imgs = [];
+  for (const im of html.matchAll(/data-image=["']([^"']+)["']/gi)) {
+    const u = upgradeDandeImg(im[1]);
+    if (u && !imgs.includes(u)) imgs.push(u);
+  }
+  for (const im of html.matchAll(/https:\/\/[^"'\s]+\/products\/\d+\/[^"'\s]+-1024-1024\.(?:jpg|jpeg|png|webp)/gi)) {
+    const u = upgradeDandeImg(im[0]);
+    if (u && !imgs.includes(u)) imgs.push(u);
+  }
+  const og = html.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+  if (og) {
+    const u = upgradeDandeImg(og[1]);
+    if (u && !imgs.includes(u)) imgs.unshift(u);
+  }
+  return { variants, desc, imgs };
+}
+
+function dandeVariantsToVariacoes(variants) {
+  return (variants || []).map((v) => {
+    const opts = [v.option0, v.option1, v.option2].filter(Boolean);
+    return {
+      id: String(v.id || ''),
+      nome: opts.length ? opts.join(' / ') : v.sku || 'Único',
+      sku: v.sku || '',
+      estoque: Number(v.stock) || 0,
+    };
+  });
+}
+
+async function fetchDandeAcessorios(existingGroups = []) {
+  const existingById = new Map();
+  for (const g of existingGroups || []) {
+    for (const it of g.items || []) {
+      if (it.id_origem) existingById.set(String(it.id_origem), it);
+    }
+  }
+
+  const byId = new Map();
+  for (const cat of DANDE_CATEGORIES) {
+    console.log(`  Dande cat ${cat.nome}`);
+    for (let page = 1; page <= 15; page++) {
+      try {
+        const html = await fetchDandeCategoryPage(cat.path, page);
+        const list = parseDandeListProducts(html);
+        if (!list.length) break;
+        let added = 0;
+        for (const p of list) {
+          if (byId.has(p.id)) continue;
+          let variants = p.variants || [];
+          let desc = '';
+          let imgs = [];
+          const prev = existingById.get(p.id);
+          // detalhe só se novo ou sem variações no snapshot
+          if (p.url && (!prev || !(prev.variacoes || []).length || !prev.notas)) {
+            try {
+              const det = await fetchDandeProductDetail(p.url);
+              if (det) {
+                if (det.variants?.length) variants = det.variants;
+                desc = det.desc || '';
+                imgs = det.imgs || [];
+              }
+              await sleep(250);
+            } catch (_) {}
+          } else if (prev) {
+            desc = prev.notas || '';
+            imgs = prev.fotos || (prev.foto ? [prev.foto] : []);
+            if (!variants.length && prev.variacoes) {
+              // keep previous structure but will reprice from list price
+              variants = null;
+            }
+          }
+          let precoBase = p.preco;
+          if ((!precoBase || precoBase <= 0) && variants && variants[0]) {
+            precoBase = Number(variants[0].price_number || variants[0].price || 0);
+          }
+          if ((!precoBase || precoBase <= 0) && prev) {
+            // reverse approx from atacado with old or new rule — skip, use list only
+            precoBase = 0;
+          }
+          const prices = calcPrecosAcessorios(precoBase || 0);
+          let variacoes;
+          let totalEstoque;
+          if (variants && Array.isArray(variants) && variants.length && variants[0].stock !== undefined) {
+            variacoes = dandeVariantsToVariacoes(variants);
+            totalEstoque = variacoes.reduce((s, v) => s + v.estoque, 0);
+          } else if (prev && prev.variacoes) {
+            variacoes = prev.variacoes;
+            totalEstoque = Number(prev.total_estoque) || variacoes.reduce((s, v) => s + (Number(v.estoque) || 0), 0);
+          } else {
+            variacoes = [];
+            totalEstoque = 0;
+          }
+          if (!imgs.length && prev) imgs = prev.fotos || (prev.foto ? [prev.foto] : []);
+          const foto = imgs[0] || (prev && prev.foto) || '';
+          const nome = p.nome || (prev && prev.nome) || 'Produto';
+          byId.set(p.id, {
+            nome: limparTexto(nome),
+            volume: '—',
+            varejo: prices.varejo,
+            atacado: prices.atacado,
+            disponivel: totalEstoque > 0 ? 'Sim' : (prev?.disponivel || 'Sim'),
+            notas: desc || (prev?.notas || ''),
+            foto,
+            fotos: imgs.length ? imgs : foto ? [foto] : [],
+            badge: '',
+            fonte: 'acessorios',
+            id_origem: String(p.id),
+            url_origem: p.url || (prev && prev.url_origem) || '',
+            total_estoque: totalEstoque,
+            variacoes,
+            cat: cat.nome,
+          });
+          added++;
+        }
+        console.log(`    p${page}: lote ${list.length} únicos+${added}`);
+        if (list.length < 8) break;
+        await sleep(400);
+      } catch (e) {
+        console.log(`    Dande erro ${cat.nome} p${page}: ${e.message}`);
+        break;
+      }
+    }
+  }
+
+  const byCat = new Map();
+  for (const item of byId.values()) {
+    const cat = item.cat || 'Outros';
+    delete item.cat;
+    if (!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat).push(item);
+  }
+  // Preserve existing items not found in scrape (keep snapshot)
+  for (const [id, prev] of existingById) {
+    if (byId.has(id)) continue;
+    const cat = prev.cat || 'Outros';
+    // try find cat from existing groups
+    let foundCat = 'Outros';
+    for (const g of existingGroups || []) {
+      if ((g.items || []).some((it) => String(it.id_origem) === String(id))) {
+        foundCat = g.cat || 'Outros';
+        break;
+      }
+    }
+    if (!byCat.has(foundCat)) byCat.set(foundCat, []);
+    byCat.get(foundCat).push({ ...prev, fonte: 'acessorios' });
+  }
+
+  const groups = [];
+  for (const [cat, items] of byCat) {
+    items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    groups.push({ cat, brand: 'Empório A.R', items });
+  }
+  groups.sort((a, b) => a.cat.localeCompare(b.cat, 'pt-BR'));
+  const total = groups.reduce((s, g) => s + g.items.length, 0);
+  console.log(`  Dande total: ${total} produtos`);
+  return groups;
+}
+
+
 async function main() {
   console.log('Carregando data.js...');
   let raw = fs.readFileSync(dataPath, 'utf8');
@@ -702,25 +1170,70 @@ async function main() {
     }
   }
 
-  // ----- Roupas (Sophia Moda) -----
+  // ----- Roupas (Sophia + Franny) — merge, não sobrescreve -----
   let roupasCount = 0;
-  if (ADD_ROUPAS) {
-    console.log('Buscando Roupas na Sophia Moda...');
-    try {
-      const roupasGroups = await fetchSophiaRoupas();
-      roupasCount = roupasGroups.reduce((s, g) => s + g.items.length, 0);
-      if (roupasCount > 0) {
-        DATA.roupas = roupasGroups;
-        console.log(`Roupas Sophia: ${roupasCount} produtos em ${roupasGroups.length} categorias`);
-      } else {
-        console.log('Roupas Sophia: 0 (mantendo dados anteriores de DATA.roupas se existirem)');
+  let frannyCount = 0;
+  if (ADD_ROUPAS || ADD_FRANNY) {
+    const chunks = [];
+    // mantém snapshot atual como base para não perder itens se um site falhar
+    if (Array.isArray(DATA.roupas) && DATA.roupas.length) {
+      chunks.push(DATA.roupas);
+    }
+    if (ADD_ROUPAS) {
+      console.log('Buscando Roupas na Sophia Moda...');
+      try {
+        const sophiaGroups = await fetchSophiaRoupas();
+        const n = sophiaGroups.reduce((s, g) => s + g.items.length, 0);
+        roupasCount = n;
+        if (n > 0) chunks.push(sophiaGroups);
+        console.log(`Roupas Sophia: ${n} produtos`);
+      } catch (e) {
+        console.log(`❌ Erro Sophia: ${e.message} (mantendo snapshot)`);
       }
-    } catch (e) {
-      console.log(`❌ Erro ao buscar Sophia Moda: ${e.message}`);
-      console.log('Roupas Sophia: 0 (mantendo snapshot anterior)');
+    } else {
+      console.log('ADD_ROUPAS=0 — pulando Sophia');
+    }
+    if (ADD_FRANNY) {
+      console.log('Buscando Roupas na Franny...');
+      try {
+        const frannyGroups = await fetchFrannyRoupas();
+        frannyCount = frannyGroups.reduce((s, g) => s + g.items.length, 0);
+        if (frannyCount > 0) chunks.push(frannyGroups);
+        console.log(`Roupas Franny: ${frannyCount} produtos`);
+      } catch (e) {
+        console.log(`❌ Erro Franny: ${e.message} (mantendo snapshot)`);
+      }
+    } else {
+      console.log('ADD_FRANNY=0 — pulando Franny');
+    }
+    if (chunks.length) {
+      DATA.roupas = mergeRoupasGroups(chunks);
+      const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
+      console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
     }
   } else {
-    console.log('ADD_ROUPAS=0 — pulando Sophia Moda');
+    console.log('ADD_ROUPAS=0 e ADD_FRANNY=0 — pulando Roupas');
+  }
+
+  // ----- Acessórios (Dande) -----
+  let acessoriosCount = 0;
+  if (ADD_ACESSORIOS) {
+    console.log('Buscando Acessórios na Dande...');
+    try {
+      const prevAcc = Array.isArray(DATA.acessorios) ? DATA.acessorios : [];
+      const accGroups = await fetchDandeAcessorios(prevAcc);
+      acessoriosCount = accGroups.reduce((s, g) => s + g.items.length, 0);
+      if (acessoriosCount > 0) {
+        DATA.acessorios = accGroups;
+        console.log(`Acessórios Dande: ${acessoriosCount} produtos em ${accGroups.length} categorias`);
+      } else {
+        console.log('Acessórios Dande: 0 (mantendo snapshot)');
+      }
+    } catch (e) {
+      console.log(`❌ Erro Dande: ${e.message} (mantendo snapshot)`);
+    }
+  } else {
+    console.log('ADD_ACESSORIOS=0 — pulando Dande');
   }
 
   for (const line of Object.keys(DATA)) {
@@ -728,13 +1241,13 @@ async function main() {
     DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
   }
 
-  const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount} Roupas | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
+  const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount}+${frannyCount} Roupas +${acessoriosCount} Acc | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
   fs.writeFileSync(dataPath, out, 'utf8');
 
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
   console.log(`Novos Brand: ${addedBrand}`);
-  console.log(`Roupas Sophia: ${roupasCount}`);
+  console.log(`Roupas Sophia: ${roupasCount} | Franny: ${frannyCount} | Acessórios: ${acessoriosCount}`);
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log(`Preços alterados: ${priceChanged}`);
   console.log('data.js atualizado localmente (com correção forçada).');
