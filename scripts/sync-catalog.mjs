@@ -1236,6 +1236,21 @@ async function main() {
     console.log('ADD_ACESSORIOS=0 — pulando Dande');
   }
 
+  // Sanitização pós-sync
+  for (const line of Object.keys(DATA)) {
+    DATA[line] = (DATA[line] || []).filter((g) => !String(g.brand || '').toUpperCase().includes('SPLAHS'));
+  }
+  for (const g of (DATA.roupas || [])) {
+    for (const it of g.items || []) {
+      if (it.notas) {
+        it.notas = String(it.notas).replace(/\bForo\b/g, 'Forro').replace(/\bforo\b/g, 'forro');
+      }
+      if (it.nome) {
+        it.nome = String(it.nome).replace(/\bForo\b/g, 'Forro').replace(/\bforo\b/g, 'forro');
+      }
+    }
+  }
+
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
