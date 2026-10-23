@@ -387,7 +387,25 @@ function ensureBrandCategoryFilters() {
 
 function allGroups() {
   const genderOrder = ['feminino', 'masculino', 'unissex', 'roupas', 'acessorios'];
-  const lines = state.gender === 'Todos' ? genderOrder : [state.gender.toLowerCase()];
+  const gSel = String(state.gender || 'Todos');
+  // Sessão Brand: coleta Brand de masculino/feminino/unissex e usa a coleção (brand) como categoria
+  if (gSel.toLowerCase() === 'brand') {
+    const result = [];
+    for (const line of ['masculino', 'feminino', 'unissex']) {
+      for (const g of (DATA[line] || [])) {
+        const cat = g.cat || '';
+        if (cat !== 'Brand' && !String(cat).startsWith('Brand')) continue;
+        result.push({
+          ...g,
+          line: 'brand',
+          cat: g.brand || 'Brand', // subcategoria = nome da coleção
+          items: g.items.map(it => applyOverride(it, g.brand))
+        });
+      }
+    }
+    return result;
+  }
+  const lines = gSel === 'Todos' ? genderOrder : [gSel.toLowerCase()];
   const result = [];
   for (const line of lines) {
     for (const g of (DATA[line] || [])) {
@@ -1168,14 +1186,18 @@ function render() {
     const brands = byCat[cat];
     const lines = brands.map(b => b.line);
     const lineClass = cat === 'Scoop Premiado' ? 'cat-scoop'
+      : String(state.gender || '').toLowerCase() === 'brand' ? 'cat-brand'
       : state.gender === 'Feminino' ? 'cat-fem'
       : state.gender === 'Unissex' ? 'cat-uni'
       : state.gender === 'Masculino' ? 'cat-masc'
       : lines[0] === 'feminino' ? 'cat-fem'
       : lines[0] === 'unissex' ? 'cat-uni'
+      : lines[0] === 'brand' ? 'cat-brand'
       : 'cat-masc';
 
-    const catTitle = cat === 'Brand' ? (sectionDisplayName(cat) === cat ? 'Brand Collection' : sectionDisplayName(cat)) : sectionDisplayName(cat);
+    const catTitle = (cat === 'Brand')
+      ? (sectionDisplayName(cat) === cat ? 'Brand Collection' : sectionDisplayName(cat))
+      : sectionDisplayName(cat);
     html += `<div class="category ${lineClass}${cat === 'Brand' ? ' cat-brand' : ''}"><div class="category-title">${catTitle}</div>`;
     brands.sort((a, b) => a.brand.localeCompare(b.brand, 'pt-BR'));
 
@@ -1418,6 +1440,31 @@ function updateCategoryFiltersForGender(gender) {
     let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
     for (const c of sorted) {
       html += `<button class="fbtn" data-filter="category" data-value="${c}">${c}</button>`;
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.fbtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.category = btn.dataset.value;
+        render();
+      });
+    });
+  } else if (g === 'brand') {
+    const cats = new Set();
+    for (const line of ['masculino', 'feminino', 'unissex']) {
+      for (const group of (DATA[line] || [])) {
+        const cat = group.cat || '';
+        if (cat === 'Brand' || String(cat).startsWith('Brand')) {
+          if (group.brand) cats.add(group.brand);
+        }
+      }
+    }
+    const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
+    for (const c of sorted) {
+      const safe = String(c).replace(/"/g, '&quot;');
+      html += `<button class="fbtn" data-filter="category" data-value="${safe}">${safe}</button>`;
     }
     el.innerHTML = html;
     el.querySelectorAll('.fbtn').forEach(btn => {
