@@ -347,40 +347,13 @@ function sortItems(items, brand) {
 
 
 function ensureBrandCategoryFilters() {
+  // Brand é sessão (gender), não chip de categoria — não injeta botão duplicado
   const el = document.getElementById('categoryFilters');
   if (!el) return;
-  // Remove old "Brand · ..." filter chips if any
   el.querySelectorAll('.fbtn').forEach(btn => {
     const v = btn.dataset.value || '';
-    if (v.startsWith('Brand ·')) btn.remove();
+    if (v === 'Brand' || v.startsWith('Brand ·')) btn.remove();
   });
-  if (el.dataset.brandReady) return;
-  // Check if DATA has Brand category
-  let hasBrand = false;
-  for (const line of Object.keys(DATA)) {
-    for (const g of (DATA[line] || [])) {
-      if (g.cat === 'Brand') { hasBrand = true; break; }
-    }
-    if (hasBrand) break;
-  }
-  if (!hasBrand) return;
-  const existing = new Set([...el.querySelectorAll('.fbtn')].map(b => b.dataset.value));
-  if (!existing.has('Brand')) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'fbtn';
-    btn.dataset.filter = 'category';
-    btn.dataset.value = 'Brand';
-    btn.textContent = 'Brand';
-    btn.addEventListener('click', () => {
-      el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.category = 'Brand';
-      render();
-    });
-    el.appendChild(btn);
-  }
-  el.dataset.brandReady = '1';
 }
 
 
@@ -1483,8 +1456,7 @@ function updateCategoryFiltersForGender(gender) {
     <button class="fbtn" data-filter="category" data-value="Miniaturas">Miniaturas</button>
     <button class="fbtn" data-filter="category" data-value="Óleos">Óleos</button>
     <button class="fbtn" data-filter="category" data-value="Outros">Outros</button>
-    <button class="fbtn" data-filter="category" data-value="Scoop Premiado">Scoop Premiado</button>
-    <button class="fbtn" data-filter="category" data-value="Brand">Brand</button>`;
+    <button class="fbtn" data-filter="category" data-value="Scoop Premiado">Scoop Premiado</button>`;
     el.querySelectorAll('.fbtn').forEach(btn => {
       btn.addEventListener('click', () => {
         el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
