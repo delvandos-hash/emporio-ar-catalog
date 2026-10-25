@@ -94,9 +94,75 @@ const state = {
   category: 'Todos',
   price: 'Todos',
   stock: 'Todos',
+  volume: 'Todos',
   search: '',
-  sort: 'nome-asc'
+  sort: 'nome-asc',
+  vitrine: 'Todos' // Todos | Lancamentos | Destaques
 };
+
+/** Sinônimos de busca (sem acento, minúsculo) */
+const SEARCH_SYNONYMS = {
+  yara: ['yara', 'iara'],
+  asad: ['asad', 'assad'],
+  khamrah: ['khamrah', 'khamra', 'qahwa'],
+  hawas: ['hawas', 'havas'],
+  fakhar: ['fakhar', 'fakar'],
+  baccarat: ['baccarat', 'bacarat', 'bacarra'],
+  sauvage: ['sauvage', 'savage'],
+  aventus: ['aventus', 'aventure'],
+  mini: ['mini', 'miniatura', 'miniaturas'],
+  miniatura: ['mini', 'miniatura', 'miniaturas'],
+};
+
+function normalizeSearch(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchesSearch(item, brand, cat, q) {
+  if (!q || !String(q).trim()) return true;
+  const hay = normalizeSearch(
+    [item.nome, brand, item.volume, item.notas, cat, item.badge, item.line]
+      .filter(Boolean)
+      .join(' ')
+  );
+  const tokens = normalizeSearch(q).split(' ').filter(Boolean);
+  return tokens.every((t) => {
+    const alts = SEARCH_SYNONYMS[t] || [t];
+    return alts.some((a) => hay.includes(a));
+  });
+}
+
+function volumeBucket(item) {
+  const v = String(item.volume || '').toLowerCase().replace(',', '.');
+  const n = String(item.nome || '').toLowerCase();
+  const ml = v.match(/(\d+(?:\.\d+)?)\s*ml/);
+  const num = ml ? parseFloat(ml[1]) : NaN;
+  if (n.includes('miniatura') || n.includes('mini ') || n.startsWith('mini')) return 'Mini';
+  if (!isNaN(num)) {
+    if (num <= 30) return 'Mini';
+    if (num >= 80 && num <= 120) return '100ml';
+    if (num > 120) return '200ml+';
+  }
+  if (v.includes('100')) return '100ml';
+  if (v.includes('200') || v.includes('250')) return '200ml+';
+  return 'Outros';
+}
+
+function isLancamentoItem(item, cat) {
+  const c = String(cat || item.cat || '').toLowerCase();
+  const b = String(item.badge || '').toLowerCase();
+  const n = String(item.nome || '').toLowerCase();
+  if (c.includes('lanç') || c.includes('lanc')) return true;
+  if (b.includes('novo') || b.includes('lanç') || b.includes('lanc') || b === 'new') return true;
+  if (n.includes('lançamento') || n.includes('lancamento')) return true;
+  return false;
+}
 
 const CART_KEY = 'emporio_ar_cart';
 const ADMIN_KEY = 'emporio_ar_admin';
@@ -397,17 +463,18 @@ function cartKey(p) {
 }
 
 function buildWaMessage(p) {
-  let msg = 'Olá! Gostaria de comprar o seguinte produto do Empório A.R:\n\n';
-  msg += `*${p.nome}*\nMarca: ${p.brand}\n`;
+  let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
+  msg += `*${p.nome}*\n`;
+  msg += `Marca: ${p.brand || 'Empório A.R'}\n`;
   if (p.volume && p.volume !== '—' && !isVariacaoCatalogProduct(p)) msg += `Volume: ${p.volume}\n`;
   const variacao = p.variacaoSelecionada || getSelectedVariacao();
   if (variacao && variacao.nome) {
-    msg += `*Variação / Tamanho: ${variacao.nome}*\n`;
+    msg += `Variação / Tamanho: *${variacao.nome}*\n`;
   }
   if (p.cat && isVariacaoCatalogProduct(p)) msg += `Categoria: ${p.cat}\n`;
-  msg += `Varejo: R$ ${p.varejo}\n`;
-  if (p.atacado && p.atacado !== '—') msg += `Atacado (6+): R$ ${p.atacado}\n`;
-  msg += '\nPode me informar a disponibilidade e formas de pagamento?';
+  msg += `Varejo: *R$ ${p.varejo}*\n`;
+  if (p.atacado && p.atacado !== '—') msg += `Atacado (6+): *R$ ${p.atacado}*\n`;
+  msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
 
@@ -420,25 +487,44 @@ function formatBRL(n) {
   return n.toFixed(2).replace('.', ',');
 }
 
+function getCartMeta() {
+  const nome = (document.getElementById('cartClientName')?.value || '').trim();
+  const obs = (document.getElementById('cartObs')?.value || '').trim();
+  const prefer = document.querySelector('input[name="cartPricePref"]:checked')?.value || 'auto';
+  return { nome, obs, prefer };
+}
+
 function buildCartWaMessage() {
   const totalItens = cartTotalQty();
-  const useAtacado = totalItens >= 6;
+  const meta = getCartMeta();
+  let useAtacado = totalItens >= 6;
+  if (meta.prefer === 'varejo') useAtacado = false;
+  if (meta.prefer === 'atacado') useAtacado = true;
   const modo = useAtacado ? 'ATACADO (6+ itens)' : 'VAREJO';
-  let msg = 'Olá! Gostaria de fazer o seguinte pedido no Empório A.R:\n\n';
-  msg += `*Tabela: ${modo}*\n\n`;
+  const agora = new Date();
+  const dataHora = agora.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  let msg = 'Olá! Gostaria de *confirmar o pedido* no *Empório A.R*.\n\n';
+  msg += `📅 ${dataHora}\n`;
+  if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
+  msg += `📋 Tabela: *${modo}*\n`;
+  msg += '────────────────\n';
   let total = 0;
   cart.forEach((p, i) => {
     const unit = unitPrice(p, useAtacado);
     const sub = unit * p.qty;
     total += sub;
-    msg += `${i + 1}. *${p.nome}* (${p.brand})`;
-    if (p.variacaoNome) msg += ` — *${p.variacaoNome}*`;
-    else if (p.volume && p.volume !== '—') msg += ` — ${p.volume}`;
-    msg += `\n   Qtd: ${p.qty} × R$ ${formatBRL(unit)} = R$ ${formatBRL(sub)}\n`;
+    msg += `*${i + 1}. ${p.nome}*\n`;
+    msg += `   Marca: ${p.brand || 'Empório A.R'}\n`;
+    if (p.variacaoNome) msg += `   Variação: *${p.variacaoNome}*\n`;
+    else if (p.volume && p.volume !== '—') msg += `   Volume: ${p.volume}\n`;
+    if (p.cat) msg += `   Categoria: ${p.cat}\n`;
+    msg += `   Qtd: *${p.qty}* × R$ ${formatBRL(unit)} = *R$ ${formatBRL(sub)}*\n`;
   });
-  msg += `\n*Total de itens: ${totalItens}*`;
-  msg += `\n*Valor total: R$ ${formatBRL(total)}*`;
-  msg += '\n\nPode confirmar disponibilidade e formas de pagamento?';
+  msg += '────────────────\n';
+  msg += `*Itens: ${totalItens}*\n`;
+  msg += `*Total: R$ ${formatBRL(total)}*\n`;
+  if (meta.obs) msg += `\n📝 Obs.: ${meta.obs}\n`;
+  msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
 
@@ -535,10 +621,14 @@ function renderCart() {
     list.innerHTML = '';
     empty.style.display = 'block';
     checkout.style.display = 'none';
+    const form = document.getElementById('cartForm');
+    if (form) form.style.display = 'none';
     return;
   }
   empty.style.display = 'none';
   checkout.style.display = 'block';
+  const form = document.getElementById('cartForm');
+  if (form) form.style.display = 'block';
 
   const totalItens = cartTotalQty();
   const useAtacado = totalItens >= 6;
@@ -683,8 +773,8 @@ function buildDetailsNavList() {
       if (!inPriceRange(item.varejo)) continue;
       if (state.stock === 'Disponivel' && !isAvailable(item)) continue;
       if (state.stock === 'Esgotado' && isAvailable(item)) continue;
-      const q = state.search.trim().toLowerCase();
-      if (q && !item.nome.toLowerCase().includes(q) && !g.brand.toLowerCase().includes(q)) continue;
+      if (!matchesSearch(item, g.brand, g.cat, state.search)) continue;
+      if (state.volume !== 'Todos' && volumeBucket(item) !== state.volume) continue;
       list.push({
         nome: item.nome,
         brand: g.brand,
@@ -1116,6 +1206,80 @@ function closeModal() {
 }
 
 
+
+function collectFeatured(limit = 12) {
+  const out = [];
+  const seen = new Set();
+  for (const g of allGroups()) {
+    for (const raw of g.items || []) {
+      const item = validateProductPrices(raw);
+      if (!isAvailable(item)) continue;
+      if (!isLancamentoItem(item, g.cat) && !(item.badge && String(item.badge).toLowerCase().includes('scoop'))) {
+        // allow acessorios Lançamentos only or scoop
+        if (!isLancamentoItem(item, g.cat)) continue;
+      }
+      const key = `${g.brand}|${item.nome}|${item.volume || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        ...item,
+        brand: g.brand,
+        cat: g.cat,
+        line: g.line,
+      });
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
+function buildFeaturedHtml() {
+  // só na home (sem busca / filtros fechados)
+  if (state.search.trim()) return '';
+  if (state.gender !== 'Todos' && state.gender.toLowerCase() !== 'todos') return '';
+  if (state.category !== 'Todos') return '';
+  if (state.vitrine === 'Destaques') {
+    /* show only via filter */ 
+  }
+  const items = collectFeatured(12);
+  if (!items.length) return '';
+  const cards = items.map((item) => {
+    const pdata = encodeURIComponent(JSON.stringify({
+      nome: item.nome,
+      brand: item.brand,
+      volume: item.volume,
+      varejo: item.varejo,
+      atacado: item.atacado,
+      foto: item.foto,
+      fotos: item.fotos || (item.foto ? [item.foto] : []),
+      notas: item.notas,
+      disponivel: item.disponivel || 'Sim',
+      badge: item.badge || '',
+      line: item.line || '',
+      cat: item.cat || '',
+      fonte: item.fonte || '',
+      id_origem: item.id_origem || '',
+      url_origem: item.url_origem || '',
+      variacoes: item.variacoes || [],
+      total_estoque: item.total_estoque
+    }));
+    const foto = item.foto || '';
+    return `<button type="button" class="feat-card" data-p="${pdata}">
+      ${foto ? `<img src="${foto}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : '<div class="feat-ph">SEM FOTO</div>'}
+      <span class="feat-name">${item.nome}</span>
+      <span class="feat-price">R$ ${item.varejo}</span>
+    </button>`;
+  }).join('');
+  return `<section class="featured-strip" aria-label="Lançamentos">
+    <div class="featured-head">
+      <h2>✨ Lançamentos</h2>
+      <button type="button" class="fbtn" id="btnVerLancamentos">Ver todos</button>
+    </div>
+    <div class="featured-row">${cards}</div>
+  </section>`;
+}
+
+
 function render() {
   if (state.category !== 'Todos' && !sectionActive(state.category)) {
     state.category = 'Todos';
@@ -1132,8 +1296,10 @@ function render() {
       if (!inPriceRange(item.varejo)) return false;
       if (state.stock === 'Disponivel' && !isAvailable(item)) return false;
       if (state.stock === 'Esgotado' && isAvailable(item)) return false;
-      if (!q) return true;
-      return item.nome.toLowerCase().includes(q) || g.brand.toLowerCase().includes(q);
+      if (!matchesSearch(item, g.brand, g.cat, state.search)) return false;
+      if (state.volume !== 'Todos' && volumeBucket(item) !== state.volume) return false;
+      if (state.vitrine === 'Lancamentos' && !isLancamentoItem(item, g.cat)) return false;
+      return true;
     });
     if (!items.length) continue;
     if (!byCat[g.cat]) byCat[g.cat] = [];
@@ -1248,7 +1414,20 @@ function render() {
     }
     html += `</div>`;
   }
-  main.innerHTML = html;
+  main.innerHTML = buildFeaturedHtml() + html;
+  main.querySelectorAll('.feat-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      try { openDetails(JSON.parse(decodeURIComponent(btn.getAttribute('data-p')))); } catch (e) {}
+    });
+  });
+  const btnLanc = document.getElementById('btnVerLancamentos');
+  if (btnLanc) {
+    btnLanc.addEventListener('click', () => {
+      state.vitrine = 'Lancamentos';
+      document.querySelectorAll('#vitrineFilters .fbtn').forEach(b => b.classList.toggle('active', b.dataset.value === 'Lancamentos'));
+      render();
+    });
+  }
 main.querySelectorAll('.btn-details, .photo-click').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1484,6 +1663,22 @@ document.querySelectorAll('#priceFilters .fbtn').forEach(btn => {
     render();
   });
 });
+document.querySelectorAll('#volumeFilters .fbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#volumeFilters .fbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.volume = btn.dataset.value;
+    render();
+  });
+});
+document.querySelectorAll('#vitrineFilters .fbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#vitrineFilters .fbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.vitrine = btn.dataset.value;
+    render();
+  });
+});
 document.querySelectorAll('#stockFilters .fbtn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#stockFilters .fbtn').forEach(b => b.classList.remove('active'));
@@ -1516,6 +1711,8 @@ document.getElementById('logoHome').addEventListener('click', e => {
   state.stock = 'Todos';
   state.search = '';
   state.sort = 'nome-asc';
+  state.volume = 'Todos';
+  state.vitrine = 'Todos';
   document.getElementById('q').value = '';
   document.getElementById('sortBy').value = 'nome-asc';
   document.querySelectorAll('#genderFilters .fbtn').forEach(b => b.classList.toggle('active', b.dataset.value === 'Todos'));
