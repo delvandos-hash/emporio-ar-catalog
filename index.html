@@ -1305,6 +1305,97 @@
     border-color: transparent;
     color: #fff;
   }
+
+  .featured-strip {
+    margin: 0 0 1.25rem;
+    padding: .85rem 0 .5rem;
+  }
+  .featured-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    margin-bottom: .6rem;
+    padding: 0 .15rem;
+  }
+  .featured-head h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+  .featured-row {
+    display: flex;
+    gap: .65rem;
+    overflow-x: auto;
+    padding: .25rem 0 .5rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .feat-card {
+    flex: 0 0 132px;
+    scroll-snap-align: start;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+    padding: .5rem;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .feat-card img, .feat-ph {
+    width: 100%;
+    height: 110px;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #f8f8f8;
+  }
+  .feat-ph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .7rem;
+    color: #9ca3af;
+  }
+  .feat-name {
+    display: block;
+    font-size: .75rem;
+    font-weight: 600;
+    margin-top: .4rem;
+    line-height: 1.25;
+    max-height: 2.5em;
+    overflow: hidden;
+  }
+  .feat-price {
+    display: block;
+    font-size: .78rem;
+    color: #166534;
+    font-weight: 700;
+    margin-top: .2rem;
+  }
+  .cart-form { border-top: 1px solid #e5e7eb; padding-top: .75rem; }
+  .cart-label { display: block; font-size: .78rem; font-weight: 600; color: #374151; margin: .45rem 0 .25rem; }
+  .cart-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: .55rem .65rem;
+    font-size: .9rem;
+    font-family: inherit;
+    background: #fff;
+  }
+  .cart-input:focus { outline: 2px solid #86efac; border-color: #22c55e; }
+  .cart-pref { margin-top: .35rem; }
+  .cart-radio {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .82rem;
+    color: #374151;
+    margin: .25rem 0;
+  }
+
 </style>
 </head>
 <body>
@@ -1334,7 +1425,7 @@
 
 <div class="toolbar">
   <div class="search">
-    <input type="search" id="q" placeholder="Buscar produto ou marca..." autocomplete="off" />
+    <input type="search" id="q" placeholder="Buscar por nome, marca, notas, volume..." autocomplete="off" />
   </div>
   <select class="filter-select" id="sortBy" title="Ordenar por">
     <option value="nome-asc">Nome A–Z</option>
@@ -1377,6 +1468,17 @@
     <button class="fbtn active" data-filter="stock" data-value="Todos">Todos</button>
     <button class="fbtn" data-filter="stock" data-value="Disponivel">Só disponíveis</button>
     <button class="fbtn" data-filter="stock" data-value="Esgotado">Só esgotados</button>
+  </div>
+  <div class="filters" id="volumeFilters">
+    <button class="fbtn active" data-filter="volume" data-value="Todos">Todos volumes</button>
+    <button class="fbtn" data-filter="volume" data-value="Mini">Mini / até 30ml</button>
+    <button class="fbtn" data-filter="volume" data-value="100ml">~100ml</button>
+    <button class="fbtn" data-filter="volume" data-value="200ml+">200ml+</button>
+    <button class="fbtn" data-filter="volume" data-value="Outros">Outros</button>
+  </div>
+  <div class="filters" id="vitrineFilters">
+    <button class="fbtn active" data-filter="vitrine" data-value="Todos">Catálogo completo</button>
+    <button class="fbtn" data-filter="vitrine" data-value="Lancamentos">Só lançamentos</button>
   </div>
 </div>
 
@@ -1433,6 +1535,18 @@
     <div class="modal-body">
       <div id="cartList"></div>
       <div id="cartEmpty" class="empty" style="padding:1.5rem">Nenhum item no pedido.</div>
+      <div id="cartForm" class="cart-form" style="display:none;margin-top:.75rem">
+        <label class="cart-label">Seu nome (opcional)</label>
+        <input type="text" id="cartClientName" class="cart-input" placeholder="Como podemos te chamar?" maxlength="80" autocomplete="name" />
+        <label class="cart-label">Observações (opcional)</label>
+        <textarea id="cartObs" class="cart-input" rows="2" placeholder="Ex.: preferência de frete, cidade, retirada..." maxlength="300"></textarea>
+        <div class="cart-pref">
+          <span class="cart-label">Preferência de preço</span>
+          <label class="cart-radio"><input type="radio" name="cartPricePref" value="auto" checked /> Automático (atacado com 6+)</label>
+          <label class="cart-radio"><input type="radio" name="cartPricePref" value="varejo" /> Varejo</label>
+          <label class="cart-radio"><input type="radio" name="cartPricePref" value="atacado" /> Atacado</label>
+        </div>
+      </div>
       <button class="btn-buy" id="cartCheckout" style="width:100%;margin-top:1rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
         📲 Enviar pedido no WhatsApp
       </button>
