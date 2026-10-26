@@ -775,32 +775,47 @@ async function fetchDandeCategoryPage(path, page = 1) {
 
 function parseDandeListProducts(html) {
   const products = [];
-  // data-product-id + nearby data-variants / links
-  const re = /data-product-id=["'](\d+)["']/gi;
-  const seen = new Set();
-  let m;
-  while ((m = re.exec(html))) {
-    const id = m[1];
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const start = Math.max(0, m.index - 200);
-    const chunk = html.slice(start, m.index + 6000);
-    const nameM = chunk.match(/data-product-name=["']([^"']+)["']/i)
-      || chunk.match(/itemprop=["']name["'][^>]*content=["']([^"']+)["']/i)
-      || chunk.match(/<h[23][^>]*class="[^"]*item-name[^"]*"[^>]*>([^<]+)/i);
-    const hrefM = chunk.match(/href=["'](https?:\/\/dandejoias\.com\/produtos\/[^"']+|\/produtos\/[^"']+)["']/i);
-    const priceM = chunk.match(/data-product-price=["']([^"']+)["']/i)
-      || chunk.match(/itemprop=["']price["'][^>]*content=["']([^"']+)["']/i);
+  const names = {};
+  const nameRe = /data-store="product-item-name-(\d+)"[^>]*>([^<]+)<\/div>/g;
+  let nm;
+  while ((nm = nameRe.exec(html))) {
+    names[nm[1]] = decodeEntities(nm[2]).trim();
+  }
+  const ids = [];
+  const idRe = /data-product-id="(\d+)"/g;
+  let im;
+  while ((im = idRe.exec(html))) {
+    if (!ids.includes(im[1])) ids.push(im[1]);
+  }
+  for (const id of ids) {
+    const pos = html.indexOf(`data-product-id="${id}"`);
+    if (pos < 0) continue;
+    const chunk = html.slice(pos, pos + 8000);
     let variants = [];
-    const vm = chunk.match(/data-variants=["']([^"']*)["']/i);
+    const vm = chunk.match(/data-variants="([^"]*)"/i);
     if (vm) {
       try { variants = JSON.parse(decodeEntities(vm[1])); } catch (_) {}
     }
-    let url = hrefM ? hrefM[1] : '';
-    if (url && url.startsWith('/')) url = DANDE_BASE + url;
-    const nome = limparTexto(nameM ? decodeEntities(nameM[1]) : '');
-    const preco = priceM ? Number(String(priceM[1]).replace(',', '.')) : 0;
-    products.push({ id, nome, url, preco, variants });
+    let img = '';
+    let preco = 0;
+    if (Array.isArray(variants) && variants.length) {
+      img = variants[0].image_url || '';
+      if (img.startsWith('//')) img = 'https:' + img;
+      img = upgradeDandeImg(img);
+      preco = Number(variants[0].price_number || 0) || 0;
+    }
+    let url = '';
+    const namePos = html.indexOf(`data-store="product-item-name-${id}"`);
+    if (namePos >= 0) {
+      const window = html.slice(Math.max(0, namePos - 3000), namePos + 400);
+      const hm = window.match(/href="((?:https:\/\/dandejoias\.com)?\/produtos\/[^"]+)"/i);
+      if (hm) {
+        url = hm[1];
+        if (url.startsWith('/')) url = DANDE_BASE + url;
+      }
+    }
+    const nome = names[id] || '';
+    products.push({ id, nome, url, preco, variants, img });
   }
   return products;
 }
@@ -876,22 +891,28 @@ async function fetchDandeAcessorios(existingGroups = []) {
           let desc = '';
           let imgs = [];
           const prev = existingById.get(p.id);
-          // detalhe só se novo ou sem variações no snapshot
-          if (p.url && (!prev || !(prev.variacoes || []).length || !prev.notas)) {
+          // foto da listagem (data-variants.image_url)
+          if (p.img) imgs = [upgradeDandeImg(p.img)];
+          const nomeList = (p.nome || '').trim();
+          const needsDetail = p.url && (
+            !nomeList || nomeList.toLowerCase() === 'produto' ||
+            !imgs.length ||
+            !prev || !(prev.variacoes || []).length || !prev.notas
+          );
+          if (needsDetail && p.url) {
             try {
               const det = await fetchDandeProductDetail(p.url);
               if (det) {
                 if (det.variants?.length) variants = det.variants;
                 desc = det.desc || '';
-                imgs = det.imgs || [];
+                if (det.imgs?.length) imgs = det.imgs;
               }
               await sleep(250);
             } catch (_) {}
           } else if (prev) {
-            desc = prev.notas || '';
-            imgs = prev.fotos || (prev.foto ? [prev.foto] : []);
+            if (!desc) desc = prev.notas || '';
+            if (!imgs.length) imgs = prev.fotos || (prev.foto ? [prev.foto] : []);
             if (!variants.length && prev.variacoes) {
-              // keep previous structure but will reprice from list price
               variants = null;
             }
           }
@@ -900,7 +921,6 @@ async function fetchDandeAcessorios(existingGroups = []) {
             precoBase = Number(variants[0].price_number || variants[0].price || 0);
           }
           if ((!precoBase || precoBase <= 0) && prev) {
-            // reverse approx from atacado with old or new rule — skip, use list only
             precoBase = 0;
           }
           const prices = calcPrecosAcessorios(precoBase || 0);
@@ -918,7 +938,20 @@ async function fetchDandeAcessorios(existingGroups = []) {
           }
           if (!imgs.length && prev) imgs = prev.fotos || (prev.foto ? [prev.foto] : []);
           const foto = imgs[0] || (prev && prev.foto) || '';
-          const nome = p.nome || (prev && prev.nome) || 'Produto';
+          let nome = nomeList || (prev && prev.nome) || '';
+          if (!nome || nome.toLowerCase() === 'produto') {
+            // tenta slug da URL
+            if (p.url) {
+              const slug = p.url.replace(/\/$/, '').split('/').pop() || '';
+              nome = decodeURIComponent(slug).replace(/-/g, ' ').replace(/\s+[a-z0-9]{4,5}$/i, '').trim();
+              nome = nome.replace(/\b\w/g, (c) => c.toUpperCase());
+            }
+          }
+          if (!nome || nome.toLowerCase() === 'produto') {
+            // não grava lixo sem nome/foto
+            if (!foto) continue;
+            nome = prev?.nome || `Item ${p.id}`;
+          }
           byId.set(p.id, {
             nome: limparTexto(nome),
             volume: '—',
