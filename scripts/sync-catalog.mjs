@@ -716,8 +716,8 @@ function mergeRoupasGroups(listOfGroupArrays) {
 // ========== DANDE (ACESSÓRIOS) ==========
 const DANDE_BASE = 'https://dandejoias.com';
 const DANDE_CATEGORIES = [
-  { path: '/acessorios-de-cabelo/', nome: 'Acessórios de Cabelo' },
-  { path: '/aneis/', nome: 'Anéis' },
+  { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
+  { path: '/aneis1/', nome: 'Anéis' },
   { path: '/braceletes/', nome: 'Braceletes' },
   { path: '/brincos/', nome: 'Brincos' },
   { path: '/colares/', nome: 'Colares' },
