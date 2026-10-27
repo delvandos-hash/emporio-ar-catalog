@@ -89,6 +89,262 @@ function openProductFromUrl() {
 }
 
 
+function getProductShareUrl(p) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('produto', productId(p));
+    url.hash = '';
+    return url.toString();
+  } catch (e) {
+    return window.location.origin + '/?produto=' + encodeURIComponent(productId(p));
+  }
+}
+
+function getProductShareText(p) {
+  const link = getProductShareUrl(p);
+  let t = `*${p.nome}* — Empório A.R\n`;
+  if (p.brand) t += `Marca: ${p.brand}\n`;
+  if (p.volume && p.volume !== '—') t += `Volume: ${p.volume}\n`;
+  if (p.varejo) t += `Varejo: R$ ${p.varejo}\n`;
+  if (p.atacado && p.atacado !== '—') t += `Atacado (6+): R$ ${p.atacado}\n`;
+  t += `\nVeja no catálogo:\n${link}`;
+  return t;
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+function loadImageCors(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      // tenta sem CORS (pode sujar o canvas)
+      const img2 = new Image();
+      img2.onload = () => resolve(img2);
+      img2.onerror = () => resolve(null);
+      img2.src = src;
+    };
+    // cache-buster leve em CDN conhecida
+    const u = src.includes('?') ? src + '&share=1' : src + '?share=1';
+    img.src = u;
+  });
+}
+
+/** Card vertical 1080x1920 para Stories / Status */
+async function downloadStoryCard(p) {
+  const W = 1080, H = 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // fundo
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0f172a');
+  grad.addColorStop(0.55, '#14532d');
+  grad.addColorStop(1, '#052e16');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // card branco
+  const pad = 64;
+  const cardX = pad, cardY = 220, cardW = W - pad * 2, cardH = H - 420;
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 12;
+  roundRect(ctx, cardX, cardY, cardW, cardH, 40);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // logo / marca
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 42px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('EMPÓRIO A.R', W / 2, 120);
+  ctx.font = '28px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText('Catálogo Digital', W / 2, 165);
+
+  // foto
+  const foto = p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '';
+  const img = await loadImageCors(foto);
+  const imgAreaY = cardY + 48;
+  const imgAreaH = 720;
+  const imgAreaX = cardX + 48;
+  const imgAreaW = cardW - 96;
+  ctx.fillStyle = '#f3f4f6';
+  roundRect(ctx, imgAreaX, imgAreaY, imgAreaW, imgAreaH, 24);
+  ctx.fill();
+  if (img) {
+    const scale = Math.min(imgAreaW / img.width, imgAreaH / img.height);
+    const iw = img.width * scale;
+    const ih = img.height * scale;
+    const ix = imgAreaX + (imgAreaW - iw) / 2;
+    const iy = imgAreaY + (imgAreaH - ih) / 2;
+    try {
+      ctx.drawImage(img, ix, iy, iw, ih);
+    } catch (e) {
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '32px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Foto indisponível', W / 2, imgAreaY + imgAreaH / 2);
+    }
+  } else {
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '32px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Sem foto', W / 2, imgAreaY + imgAreaH / 2);
+  }
+
+  // textos
+  let ty = imgAreaY + imgAreaH + 56;
+  ctx.fillStyle = '#111827';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
+  const nome = wrapText(ctx, p.nome || 'Produto', cardW - 100, 2);
+  nome.forEach((line, i) => {
+    ctx.fillText(line, W / 2, ty + i * 52);
+  });
+  ty += nome.length * 52 + 28;
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '30px system-ui, sans-serif';
+  const meta = [p.brand, p.volume && p.volume !== '—' ? p.volume : ''].filter(Boolean).join(' · ');
+  if (meta) {
+    ctx.fillText(meta, W / 2, ty);
+    ty += 48;
+  }
+
+  ctx.fillStyle = '#166534';
+  ctx.font = 'bold 48px system-ui, sans-serif';
+  if (p.varejo) ctx.fillText(`Varejo R$ ${p.varejo}`, W / 2, ty);
+  ty += 52;
+  if (p.atacado && p.atacado !== '—') {
+    ctx.fillStyle = '#15803d';
+    ctx.font = '36px system-ui, sans-serif';
+    ctx.fillText(`Atacado (6+) R$ ${p.atacado}`, W / 2, ty);
+  }
+
+  // rodapé
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = '28px system-ui, sans-serif';
+  ctx.fillText('Toque no link da bio · WhatsApp (62) 99113-4488', W / 2, H - 80);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        alert('Não foi possível gerar a imagem. Tente em outro aparelho.');
+        resolve(false);
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `emporio-ar-${normId(p.nome) || 'produto'}-story.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      resolve(true);
+    }, 'image/jpeg', 0.92);
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, maxWidth, maxLines) {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = w;
+      if (lines.length >= maxLines) break;
+    } else {
+      line = test;
+    }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  if (lines.length === maxLines && words.length) {
+    // ellipsis
+    let last = lines[maxLines - 1];
+    while (ctx.measureText(last + '…').width > maxWidth && last.length) last = last.slice(0, -1);
+    lines[maxLines - 1] = last + (last !== lines[maxLines - 1] || words.join(' ') !== lines.join(' ') ? '…' : '');
+  }
+  return lines;
+}
+
+async function shareProduct(p) {
+  if (!p) return;
+  const url = getProductShareUrl(p);
+  const text = getProductShareText(p);
+  const title = `${p.nome} · Empório A.R`;
+
+  // 1) Web Share API (abre menu do celular: WhatsApp, Instagram, etc.)
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text, url });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      // cai no menu manual
+    }
+  }
+  // 2) Menu fallback
+  openShareSheet(p, url, text);
+}
+
+function openShareSheet(p, url, text) {
+  const ov = document.getElementById('shareSheet');
+  if (!ov) {
+    // fallback mínimo
+    copyText(url).then((ok) => alert(ok ? 'Link do produto copiado!' : url));
+    return;
+  }
+  ov.dataset.url = url;
+  ov.dataset.text = text;
+  ov.classList.add('open');
+}
+
+function closeShareSheet() {
+  document.getElementById('shareSheet')?.classList.remove('open');
+}
+
+
+
 const state = {
   gender: 'Todos',
   category: 'Todos',
@@ -1057,6 +1313,11 @@ function openDetails(p, opts = {}) {
 
   const btnAdd = document.getElementById('modalAddCart');
   const btnBuy = document.getElementById('modalBuy');
+  const btnShare = document.getElementById('modalShare');
+  if (btnShare) {
+    btnShare.disabled = false;
+    btnShare.onclick = () => shareProduct(p);
+  }
   if (avail) {
     btnAdd.disabled = false;
     btnAdd.classList.remove('btn-disabled');
@@ -1821,6 +2082,53 @@ refreshCategoryFilterVisibility();
 
 ensureBrandCategoryFilters();
 updateShareLink();
+
+// Share sheet actions
+document.getElementById('shareSheetClose')?.addEventListener('click', closeShareSheet);
+document.getElementById('shareSheet')?.addEventListener('click', (e) => {
+  if (e.target.id === 'shareSheet') closeShareSheet();
+});
+document.getElementById('shareCopyLink')?.addEventListener('click', async () => {
+  const ov = document.getElementById('shareSheet');
+  const url = ov?.dataset.url || '';
+  const ok = await copyText(url);
+  alert(ok ? 'Link copiado! Cole no Instagram Stories ou Status do WhatsApp.' : 'Não foi possível copiar.');
+  closeShareSheet();
+});
+document.getElementById('shareCopyText')?.addEventListener('click', async () => {
+  const ov = document.getElementById('shareSheet');
+  const text = ov?.dataset.text || '';
+  const ok = await copyText(text);
+  alert(ok ? 'Texto copiado!' : 'Não foi possível copiar.');
+  closeShareSheet();
+});
+document.getElementById('shareDownloadStory')?.addEventListener('click', async () => {
+  if (!currentProduct) return;
+  closeShareSheet();
+  alert('Gerando imagem para Stories/Status…');
+  await downloadStoryCard(currentProduct);
+});
+document.getElementById('shareNative')?.addEventListener('click', async () => {
+  if (!currentProduct) return;
+  closeShareSheet();
+  const p = currentProduct;
+  const url = getProductShareUrl(p);
+  const text = getProductShareText(p);
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: `${p.nome} · Empório A.R`, text, url });
+    } catch (e) {}
+  } else {
+    alert('Compartilhamento do sistema não disponível neste aparelho. Use copiar link ou baixar imagem.');
+  }
+});
+document.getElementById('shareWhatsApp')?.addEventListener('click', () => {
+  const ov = document.getElementById('shareSheet');
+  const text = ov?.dataset.text || '';
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  closeShareSheet();
+});
+
 updateCartUI();
 render();
 syncStockFromRoot().then((ok) => {
