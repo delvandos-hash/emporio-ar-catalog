@@ -5,8 +5,8 @@
  */
 const SOURCES = {
   sophia: {
-    base: "https://sophiamoda.com.br",
-    loja: "62982459275",
+    base: "https://facilzap.app.br/sophiamodafemi",
+    loja: "lojavendedoras",
     categories: ["108042", "108328", "108333", "108339", "108338", "379539"],
   },
   franny: {
