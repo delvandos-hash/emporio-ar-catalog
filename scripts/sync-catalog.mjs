@@ -312,8 +312,9 @@ async function fetchBrandList() {
 }
 
 // ========== SOPHIA MODA (ROUPAS) ==========
-const SOPHIA_BASE = 'https://sophiamoda.com.br';
-const SOPHIA_LOJA = '62982459275';
+// Domínio próprio sophiamoda.com.br saiu do ar (DNS). Catálogo ativo no FacilZap:
+const SOPHIA_BASE = 'https://facilzap.app.br/sophiamodafemi';
+const SOPHIA_LOJA = 'lojavendedoras'; // path da loja no FacilZap (antes era ID 62982459275 no domínio antigo)
 const SOPHIA_CATEGORIES = [
   { id: '108042', nome: 'VESTIDOS' },
   { id: '108328', nome: 'MACACÃO/MACAQUINHOS' },
@@ -417,9 +418,9 @@ async function fetchSophiaRoupas() {
   const headers = {
     'User-Agent': UA,
     Accept: 'application/json, text/javascript, */*; q=0.01',
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
     'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-    Origin: SOPHIA_BASE,
+    Origin: 'https://facilzap.app.br',
     Referer: `${SOPHIA_BASE}/c/atacado/${SOPHIA_LOJA}`,
     'X-Requested-With': 'XMLHttpRequest',
     ...(cookie ? { Cookie: cookie } : {}),
