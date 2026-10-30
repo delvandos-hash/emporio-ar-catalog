@@ -394,20 +394,49 @@ function matchesSearch(item, brand, cat, q) {
   });
 }
 
+/** Itens que NÃO entram nos filtros Mini e 80–100ml (só perfumes) */
+function isNonPerfumeVolumeItem(item, cat) {
+  const n = String(item.nome || '').toLowerCase();
+  const c = String(cat || item.cat || '').toLowerCase();
+  const blob = n + ' ' + c;
+  const block = [
+    'hidratante', 'body cream', 'body splash', 'bodysplash', 'body lotion',
+    'creme', 'loção', 'locao', 'óleo', 'oleo', 'oil ', ' óleo',
+    'maquiagem', 'gloss', 'batom', 'máscara', 'mascara', 'rimel', 'rímel',
+    'shampoo', 'condicionador', 'sabonete', 'desodorante', 'kit presente',
+  ];
+  if (c === 'óleos' || c === 'oleos' || c.includes('óleo') || c.includes('oleo')) return true;
+  if (c.includes('maqui')) return true;
+  for (const w of block) {
+    if (blob.includes(w)) return true;
+  }
+  return false;
+}
+
 function volumeBucket(item) {
   const v = String(item.volume || '').toLowerCase().replace(',', '.');
   const n = String(item.nome || '').toLowerCase();
   const ml = v.match(/(\d+(?:\.\d+)?)\s*ml/);
   const num = ml ? parseFloat(ml[1]) : NaN;
+  // Miniaturas: até 50ml (inclui 30ml e 50ml) ou nome com mini/miniatura
   if (n.includes('miniatura') || n.includes('mini ') || n.startsWith('mini')) return 'Mini';
   if (!isNaN(num)) {
-    if (num <= 30) return 'Mini';
-    if (num >= 80 && num <= 120) return '100ml';
+    if (num <= 50) return 'Mini';
+    if (num >= 80 && num <= 120) return '100ml'; // 80ml e ~100ml
     if (num > 120) return '200ml+';
   }
-  if (v.includes('100')) return '100ml';
+  if (v.includes('100') || v.includes('80')) return '100ml';
   if (v.includes('200') || v.includes('250')) return '200ml+';
   return 'Outros';
+}
+
+/** Filtro de volume: Mini e 100ml só perfumes */
+function matchesVolumeFilter(item, cat, volumeState) {
+  if (!volumeState || volumeState === 'Todos') return true;
+  if (volumeState === 'Mini' || volumeState === '100ml') {
+    if (isNonPerfumeVolumeItem(item, cat)) return false;
+  }
+  return volumeBucket(item) === volumeState;
 }
 
 function isLancamentoItem(item, cat) {
@@ -1030,7 +1059,7 @@ function buildDetailsNavList() {
       if (state.stock === 'Disponivel' && !isAvailable(item)) continue;
       if (state.stock === 'Esgotado' && isAvailable(item)) continue;
       if (!matchesSearch(item, g.brand, g.cat, state.search)) continue;
-      if (state.volume !== 'Todos' && volumeBucket(item) !== state.volume) continue;
+      if (!matchesVolumeFilter(item, g.cat, state.volume)) continue;
       list.push({
         nome: item.nome,
         brand: g.brand,
@@ -1558,7 +1587,7 @@ function render() {
       if (state.stock === 'Disponivel' && !isAvailable(item)) return false;
       if (state.stock === 'Esgotado' && isAvailable(item)) return false;
       if (!matchesSearch(item, g.brand, g.cat, state.search)) return false;
-      if (state.volume !== 'Todos' && volumeBucket(item) !== state.volume) return false;
+      if (!matchesVolumeFilter(item, g.cat, state.volume)) return false;
       if (state.vitrine === 'Lancamentos' && !isLancamentoItem(item, g.cat)) return false;
       return true;
     });
