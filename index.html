@@ -1412,6 +1412,304 @@
   .share-opt:active { background: #f3f4f6; }
   #modalShare:active { background: #f9fafb !important; }
 
+
+  /* ===== TEMA HALLOWEEN (ativo via body.theme-halloween até 02/11/2026) ===== */
+  body.theme-halloween {
+    --bg: #0c0a09;
+    --card: #1c1917;
+    --text: #fafaf9;
+    --muted: #a8a29e;
+    --line: #44403c;
+    --wa: #25D366;
+    --wa-dark: #1ebe57;
+    background:
+      radial-gradient(ellipse 120% 80% at 10% -10%, rgba(234, 88, 12, 0.25), transparent 50%),
+      radial-gradient(ellipse 90% 60% at 100% 0%, rgba(124, 45, 18, 0.35), transparent 45%),
+      #0c0a09;
+    color: var(--text);
+  }
+  body.theme-halloween header {
+    background: linear-gradient(180deg, #1c1010 0%, rgba(12,10,9,0.95) 100%);
+    border-bottom: 1px solid #7c2d12;
+  }
+  body.theme-halloween header h1 {
+    background: linear-gradient(90deg, #fb923c, #fbbf24, #ea580c);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  body.theme-halloween .brand span { color: #fdba74; }
+  body.theme-halloween .notice {
+    background: linear-gradient(90deg, #431407, #7c2d12);
+    border-color: #ea580c;
+    color: #ffedd5;
+  }
+  body.theme-halloween .fbtn.active,
+  body.theme-halloween .tab.active {
+    background: #ea580c !important;
+    border-color: #fb923c !important;
+    color: #fff !important;
+  }
+  body.theme-halloween .fbtn:hover { border-color: #fb923c; }
+  body.theme-halloween .category-title {
+    color: #fdba74;
+    border-bottom-color: #7c2d12;
+  }
+  body.theme-halloween .product-card,
+  body.theme-halloween .card {
+    background: #1c1917;
+    border-color: #44403c;
+    box-shadow: 0 4px 20px rgba(234, 88, 12, 0.08);
+  }
+  body.theme-halloween .product-card:active,
+  body.theme-halloween .card:active {
+    border-color: #ea580c;
+  }
+  body.theme-halloween .price-v { color: #fb923c; }
+  body.theme-halloween .price-a { color: #fbbf24; }
+  body.theme-halloween .modal {
+    background: #1c1917;
+    color: #fafaf9;
+    border: 1px solid #7c2d12;
+  }
+  body.theme-halloween .modal-header {
+    border-bottom-color: #44403c;
+    background: #292524;
+  }
+  body.theme-halloween .modal-header h3 { color: #fdba74; }
+  body.theme-halloween .cart-fab {
+    background: #ea580c;
+    box-shadow: 0 4px 16px rgba(234, 88, 12, 0.45);
+  }
+  body.theme-halloween footer {
+    color: #a8a29e;
+    border-top: 1px solid #44403c;
+  }
+  body.theme-halloween .halloween-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: .55rem 1rem;
+    margin: 0;
+    background: linear-gradient(90deg, #7c2d12, #ea580c, #7c2d12);
+    color: #fff7ed;
+    font-weight: 700;
+    font-size: .88rem;
+    letter-spacing: .02em;
+    text-align: center;
+  }
+  body:not(.theme-halloween) .halloween-banner { display: none !important; }
+  body.theme-halloween .search input {
+    background: #292524;
+    border-color: #57534e;
+    color: #fafaf9;
+  }
+  body.theme-halloween .filter-select {
+    background: #292524;
+    border-color: #57534e;
+    color: #fafaf9;
+  }
+
+
+  /* ===== Temas comemorativos (body.theme-*) ===== */
+  .seasonal-banner, .halloween-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: .55rem 1rem;
+    margin: 0;
+    font-weight: 700;
+    font-size: .88rem;
+    letter-spacing: .02em;
+    text-align: center;
+    color: #fff;
+  }
+  body:not([class*="theme-"]) .seasonal-banner,
+  body:not([class*="theme-"]) .halloween-banner { display: none !important; }
+
+  /* Natal */
+  body.theme-natal {
+    --bg: #0a1628;
+    background: radial-gradient(ellipse at 20% 0%, rgba(220,38,38,.25), transparent 50%),
+      radial-gradient(ellipse at 80% 0%, rgba(22,163,74,.2), transparent 45%), #0a1628;
+    color: #f8fafc;
+  }
+  body.theme-natal header { background: #0f172a; border-bottom: 1px solid #166534; }
+  body.theme-natal header h1 {
+    background: linear-gradient(90deg, #fca5a5, #fef08a, #86efac);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  body.theme-natal .fbtn.active { background: #dc2626 !important; border-color: #fca5a5 !important; color: #fff !important; }
+  body.theme-natal .price-v { color: #f87171; }
+  body.theme-natal .price-a { color: #4ade80; }
+  body.theme-natal .seasonal-banner {
+    background: linear-gradient(90deg, #14532d, #dc2626, #14532d);
+  }
+
+  /* Namorados */
+  body.theme-namorados {
+    background: radial-gradient(ellipse at 50% -10%, rgba(244,63,94,.3), transparent 55%), #1c0a12;
+    color: #fff1f2;
+  }
+  body.theme-namorados header { background: #4c0519; border-bottom-color: #e11d48; }
+  body.theme-namorados header h1 {
+    background: linear-gradient(90deg, #fb7185, #fda4af);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  body.theme-namorados .fbtn.active { background: #e11d48 !important; border-color: #fb7185 !important; }
+  body.theme-namorados .price-v, body.theme-namorados .price-a { color: #fb7185; }
+  body.theme-namorados .seasonal-banner { background: linear-gradient(90deg, #9f1239, #e11d48, #9f1239); }
+
+  /* Mães */
+  body.theme-maes {
+    background: radial-gradient(ellipse at 30% 0%, rgba(244,114,182,.25), transparent 50%), #1a1020;
+    color: #fdf4ff;
+  }
+  body.theme-maes header { background: #3b0764; border-bottom-color: #d946ef; }
+  body.theme-maes .fbtn.active { background: #c026d3 !important; }
+  body.theme-maes .seasonal-banner { background: linear-gradient(90deg, #86198f, #e879f9, #86198f); color: #fff; }
+
+  /* Pais */
+  body.theme-pais {
+    background: radial-gradient(ellipse at 50% 0%, rgba(37,99,235,.28), transparent 50%), #0b1220;
+    color: #eff6ff;
+  }
+  body.theme-pais header { background: #1e3a8a; border-bottom-color: #3b82f6; }
+  body.theme-pais .fbtn.active { background: #2563eb !important; }
+  body.theme-pais .seasonal-banner { background: linear-gradient(90deg, #1e3a8a, #3b82f6, #1e3a8a); }
+
+  /* Independência / datas cívicas */
+  body.theme-independencia,
+  body.theme-tiradentes,
+  body.theme-republica {
+    background: radial-gradient(ellipse at 20% 0%, rgba(22,163,74,.25), transparent 45%),
+      radial-gradient(ellipse at 80% 0%, rgba(234,179,8,.2), transparent 45%), #0a1f12;
+    color: #f0fdf4;
+  }
+  body.theme-independencia .seasonal-banner,
+  body.theme-tiradentes .seasonal-banner,
+  body.theme-republica .seasonal-banner {
+    background: linear-gradient(90deg, #14532d, #eab308, #14532d);
+    color: #14532d;
+  }
+  body.theme-independencia .fbtn.active,
+  body.theme-tiradentes .fbtn.active,
+  body.theme-republica .fbtn.active { background: #16a34a !important; }
+
+  /* Ano novo / réveillon */
+  body.theme-ano-novo, body.theme-vira-ano {
+    background: radial-gradient(ellipse at 50% 0%, rgba(250,204,21,.2), transparent 50%), #0c0a1a;
+    color: #fefce8;
+  }
+  body.theme-ano-novo .seasonal-banner,
+  body.theme-vira-ano .seasonal-banner {
+    background: linear-gradient(90deg, #312e81, #eab308, #312e81);
+    color: #fff;
+  }
+  body.theme-ano-novo .fbtn.active,
+  body.theme-vira-ano .fbtn.active { background: #ca8a04 !important; }
+
+  /* Crianças */
+  body.theme-criancas {
+    background: radial-gradient(ellipse at 30% 0%, rgba(56,189,248,.25), transparent 50%),
+      radial-gradient(ellipse at 70% 0%, rgba(251,191,36,.2), transparent 45%), #0c1929;
+    color: #f0f9ff;
+  }
+  body.theme-criancas .seasonal-banner {
+    background: linear-gradient(90deg, #0284c7, #f59e0b, #db2777);
+  }
+  body.theme-criancas .fbtn.active { background: #0ea5e9 !important; }
+
+  /* Consciência Negra */
+  body.theme-consciencia-negra {
+    background: radial-gradient(ellipse at 50% 0%, rgba(234,179,8,.2), transparent 50%), #0a0a0a;
+    color: #fafaf9;
+  }
+  body.theme-consciencia-negra .seasonal-banner {
+    background: linear-gradient(90deg, #171717, #eab308, #171717);
+    color: #fafaf9;
+  }
+  body.theme-consciencia-negra .fbtn.active { background: #eab308 !important; color: #171717 !important; }
+
+  /* Finados — sóbrio */
+  body.theme-finados {
+    background: #18181b;
+    color: #e4e4e7;
+  }
+  body.theme-finados .seasonal-banner {
+    background: #27272a;
+    color: #a1a1aa;
+  }
+
+  /* Halloween já definido em .theme-halloween */
+  body.theme-halloween .seasonal-banner,
+  body.theme-halloween .halloween-banner {
+    background: linear-gradient(90deg, #7c2d12, #ea580c, #7c2d12);
+    color: #fff7ed;
+  }
+
+
+  /* Black Friday */
+  body.theme-black-friday { background: #000; color: #fafafa; }
+  body.theme-black-friday header { background: #0a0a0a; border-bottom: 2px solid #eab308; }
+  body.theme-black-friday header h1 {
+    background: linear-gradient(90deg, #fafafa, #eab308, #fafafa);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  body.theme-black-friday .fbtn.active { background: #eab308 !important; border-color: #fde047 !important; color: #000 !important; }
+  body.theme-black-friday .price-v { color: #eab308; }
+  body.theme-black-friday .price-a { color: #fde047; }
+  body.theme-black-friday .seasonal-banner {
+    background: linear-gradient(90deg, #000, #eab308, #000); color: #000; font-weight: 800;
+  }
+  body.theme-black-friday .product-card, body.theme-black-friday .card { background: #171717; border-color: #404040; }
+
+  /* Cyber Monday */
+  body.theme-cyber-monday {
+    background: radial-gradient(ellipse at 50% 0%, rgba(34,211,238,.2), transparent 50%), #020617;
+    color: #ecfeff;
+  }
+  body.theme-cyber-monday header { background: #0f172a; border-bottom-color: #22d3ee; }
+  body.theme-cyber-monday .fbtn.active { background: #0891b2 !important; }
+  body.theme-cyber-monday .seasonal-banner { background: linear-gradient(90deg, #0e7490, #22d3ee, #0e7490); color: #082f49; }
+  body.theme-cyber-monday .price-v, body.theme-cyber-monday .price-a { color: #22d3ee; }
+
+  /* Dia do Cliente */
+  body.theme-cliente {
+    background: radial-gradient(ellipse at 40% 0%, rgba(251,191,36,.22), transparent 50%),
+      radial-gradient(ellipse at 80% 0%, rgba(16,185,129,.18), transparent 45%), #0c1a14;
+    color: #ecfdf5;
+  }
+  body.theme-cliente header { background: #064e3b; border-bottom-color: #fbbf24; }
+  body.theme-cliente header h1 {
+    background: linear-gradient(90deg, #fbbf24, #6ee7b7);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  body.theme-cliente .fbtn.active { background: #059669 !important; border-color: #fbbf24 !important; }
+  body.theme-cliente .seasonal-banner { background: linear-gradient(90deg, #047857, #f59e0b, #047857); color: #fff; }
+  body.theme-cliente .price-v { color: #fbbf24; }
+  body.theme-cliente .price-a { color: #6ee7b7; }
+
+  /* Dia do Consumidor */
+  body.theme-consumidor {
+    background: radial-gradient(ellipse at 50% 0%, rgba(99,102,241,.25), transparent 50%), #0f0a1e;
+    color: #eef2ff;
+  }
+  body.theme-consumidor header { background: #312e81; border-bottom-color: #818cf8; }
+  body.theme-consumidor .fbtn.active { background: #4f46e5 !important; }
+  body.theme-consumidor .seasonal-banner { background: linear-gradient(90deg, #3730a3, #818cf8, #3730a3); }
+
+  /* Dia do Amigo */
+  body.theme-amigos {
+    background: radial-gradient(ellipse at 50% 0%, rgba(251,146,60,.22), transparent 50%), #1c1008;
+    color: #fff7ed;
+  }
+  body.theme-amigos header { background: #7c2d12; border-bottom-color: #fb923c; }
+  body.theme-amigos .fbtn.active { background: #ea580c !important; }
+  body.theme-amigos .seasonal-banner { background: linear-gradient(90deg, #9a3412, #fb923c, #9a3412); }
+
 </style>
 </head>
 <body>
@@ -1429,6 +1727,9 @@
     <a class="tab btn-action btn-wa" id="shareWa" href="#" target="_blank" rel="noopener">📲 WhatsApp</a>
   </div>
 </header>
+
+
+<div class="seasonal-banner halloween-banner" id="seasonalBanner" aria-hidden="true">🎃 Halloween no Empório A.R — ofertas assustadoras até 02/11!</div>
 
 <div class="notice">
   <div class="notice-inner">
