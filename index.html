@@ -398,9 +398,9 @@
   }
   .btn-details {
     background: #f3f4f6;
-    color: var(--text);
+    color: #111827; /* sempre escuro no botão claro — legível em qualquer tema */
   }
-  .btn-details:hover { background: #e5e7eb; }
+  .btn-details:hover { background: #e5e7eb; color: #111827; }
   .btn-buy {
     background: var(--wa);
     color: #fff;
@@ -1709,6 +1709,32 @@
   body.theme-amigos header { background: #7c2d12; border-bottom-color: #fb923c; }
   body.theme-amigos .fbtn.active { background: #ea580c !important; }
   body.theme-amigos .seasonal-banner { background: linear-gradient(90deg, #9a3412, #fb923c, #9a3412); }
+
+
+  /* Contraste: botões claros sempre com texto escuro em qualquer tema sazonal */
+  body[class*="theme-"] .btn-details,
+  body[class*="theme-"] .btn-sm.btn-details {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb;
+  }
+  body[class*="theme-"] .btn-details:hover {
+    background: #e5e7eb !important;
+    color: #111827 !important;
+  }
+  /* Adicionar ao carrinho — manter texto legível */
+  body[class*="theme-"] .btn-add {
+    color: #065f46 !important;
+  }
+  /* Inputs/selects com texto legível */
+  body[class*="theme-"] .search input,
+  body[class*="theme-"] .filter-select,
+  body[class*="theme-"] select {
+    color: #fafaf9;
+  }
+  body[class*="theme-"] .search input::placeholder {
+    color: #a8a29e;
+  }
 
 </style>
 </head>
