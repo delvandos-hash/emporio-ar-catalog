@@ -1322,7 +1322,7 @@
     margin: 0;
     font-size: 1.05rem;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text, #1a1a1a);
   }
   .featured-row {
     display: flex;
@@ -1736,6 +1736,61 @@
     color: #a8a29e;
   }
 
+
+  /* Títulos e textos em temas sazonais escuros — sempre legíveis */
+  body[class*="theme-"] .featured-head h2,
+  body[class*="theme-"] .featured-strip h2 {
+    color: #fff7ed !important;
+  }
+  body[class*="theme-"] .featured-head a,
+  body[class*="theme-"] .featured-head button,
+  body[class*="theme-"] .featured-head .link-all {
+    color: #fdba74 !important;
+  }
+  /* nomes de marca / seções acima dos cards */
+  body[class*="theme-"] .brand-name,
+  body[class*="theme-"] .group-brand,
+  body[class*="theme-"] .section-label,
+  body[class*="theme-"] .stats,
+  body[class*="theme-"] #stats {
+    color: #e7e5e4 !important;
+  }
+  body[class*="theme-"] .filters-label,
+  body[class*="theme-"] .filter-group-label {
+    color: #d6d3d1 !important;
+  }
+  /* fbtns inativos: texto escuro no fundo claro do chip */
+  body[class*="theme-"] .fbtn:not(.active) {
+    background: #f5f5f4 !important;
+    color: #1c1917 !important;
+    border-color: #d6d3d1 !important;
+  }
+  body[class*="theme-"] .fbtn.active {
+    color: #fff !important;
+  }
+  /* Ver todos etc. */
+  body[class*="theme-"] .featured-head .btn-sm,
+  body[class*="theme-"] .featured-head .tab {
+    color: #1c1917 !important;
+    background: #fafaf9 !important;
+  }
+
+
+  /* Esconde badge "Powered by Netlify" */
+  body > a[href*="netlify.com"],
+  body > div[style*="position: fixed"][style*="bottom"] a[href*="netlify"],
+  iframe[src*="netlify"],
+  .netlify-badge,
+  #netlify-badge,
+  a[href="https://www.netlify.com"][style*="position"],
+  a[href*="netlify.com"][style*="position: fixed"],
+  a[href*="netlify.com"][style*="position:fixed"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
 </style>
 </head>
 <body>
@@ -1814,8 +1869,8 @@
   </div>
   <div class="filters" id="volumeFilters">
     <button class="fbtn active" data-filter="volume" data-value="Todos">Todos volumes</button>
-    <button class="fbtn" data-filter="volume" data-value="Mini">Mini / até 30ml</button>
-    <button class="fbtn" data-filter="volume" data-value="100ml">~100ml</button>
+    <button class="fbtn" data-filter="volume" data-value="Mini">Mini / até 50ml</button>
+    <button class="fbtn" data-filter="volume" data-value="100ml">Perfumes 80–100ml</button>
     <button class="fbtn" data-filter="volume" data-value="200ml+">200ml+</button>
     <button class="fbtn" data-filter="volume" data-value="Outros">Outros</button>
   </div>
@@ -1939,6 +1994,24 @@
 </div>
 
 <script type="module" src="js/app.js"></script>
+
+<script>
+(function hideNetlifyBadge(){
+  function run(){
+    document.querySelectorAll('a[href*="netlify.com"]').forEach(function(a){
+      var s = (a.getAttribute('style')||'') + ' ' + (a.parentElement && a.parentElement.getAttribute('style')||'');
+      if (/position:\s*fixed/i.test(s) || /Powered by Netlify/i.test(a.textContent||'') || /Powered by Netlify/i.test(a.getAttribute('aria-label')||'')) {
+        a.style.display = 'none';
+        if (a.parentElement && a.parentElement !== document.body) a.parentElement.style.display = 'none';
+      }
+    });
+  }
+  run();
+  setTimeout(run, 500);
+  setTimeout(run, 2000);
+})();
+</script>
+
 </body>
 </html>
 <script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="185390da-1111-4b2d-b144-ee23e3209d81" data-app-host="app.netlify.com"></script>
