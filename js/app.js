@@ -2083,6 +2083,140 @@ refreshCategoryFilterVisibility();
 ensureBrandCategoryFilters();
 updateShareLink();
 
+/** Temas comemorativos BR: ativo de 3 dias antes até 2 dias depois de cada data */
+const SEASONAL_THEMES = [
+  // month: 1-12 · janela: 3 dias antes → 2 dias depois
+  { id: 'ano-novo', month: 1, day: 1, label: '✨ Feliz Ano Novo no Empório A.R!', emoji: '✨' },
+  { id: 'carnaval', month: 2, day: 17, label: '🎭 Carnaval no Empório A.R — venha se fantasiar de perfume!', emoji: '🎭' },
+  { id: 'mulheres', month: 3, day: 8, label: '💐 Dia Internacional da Mulher — Empório A.R', emoji: '💐' },
+  { id: 'consumidor', month: 3, day: 15, label: '🛍️ Dia do Consumidor — condições especiais no Empório A.R', emoji: '🛍️' },
+  { id: 'pascoa', month: 4, day: 5, label: '🐰 Feliz Páscoa no Empório A.R!', emoji: '🐰' },
+  { id: 'tiradentes', month: 4, day: 21, label: '🇧🇷 Tiradentes — Empório A.R', emoji: '🇧🇷' },
+  { id: 'trabalho', month: 5, day: 1, label: '⚒️ Dia do Trabalho — ofertas no Empório A.R', emoji: '⚒️' },
+  { id: 'maes', month: 5, day: 10, label: '💝 Dia das Mães — o presente perfeito no Empório A.R', emoji: '💝' },
+  { id: 'namorados', month: 6, day: 12, label: '💕 Dia dos Namorados — Empório A.R', emoji: '💕' },
+  { id: 'sao-joao', month: 6, day: 24, label: '🌽 São João no Empório A.R!', emoji: '🌽' },
+  { id: 'amigos', month: 7, day: 20, label: '🤝 Dia do Amigo — Empório A.R', emoji: '🤝' },
+  { id: 'pais', month: 8, day: 9, label: '👔 Dia dos Pais — Empório A.R', emoji: '👔' },
+  { id: 'independencia', month: 9, day: 7, label: '🇧🇷 Independência do Brasil — Empório A.R', emoji: '🇧🇷' },
+  { id: 'cliente', month: 9, day: 15, label: '🌟 Dia do Cliente — obrigado por comprar no Empório A.R!', emoji: '🌟' },
+  { id: 'criancas', month: 10, day: 12, label: '🎈 Dia das Crianças — Empório A.R', emoji: '🎈' },
+  { id: 'professores', month: 10, day: 15, label: '📚 Dia dos Professores — Empório A.R', emoji: '📚' },
+  { id: 'halloween', month: 10, day: 31, label: '🎃 Halloween no Empório A.R — ofertas assustadoras!', emoji: '🎃' },
+  { id: 'finados', month: 11, day: 2, label: '🕯️ Finados — Empório A.R', emoji: '🕯️' },
+  { id: 'republica', month: 11, day: 15, label: '🇧🇷 Proclamação da República — Empório A.R', emoji: '🇧🇷' },
+  { id: 'consciencia-negra', month: 11, day: 20, label: '✊ Consciência Negra — Empório A.R', emoji: '✊' },
+  { id: 'black-friday', month: 11, day: 27, label: '🖤 Black Friday no Empório A.R — não perca!', emoji: '🖤' },
+  { id: 'cyber-monday', month: 11, day: 30, label: '💻 Cyber Monday no Empório A.R!', emoji: '💻' },
+  { id: 'natal', month: 12, day: 25, label: '🎄 Feliz Natal no Empório A.R!', emoji: '🎄' },
+  { id: 'vira-ano', month: 12, day: 31, label: '🥂 Réveillon no Empório A.R!', emoji: '🥂' },
+];
+
+function brazilTodayParts() {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const parts = fmt.formatToParts(new Date());
+  return {
+    y: +parts.find((p) => p.type === 'year').value,
+    m: +parts.find((p) => p.type === 'month').value,
+    d: +parts.find((p) => p.type === 'day').value,
+  };
+}
+
+function dateKey(y, m, d) {
+  return y * 10000 + m * 100 + d;
+}
+
+/** 2º domingo do mês (mães/pais aproximados) */
+function secondSunday(year, month) {
+  const first = new Date(Date.UTC(year, month - 1, 1));
+  const dow = first.getUTCDay(); // 0=dom
+  const firstSun = dow === 0 ? 1 : 8 - dow;
+  return firstSun + 7;
+}
+
+function resolveThemeDate(theme, year) {
+  if (theme.id === 'maes') return { y: year, m: 5, d: secondSunday(year, 5) };
+  if (theme.id === 'pais') return { y: year, m: 8, d: secondSunday(year, 8) };
+  if (theme.id === 'black-friday') {
+    // 4ª quinta de novembro + 1 = sexta (Black Friday)
+    const first = new Date(Date.UTC(year, 10, 1));
+    const dow = first.getUTCDay();
+    const firstThu = dow <= 4 ? 1 + (4 - dow) : 1 + (11 - dow);
+    const fourthThu = firstThu + 21;
+    return { y: year, m: 11, d: fourthThu + 1 };
+  }
+  if (theme.id === 'cyber-monday') {
+    const bf = resolveThemeDate({ id: 'black-friday' }, year);
+    return { y: year, m: 11, d: bf.d + 3 };
+  }
+  // Carnaval/Páscoa: datas aproximadas no array; podem ser ajustadas no ano
+  return { y: year, m: theme.month, d: theme.day };
+}
+
+function daysBetween(a, b) {
+  // a,b as {y,m,d} — diferença em dias (b - a) aproximada
+  const da = Date.UTC(a.y, a.m - 1, a.d);
+  const db = Date.UTC(b.y, b.m - 1, b.d);
+  return Math.round((db - da) / 86400000);
+}
+
+function getActiveSeasonalTheme() {
+  const today = brazilTodayParts();
+  let best = null;
+  let bestDist = 999;
+  for (const year of [today.y - 1, today.y, today.y + 1]) {
+    for (const theme of SEASONAL_THEMES) {
+      const event = resolveThemeDate(theme, year);
+      const delta = daysBetween(event, today); // positivo = depois do evento
+      // janela: 3 dias antes (-3) até 2 dias depois (+2)
+      if (delta >= -3 && delta <= 2) {
+        const dist = Math.abs(delta);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = theme;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function applySeasonalTheme() {
+  try {
+    // remove temas anteriores
+    [...document.body.classList].forEach((c) => {
+      if (c.startsWith('theme-')) document.body.classList.remove(c);
+    });
+    const theme = getActiveSeasonalTheme();
+    const ban = document.getElementById('seasonalBanner') || document.getElementById('halloweenBanner');
+    if (!theme) {
+      if (ban) {
+        ban.style.display = 'none';
+        ban.setAttribute('aria-hidden', 'true');
+      }
+      return;
+    }
+    document.body.classList.add('theme-' + theme.id);
+    // halloween reaproveita classes visuais dedicadas
+    if (theme.id === 'halloween') document.body.classList.add('theme-halloween');
+    if (ban) {
+      ban.style.display = '';
+      ban.setAttribute('aria-hidden', 'false');
+      ban.textContent = theme.label;
+      ban.className = 'seasonal-banner theme-banner-' + theme.id;
+    }
+  } catch (e) {
+    console.warn('seasonal theme', e);
+  }
+}
+applySeasonalTheme();
+
+
+
+
 // Share sheet actions
 document.getElementById('shareSheetClose')?.addEventListener('click', closeShareSheet);
 document.getElementById('shareSheet')?.addEventListener('click', (e) => {
