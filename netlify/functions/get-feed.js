@@ -1,10 +1,10 @@
 /**
  * Feed Google Merchant Center (RSS 2.0 + namespace g)
- * URL pública: https://emporioarcatalogo.netlify.app/feed.xml
+ * URL pública: https://catalogoemporio.netlify.app/feed.xml
  */
 const GIST_RAW =
   "https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json";
-const BASE_URL = "https://emporioarcatalogo.netlify.app";
+const BASE_URL = "https://catalogoemporio.netlify.app";
 const IMG_BASE = "https://arquivos-cdn.facilzap.app.br/";
 
 function normId(s) {
