@@ -168,6 +168,58 @@ function loadImageCors(src) {
 }
 
 /** Card vertical 1080x1920 para Stories / Status */
+
+async function buildStoryCardBlob(p) {
+  try {
+    // reutiliza downloadStoryCard internamente via canvas se existir no fluxo
+    if (!p) return null;
+    const W = 1080, H = 1920;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0c0a09';
+    ctx.fillRect(0, 0, W, H);
+    // fundo gradiente
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#1c1010');
+    g.addColorStop(1, '#0c0a09');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    // título
+    ctx.fillStyle = '#fdba74';
+    ctx.font = 'bold 52px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Empório A.R', W / 2, 160);
+    // nome
+    ctx.fillStyle = '#fafaf9';
+    ctx.font = 'bold 44px system-ui, sans-serif';
+    const nome = String(p.nome || '').slice(0, 48);
+    ctx.fillText(nome, W / 2, 280);
+    // preço
+    ctx.fillStyle = '#4ade80';
+    ctx.font = 'bold 48px system-ui, sans-serif';
+    ctx.fillText('R$ ' + (p.varejo || ''), W / 2, 360);
+    // foto
+    const src = p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '';
+    if (src) {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
+        const size = 700;
+        const x = (W - size) / 2, y = 420;
+        ctx.drawImage(img, x, y, size, size);
+      } catch (e) {}
+    }
+    ctx.fillStyle = '#a8a29e';
+    ctx.font = '32px system-ui, sans-serif';
+    ctx.fillText('catalogoemporio.netlify.app', W / 2, H - 120);
+    return await new Promise((res) => canvas.toBlob(res, 'image/png', 0.92));
+  } catch (e) {
+    return null;
+  }
+}
+
 async function downloadStoryCard(p) {
   const W = 1080, H = 1920;
   const canvas = document.createElement('canvas');
@@ -326,7 +378,32 @@ async function shareProduct(p) {
   if (!p) return;
   const url = getProductShareUrl(p);
   const text = getProductShareText(p);
-  // Sempre abre o menu com opções (Stories, Status, WhatsApp, link…)
+  const title = `${p.nome} · Empório A.R`;
+
+  // 1) Menu nativo do celular (WhatsApp, Instagram, etc. quando o sistema oferecer)
+  if (navigator.share) {
+    try {
+      // tenta com imagem do card se possível
+      if (typeof buildStoryCardBlob === 'function') {
+        try {
+          const blob = await buildStoryCardBlob(p);
+          if (blob) {
+            const file = new File([blob], 'emporio-ar-produto.png', { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ title, text, url, files: [file] });
+              return;
+            }
+          }
+        } catch (e) {}
+      }
+      await navigator.share({ title, text, url });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      // cai no menu manual
+    }
+  }
+  // 2) Menu com Stories / Status / link / baixar
   openShareSheet(p, url, text);
 }
 
