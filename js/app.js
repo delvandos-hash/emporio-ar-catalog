@@ -395,18 +395,22 @@ function matchesSearch(item, brand, cat, q) {
 }
 
 /** Itens que NÃO entram nos filtros Mini e 80–100ml (só perfumes) */
-function isNonPerfumeVolumeItem(item, cat) {
+function isNonPerfumeVolumeItem(item, cat, brand) {
   const n = String(item.nome || '').toLowerCase();
   const c = String(cat || item.cat || '').toLowerCase();
-  const blob = n + ' ' + c;
-  const block = [
-    'hidratante', 'body cream', 'body splash', 'bodysplash', 'body lotion',
-    'creme', 'loção', 'locao', 'óleo', 'oleo', 'oil ', ' óleo',
-    'maquiagem', 'gloss', 'batom', 'máscara', 'mascara', 'rimel', 'rímel',
-    'shampoo', 'condicionador', 'sabonete', 'desodorante', 'kit presente',
-  ];
+  const b = String(brand || item.brand || '').toLowerCase();
+  const blob = `${n} ${c} ${b}`;
+  // marcas / categorias cosméticas
+  if (b.includes('makeup') || b.includes('make up') || b.includes('maqui') || c.includes('maqui')) return true;
   if (c === 'óleos' || c === 'oleos' || c.includes('óleo') || c.includes('oleo')) return true;
-  if (c.includes('maqui')) return true;
+  const block = [
+    'hidratante', 'body cream', 'body splash', 'bodysplash', 'body lotion', 'body spray',
+    'creme', 'loção', 'locao', 'óleo', 'oleo', ' oil', 'oil ',
+    'maquiagem', 'makeup', 'make-up', 'gloss', 'batom', 'lip ', 'lipbalm', 'lip balm',
+    'lip blam', 'lipblam', 'blam', 'balm', 'máscara', 'mascara', 'rimel', 'rímel',
+    'shampoo', 'condicionador', 'sabonete', 'desodorante', 'esmalte', 'primer',
+    'base líquida', 'corretivo', 'iluminador', 'blush', 'pó compacto',
+  ];
   for (const w of block) {
     if (blob.includes(w)) return true;
   }
@@ -431,22 +435,43 @@ function volumeBucket(item) {
 }
 
 /** Filtro de volume: Mini e 100ml só perfumes */
-function matchesVolumeFilter(item, cat, volumeState) {
+function matchesVolumeFilter(item, cat, volumeState, brand) {
   if (!volumeState || volumeState === 'Todos') return true;
   if (volumeState === 'Mini' || volumeState === '100ml') {
-    if (isNonPerfumeVolumeItem(item, cat)) return false;
+    if (isNonPerfumeVolumeItem(item, cat, brand)) return false;
   }
   return volumeBucket(item) === volumeState;
 }
 
+/** Lançamento: produto novo há no máximo 3 dias (campo novoDesde da Action) */
+const LANCAMENTO_DIAS = 3;
+
 function isLancamentoItem(item, cat) {
-  const c = String(cat || item.cat || '').toLowerCase();
-  const b = String(item.badge || '').toLowerCase();
-  const n = String(item.nome || '').toLowerCase();
-  if (c.includes('lanç') || c.includes('lanc')) return true;
-  if (b.includes('novo') || b.includes('lanç') || b.includes('lanc') || b === 'new') return true;
-  if (n.includes('lançamento') || n.includes('lancamento')) return true;
+  const raw = item && item.novoDesde;
+  if (raw) {
+    const start = new Date(raw).getTime();
+    if (!Number.isNaN(start)) {
+      const ageDays = (Date.now() - start) / 86400000;
+      if (ageDays >= 0 && ageDays <= LANCAMENTO_DIAS) return true;
+    }
+  }
+  // legado: badge Novo sem data não entra mais (evita vitrine eterna)
   return false;
+}
+
+function fonteLancamento(item, line, cat) {
+  const f = String(item.fonte || '').toLowerCase();
+  if (f.includes('acessor') || f === 'dande') return 'acessorios';
+  if (f.includes('roup') || f.includes('franny') || f.includes('sophia')) return 'roupas';
+  if (f.includes('brand')) return 'brand';
+  if (f.includes('imarat')) return 'imarat';
+  const c = String(cat || item.cat || '');
+  if (c === 'Brand' || c.startsWith('Brand')) return 'brand';
+  const ln = String(line || item.line || '').toLowerCase();
+  if (ln === 'roupas') return 'roupas';
+  if (ln === 'acessorios' || ln === 'acessórios') return 'acessorios';
+  if (['masculino', 'feminino', 'unissex'].includes(ln)) return 'imarat';
+  return 'outros';
 }
 
 const CART_KEY = 'emporio_ar_cart';
@@ -1059,7 +1084,7 @@ function buildDetailsNavList() {
       if (state.stock === 'Disponivel' && !isAvailable(item)) continue;
       if (state.stock === 'Esgotado' && isAvailable(item)) continue;
       if (!matchesSearch(item, g.brand, g.cat, state.search)) continue;
-      if (!matchesVolumeFilter(item, g.cat, state.volume)) continue;
+      if (!matchesVolumeFilter(item, g.cat, state.volume, g.brand)) continue;
       list.push({
         nome: item.nome,
         brand: g.brand,
@@ -1498,27 +1523,40 @@ function closeModal() {
 
 
 function collectFeatured(limit = 12) {
-  const out = [];
+  // Agrupa por fonte (imarat / brand / roupas / acessorios) e mistura no destaque
+  const buckets = { imarat: [], brand: [], roupas: [], acessorios: [], outros: [] };
   const seen = new Set();
   for (const g of allGroups()) {
     for (const raw of g.items || []) {
       const item = validateProductPrices(raw);
       if (!isAvailable(item)) continue;
-      if (!isLancamentoItem(item, g.cat) && !(item.badge && String(item.badge).toLowerCase().includes('scoop'))) {
-        // allow acessorios Lançamentos only or scoop
-        if (!isLancamentoItem(item, g.cat)) continue;
-      }
+      if (!isLancamentoItem(item, g.cat)) continue;
       const key = `${g.brand}|${item.nome}|${item.volume || ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({
-        ...item,
-        brand: g.brand,
-        cat: g.cat,
-        line: g.line,
-      });
-      if (out.length >= limit) return out;
+      const row = { ...item, brand: g.brand, cat: g.cat, line: g.line };
+      const fonte = fonteLancamento(row, g.line, g.cat);
+      (buckets[fonte] || buckets.outros).push(row);
     }
+  }
+  // mais novos primeiro dentro de cada fonte
+  for (const k of Object.keys(buckets)) {
+    buckets[k].sort((a, b) => String(b.novoDesde || '').localeCompare(String(a.novoDesde || '')));
+  }
+  const order = ['imarat', 'roupas', 'acessorios', 'brand', 'outros'];
+  const out = [];
+  let i = 0;
+  while (out.length < limit) {
+    let added = false;
+    for (const k of order) {
+      if (buckets[k][i]) {
+        out.push(buckets[k][i]);
+        added = true;
+        if (out.length >= limit) break;
+      }
+    }
+    if (!added) break;
+    i++;
   }
   return out;
 }
@@ -1587,7 +1625,7 @@ function render() {
       if (state.stock === 'Disponivel' && !isAvailable(item)) return false;
       if (state.stock === 'Esgotado' && isAvailable(item)) return false;
       if (!matchesSearch(item, g.brand, g.cat, state.search)) return false;
-      if (!matchesVolumeFilter(item, g.cat, state.volume)) return false;
+      if (!matchesVolumeFilter(item, g.cat, state.volume, g.brand)) return false;
       if (state.vitrine === 'Lancamentos' && !isLancamentoItem(item, g.cat)) return false;
       return true;
     });
