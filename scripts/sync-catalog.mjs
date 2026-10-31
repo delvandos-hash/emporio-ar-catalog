@@ -263,6 +263,24 @@ async function fetchImaratList() {
   return all;
 }
 
+function imaratImagesFrom(p, detail) {
+  const out = [];
+  const push = (u) => {
+    if (!u) return;
+    let s = String(u.url || u.src || u || '').trim();
+    if (!s) return;
+    if (!s.startsWith('http')) s = IMARAT_ORIGIN + (s.startsWith('/') ? s : '/' + s);
+    if (!out.includes(s)) out.push(s);
+  };
+  if (detail && Array.isArray(detail.images)) detail.images.forEach(push);
+  if (p) {
+    push(p.image);
+    push(p.hoverImage);
+    if (Array.isArray(p.images)) p.images.forEach(push);
+  }
+  return out;
+}
+
 async function fetchImaratDetail(slug) {
   try {
     const res = await fetch(`${IMARAT_API}/${encodeURIComponent(slug)}`, {
@@ -1120,6 +1138,24 @@ async function main() {
         }
         if (notas) it.notas = notas;
 
+        // Galeria: busca imagens extras no detalhe da Imarat
+        let detailImgs = null;
+        if (hit.slug) {
+          const detail2 = await fetchImaratDetail(hit.slug);
+          if (detail2) {
+            if (!notas) {
+              const n2 = notesToText(detail2.notes) || (detail2.shortDesc || detail2.description || '').slice(0, 400);
+              if (n2) it.notas = sanitizarNotas(n2);
+            }
+            detailImgs = detail2;
+          }
+        }
+        const imgs = imaratImagesFrom(hit, detailImgs);
+        if (imgs.length) {
+          it.foto = imgs[0];
+          it.fotos = imgs;
+        }
+
         const disp = hit.inStock === true ? 'Sim' : 'Não';
         if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
 
@@ -1195,18 +1231,21 @@ async function main() {
       if (duplicado) continue;
 
       let notas = '';
+      let detail = null;
       if (p.slug) {
-        const detail = await fetchImaratDetail(p.slug);
+        detail = await fetchImaratDetail(p.slug);
         if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
       }
       notas = sanitizarNotas(notas);
+      const imgsNew = imaratImagesFrom(p, detail);
+      const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : '');
       
       const precoVarejoOrig = (p.priceCents || 0) / 100; 
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       
       const line = genderLine(p.gender); 
-      const foto = p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : ''; 
+      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : ''); 
       const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
       
       const group = ensureBrandGroup(DATA, line, brand, cat);
@@ -1218,6 +1257,7 @@ async function main() {
           disponivel: p.inStock === true ? 'Sim' : 'Não', 
           notas: notas || '', 
           foto,
+          fotos: imgsNew.length ? imgsNew : (foto ? [foto] : []),
           fonte: 'imarat',
       }, true));
       
@@ -1246,6 +1286,25 @@ async function main() {
         it.nome = hit.nome; 
         if (hit.descricao) it.notas = String(hit.descricao).trim().slice(0, 500);
         const disp = brandDisponivel(hit); if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
+      }
+    }
+  }
+
+  
+  // Brand: itens do catálogo que não existem mais na loja → esgotado
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
+      for (const it of g.items || []) {
+        const n = norm(it.nome);
+        const hit = brandList.find((p) => norm(p.nome) === n)
+          || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
+        if (!hit) {
+          if ((it.disponivel || 'Sim') !== 'Não') {
+            it.disponivel = 'Não';
+            stockChanged++;
+          }
+        }
       }
     }
   }
