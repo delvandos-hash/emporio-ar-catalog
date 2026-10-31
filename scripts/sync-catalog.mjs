@@ -312,9 +312,13 @@ async function fetchBrandList() {
 }
 
 // ========== SOPHIA MODA (ROUPAS) ==========
-// Domínio próprio sophiamoda.com.br saiu do ar (DNS). Catálogo ativo no FacilZap:
-const SOPHIA_BASE = 'https://facilzap.app.br/sophiamodafemi';
-const SOPHIA_LOJA = 'lojavendedoras'; // path da loja no FacilZap (antes era ID 62982459275 no domínio antigo)
+// Fallback: domínio próprio → FacilZap (resolveSophiaBase escolhe a que responde JSON)
+const SOPHIA_CANDIDATES = [
+  'https://sophiamoda.com.br',
+  'https://facilzap.app.br/sophiamodafemi',
+];
+let SOPHIA_BASE = SOPHIA_CANDIDATES[0];
+const SOPHIA_LOJA = 'lojavendedoras';
 const SOPHIA_CATEGORIES = [
   { id: '108042', nome: 'VESTIDOS' },
   { id: '108328', nome: 'MACACÃO/MACAQUINHOS' },
@@ -369,7 +373,7 @@ async function fetchSophiaWithRetry(url, options, retries = 3) {
         throw new Error('resposta vazia (bloqueio anti-robô)');
       }
       // HTML em vez de JSON = bloqueio
-      if (text.trimStart().startsWith('<!') || text.includes('<html')) {
+      if (text.trimStart().startsWith('<') || text.includes('<html') || text.includes('window.location')) {
         throw new Error('HTML recebido em vez de JSON (bloqueio anti-robô)');
       }
       const data = JSON.parse(text);
@@ -384,43 +388,83 @@ async function fetchSophiaWithRetry(url, options, retries = 3) {
   throw lastErr;
 }
 
+
+/** Escolhe base Sophia que devolve JSON (próprio ou FacilZap) */
+async function resolveSophiaBase(UA) {
+  for (const base of SOPHIA_CANDIDATES) {
+    try {
+      const warm = await fetch(`${base}/c/atacado/${SOPHIA_LOJA}`, {
+        headers: {
+          'User-Agent': UA,
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+        },
+      });
+      let cookie = '';
+      const setCookie = warm.headers.getSetCookie?.() || [];
+      if (setCookie.length) {
+        cookie = setCookie.map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
+      } else {
+        const sc = warm.headers.get('set-cookie') || '';
+        cookie = sc
+          .split(/,(?=[^;]+?=)/)
+          .map((c) => c.split(';')[0].trim())
+          .filter(Boolean)
+          .join('; ');
+      }
+      await warm.text().catch(() => {});
+
+      const probeUrl = `${base}/c/atacado/carregar_produtos/1/108042/${SOPHIA_LOJA}?mobile=0`;
+      const origin = base.includes('facilzap') ? 'https://facilzap.app.br' : base;
+      const res = await fetch(probeUrl, {
+        method: 'POST',
+        headers: {
+          'User-Agent': UA,
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest',
+          Referer: `${base}/c/atacado/${SOPHIA_LOJA}`,
+          Origin: origin,
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+        body: '',
+      });
+      const text = await res.text();
+      if (!text || text.trimStart().startsWith('<') || text.includes('window.location') || text.includes('<html')) {
+        console.log(`  Sophia ${base}: HTML/redirect — próxima`);
+        continue;
+      }
+      const data = JSON.parse(text);
+      const n = Array.isArray(data.produtos) ? data.produtos.length : 0;
+      if (!n) {
+        console.log(`  Sophia ${base}: JSON sem produtos — próxima`);
+        continue;
+      }
+      SOPHIA_BASE = base;
+      console.log(`  ✓ Sophia base ativa: ${base} (probe ${n} produtos)`);
+      return { base, cookie };
+    } catch (e) {
+      console.log(`  Sophia ${base}: ${e.message}`);
+    }
+  }
+  throw new Error('Nenhuma base Sophia respondeu JSON (sophiamoda.com.br e FacilZap)');
+}
+
 async function fetchSophiaRoupas() {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
-  // Warm-up: pega cookie de sessão
-  let cookie = '';
-  try {
-    const warm = await fetch(`${SOPHIA_BASE}/c/atacado/${SOPHIA_LOJA}`, {
-      headers: {
-        'User-Agent': UA,
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-      },
-    });
-    const setCookie = warm.headers.getSetCookie?.() || [];
-    // Node fetch may expose getSetCookie; fallback parse
-    if (setCookie.length) {
-      cookie = setCookie.map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
-    } else {
-      const sc = warm.headers.get('set-cookie') || '';
-      cookie = sc
-        .split(/,(?=[^;]+?=)/)
-        .map((c) => c.split(';')[0].trim())
-        .filter(Boolean)
-        .join('; ');
-    }
-    await warm.text().catch(() => {});
-  } catch (e) {
-    console.log('  ⚠ Warm-up Sophia falhou (seguindo sem cookie):', e.message);
-  }
+  // Escolhe base viva (próprio ou FacilZap) + cookie
+  const resolved = await resolveSophiaBase(UA);
+  const cookie = resolved.cookie || '';
+  const origin = SOPHIA_BASE.includes('facilzap') ? 'https://facilzap.app.br' : SOPHIA_BASE;
 
   const headers = {
     'User-Agent': UA,
     Accept: 'application/json, text/javascript, */*; q=0.01',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
     'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-    Origin: 'https://facilzap.app.br',
+    Origin: origin,
     Referer: `${SOPHIA_BASE}/c/atacado/${SOPHIA_LOJA}`,
     'X-Requested-With': 'XMLHttpRequest',
     ...(cookie ? { Cookie: cookie } : {}),
@@ -605,7 +649,7 @@ async function fetchFacilZapPage(base, loja, catId, page, cookie) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
-  if (!text || text.trimStart().startsWith('<!')) throw new Error('HTML em vez de JSON');
+  if (!text || text.trimStart().startsWith('<') || text.includes('window.location')) throw new Error('HTML/redirect da Sophia (não JSON)');
   return JSON.parse(text);
 }
 
