@@ -5,7 +5,12 @@
  */
 const SOURCES = {
   sophia: {
-    base: "https://facilzap.app.br/sophiamodafemi",
+    // tenta domínio próprio e, se cair, FacilZap
+    bases: [
+      "https://sophiamoda.com.br",
+      "https://facilzap.app.br/sophiamodafemi",
+    ],
+    base: "https://sophiamoda.com.br",
     loja: "lojavendedoras",
     categories: ["108042", "108328", "108333", "108339", "108338", "379539"],
   },
@@ -64,7 +69,7 @@ async function fetchCategoryPage(src, catId, page, cookie) {
     headers: {
       "User-Agent": UA,
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      Origin: src.base,
+      Origin: src.base.includes("facilzap") ? "https://facilzap.app.br" : src.base,
       Referer: `${src.base}/c/atacado/${src.loja}`,
       "X-Requested-With": "XMLHttpRequest",
       Accept: "application/json, text/javascript, */*; q=0.01",
@@ -73,7 +78,13 @@ async function fetchCategoryPage(src, catId, page, cookie) {
     body: "",
   });
   if (!res.ok) return null;
-  return res.json();
+  const text = await res.text();
+  if (!text || text.trimStart().startsWith("<") || text.includes("window.location")) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 function buildVariacoes(found) {
@@ -117,59 +128,85 @@ export default async (req) => {
       });
     }
 
-    const cookie = await warmUp(src);
+    const bases =
+      source === "sophia" && Array.isArray(src.bases) && src.bases.length
+        ? src.bases
+        : [src.base];
 
-    for (const catId of src.categories) {
-      for (let page = 1; page <= 5; page++) {
-        const data = await fetchCategoryPage(src, catId, page, cookie);
-        if (!data) break;
-        const produtos = data.produtos || [];
-        if (!produtos.length) break;
+    for (const base of bases) {
+      const srcTry = { ...src, base };
+      const cookie = await warmUp(srcTry);
+      let baseUsable = false;
 
-        const found = produtos.find((p) => String(p.id) === String(id));
-        if (found) {
-          const { variacoes, total } = buildVariacoes(found);
-          return new Response(
-            JSON.stringify({
-              id: String(found.id),
-              id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
-              fonte: source,
-              nome: found.nome,
-              total_estoque: total,
-              variacoes,
-              atualizado_em: new Date().toISOString(),
-            }),
-            { status: 200, headers }
-          );
+      for (const catId of srcTry.categories) {
+        for (let page = 1; page <= 5; page++) {
+          let data;
+          try {
+            data = await fetchCategoryPage(srcTry, catId, page, cookie);
+          } catch {
+            data = null;
+          }
+          if (!data) break;
+          baseUsable = true;
+          const produtos = data.produtos || [];
+          if (!produtos.length) break;
+
+          const found = produtos.find((p) => String(p.id) === String(id));
+          if (found) {
+            const { variacoes, total } = buildVariacoes(found);
+            return new Response(
+              JSON.stringify({
+                id: String(found.id),
+                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
+                fonte: source,
+                base,
+                nome: found.nome,
+                total_estoque: total,
+                variacoes,
+                atualizado_em: new Date().toISOString(),
+              }),
+              { status: 200, headers }
+            );
+          }
+
+          if (produtos.length < 5) break;
         }
-
-        if (produtos.length < 5) break;
       }
-    }
 
-    // fallback: "todas"
-    for (let page = 1; page <= 8; page++) {
-      const data = await fetchCategoryPage(src, "todas", page, cookie);
-      if (!data) break;
-      const produtos = data.produtos || [];
-      if (!produtos.length) break;
-      const found = produtos.find((p) => String(p.id) === String(id));
-      if (found) {
-        const { variacoes, total } = buildVariacoes(found);
-        return new Response(
-          JSON.stringify({
-            id: String(found.id),
-            id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
-            fonte: source,
-            nome: found.nome,
-            total_estoque: total,
-            variacoes,
-            atualizado_em: new Date().toISOString(),
-          }),
-          { status: 200, headers }
-        );
+      if (baseUsable) {
+        for (let page = 1; page <= 8; page++) {
+          let data;
+          try {
+            data = await fetchCategoryPage(srcTry, "todas", page, cookie);
+          } catch {
+            data = null;
+          }
+          if (!data) break;
+          const produtos = data.produtos || [];
+          if (!produtos.length) break;
+          const found = produtos.find((p) => String(p.id) === String(id));
+          if (found) {
+            const { variacoes, total } = buildVariacoes(found);
+            return new Response(
+              JSON.stringify({
+                id: String(found.id),
+                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
+                fonte: source,
+                base,
+                nome: found.nome,
+                total_estoque: total,
+                variacoes,
+                atualizado_em: new Date().toISOString(),
+              }),
+              { status: 200, headers }
+            );
+          }
+          if (produtos.length < 5) break;
+        }
+        // base respondeu mas produto não achado — não tenta FacilZap à toa
+        break;
       }
-      if (produtos.length < 5) break;
+      // base não respondeu JSON → tenta próxima
     }
 
     return new Response(
