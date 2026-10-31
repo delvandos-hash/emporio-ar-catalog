@@ -1045,27 +1045,28 @@ function renderCart() {
     <div class="cart-item">
       <div class="cart-item-info">
         <strong>${p.nome}</strong><br>
-        <span style="color:var(--muted);font-size:.78rem">${p.brand} · ${p.volume || '—'} · ${label}: R$ ${formatBRL(unit)}</span>
+        <span class="cart-item-meta">${p.brand || ''} · ${p.volume || '—'} · ${label}: R$ ${formatBRL(unit)}</span>
         <div class="cart-qty">
           <button type="button" data-qty-minus="${i}" aria-label="Diminuir">−</button>
           <span>${p.qty}</span>
           <button type="button" data-qty-plus="${i}" aria-label="Aumentar">+</button>
         </div>
-        <div style="font-size:.78rem;margin-top:.25rem">Subtotal: R$ ${formatBRL(sub)}</div>
+        <div class="cart-item-sub">Subtotal: R$ ${formatBRL(sub)}</div>
       </div>
-      <button type="button" data-remove="${i}">Remover</button>
+      <button type="button" class="cart-remove" data-remove="${i}">Remover</button>
     </div>`;
   }).join('');
 
   const modeHtml = useAtacado
-    ? '<div class="cart-mode">✓ Preços de ATACADO (6+ itens)</div>'
-    : `<div class="cart-mode" style="color:var(--muted)">Varejo — adicione mais ${6 - totalItens} item(ns) para preço de atacado</div>`;
+    ? '<div class="cart-mode is-atacado">✓ Preço de ATACADO aplicado (6+ itens)</div>'
+    : `<div class="cart-mode is-varejo">Varejo — faltam <strong>${6 - totalItens}</strong> item(ns) para preço de atacado</div>`;
 
   list.innerHTML = modeHtml + itemsHtml + `
     <div class="cart-total">
       <div>Itens: ${totalItens}</div>
       <strong>Total: R$ ${formatBRL(total)}</strong>
-    </div>`;
+    </div>
+    <button type="button" class="cart-clear" id="cartClearBtn">Limpar pedido</button>`;
 
   list.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => removeFromCart(Number(btn.dataset.remove)));
@@ -2362,6 +2363,17 @@ document.getElementById('shareWhatsApp')?.addEventListener('click', () => {
   window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
   closeShareSheet();
 });
+
+
+(function cartObsCepMask(){
+  const el = document.getElementById('cartObs');
+  if (!el) return;
+  el.addEventListener('input', () => {
+    let v = el.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5);
+    el.value = v;
+  });
+})();
 
 updateCartUI();
 render();
