@@ -443,20 +443,34 @@ function matchesVolumeFilter(item, cat, volumeState, brand) {
   return volumeBucket(item) === volumeState;
 }
 
-/** Lançamento: produto novo há no máximo 3 dias (campo novoDesde da Action) */
+/** Lançamentos híbridos:
+ * 1) Prioridade: novoDesde ≤ 3 dias (todas as fontes)
+ * 2) Completar: categoria Lançamentos / badge Novo / nome com lançamento
+ */
 const LANCAMENTO_DIAS = 3;
 
-function isLancamentoItem(item, cat) {
+function isNovoRecente(item) {
   const raw = item && item.novoDesde;
-  if (raw) {
-    const start = new Date(raw).getTime();
-    if (!Number.isNaN(start)) {
-      const ageDays = (Date.now() - start) / 86400000;
-      if (ageDays >= 0 && ageDays <= LANCAMENTO_DIAS) return true;
-    }
-  }
-  // legado: badge Novo sem data não entra mais (evita vitrine eterna)
+  if (!raw) return false;
+  const start = new Date(raw).getTime();
+  if (Number.isNaN(start)) return false;
+  const ageDays = (Date.now() - start) / 86400000;
+  return ageDays >= 0 && ageDays <= LANCAMENTO_DIAS;
+}
+
+function isLancamentoLegado(item, cat) {
+  const c = String(cat || item.cat || '').toLowerCase();
+  const b = String(item.badge || '').toLowerCase();
+  const n = String(item.nome || '').toLowerCase();
+  if (c.includes('lanç') || c.includes('lanc')) return true;
+  if (b.includes('novo') || b.includes('lanç') || b.includes('lanc') || b === 'new') return true;
+  if (n.includes('lançamento') || n.includes('lancamento')) return true;
   return false;
+}
+
+/** Filtro "Só lançamentos" e cards: recente OU legado */
+function isLancamentoItem(item, cat) {
+  return isNovoRecente(item) || isLancamentoLegado(item, cat);
 }
 
 function fonteLancamento(item, line, cat) {
@@ -1523,40 +1537,57 @@ function closeModal() {
 
 
 function collectFeatured(limit = 12) {
-  // Agrupa por fonte (imarat / brand / roupas / acessorios) e mistura no destaque
-  const buckets = { imarat: [], brand: [], roupas: [], acessorios: [], outros: [] };
+  // Híbrido: 1º novidades ≤3 dias (mistura fontes); 2º completa com legado (categoria/badge)
+  const bucketsRecente = { imarat: [], brand: [], roupas: [], acessorios: [], outros: [] };
+  const legado = [];
   const seen = new Set();
+
   for (const g of allGroups()) {
     for (const raw of g.items || []) {
       const item = validateProductPrices(raw);
       if (!isAvailable(item)) continue;
-      if (!isLancamentoItem(item, g.cat)) continue;
       const key = `${g.brand}|${item.nome}|${item.volume || ''}`;
       if (seen.has(key)) continue;
-      seen.add(key);
       const row = { ...item, brand: g.brand, cat: g.cat, line: g.line };
-      const fonte = fonteLancamento(row, g.line, g.cat);
-      (buckets[fonte] || buckets.outros).push(row);
+      if (isNovoRecente(item)) {
+        seen.add(key);
+        const fonte = fonteLancamento(row, g.line, g.cat);
+        (bucketsRecente[fonte] || bucketsRecente.outros).push(row);
+      } else if (isLancamentoLegado(item, g.cat)) {
+        seen.add(key);
+        legado.push(row);
+      }
     }
   }
-  // mais novos primeiro dentro de cada fonte
-  for (const k of Object.keys(buckets)) {
-    buckets[k].sort((a, b) => String(b.novoDesde || '').localeCompare(String(a.novoDesde || '')));
+
+  for (const k of Object.keys(bucketsRecente)) {
+    bucketsRecente[k].sort((a, b) => String(b.novoDesde || '').localeCompare(String(a.novoDesde || '')));
   }
+  // legado: embaralha leve por nome para não fixar sempre os mesmos no topo
+  legado.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+
   const order = ['imarat', 'roupas', 'acessorios', 'brand', 'outros'];
   const out = [];
   let i = 0;
   while (out.length < limit) {
     let added = false;
     for (const k of order) {
-      if (buckets[k][i]) {
-        out.push(buckets[k][i]);
+      if (bucketsRecente[k][i]) {
+        out.push(bucketsRecente[k][i]);
         added = true;
         if (out.length >= limit) break;
       }
     }
     if (!added) break;
     i++;
+  }
+
+  // completa com legado até o limite
+  for (const row of legado) {
+    if (out.length >= limit) break;
+    const key = `${row.brand}|${row.nome}|${row.volume || ''}`;
+    if (out.some((x) => `${x.brand}|${x.nome}|${x.volume || ''}` === key)) continue;
+    out.push(row);
   }
   return out;
 }
