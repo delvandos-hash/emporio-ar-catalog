@@ -1358,13 +1358,20 @@
     color: #9ca3af;
   }
   .feat-name {
-    display: block;
-    font-size: .75rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    font-size: .72rem;
     font-weight: 600;
     margin-top: .4rem;
-    line-height: 1.25;
-    max-height: 2.5em;
+    line-height: 1.3;
+    min-height: 3.9em;
+    max-height: 3.9em;
     overflow: hidden;
+    text-align: center;
+    padding: 0 .25rem;
+    word-break: break-word;
   }
   .feat-price {
     display: block;
@@ -1807,11 +1814,17 @@
     width: 100%;
   }
   .feat-card .feat-name {
-    padding: .35rem .4rem 0;
-    font-size: .78rem;
+    padding: .35rem .35rem 0;
+    font-size: .72rem;
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.3;
     color: #111827;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    min-height: 3.9em;
+    max-height: 3.9em;
+    overflow: hidden;
+    word-break: break-word;
   }
   .feat-card .feat-price {
     padding: .2rem .4rem .45rem;
@@ -2050,13 +2063,13 @@
       <button class="modal-close" id="shareSheetClose" type="button">×</button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:.55rem">
-      <p style="margin:0 0 .35rem;font-size:.85rem;color:#6b7280">Instagram e WhatsApp não permitem postar Stories/Status direto pelo site. Use as opções abaixo:</p>
-      <button type="button" class="share-opt" id="shareNative">📱 Compartilhar pelo celular</button>
-      <button type="button" class="share-opt" id="shareWhatsApp">📲 Enviar no WhatsApp (conversa)</button>
-      <button type="button" class="share-opt" id="shareIgStory">📸 Instagram Stories (baixar card)</button>
-      <button type="button" class="share-opt" id="shareWaStatus">🟢 WhatsApp Status (baixar card)</button>
-      <button type="button" class="share-opt" id="shareDownloadStory">🖼️ Baixar imagem do produto</button>
-      <button type="button" class="share-opt" id="shareCopyLink">🔗 Copiar link do produto</button>
+      <p style="margin:0 0 .35rem;font-size:.85rem;color:#6b7280">Escolha como compartilhar. No celular, “Compartilhar” abre o menu do sistema (WhatsApp, Instagram…).</p>
+      <button type="button" class="share-opt" id="shareNative">📱 Compartilhar (menu do celular)</button>
+      <button type="button" class="share-opt" id="shareWhatsApp">📲 WhatsApp — conversa</button>
+      <button type="button" class="share-opt" id="shareIgStory">📸 Stories Instagram — gerar card</button>
+      <button type="button" class="share-opt" id="shareWaStatus">🟢 Status WhatsApp — gerar card</button>
+      <button type="button" class="share-opt" id="shareDownloadStory">🖼️ Baixar imagem</button>
+      <button type="button" class="share-opt" id="shareCopyLink">🔗 Copiar link</button>
       <button type="button" class="share-opt" id="shareCopyText">📋 Copiar texto + link</button>
     </div>
   </div>
@@ -2067,35 +2080,38 @@
 <script>
 (function hideNetlifyBadge(){
   function nuke(el){
-    if (!el || el.__netlifyBadgeHidden) return;
-    el.__netlifyBadgeHidden = true;
+    if (!el || el.__nfHide) return;
+    el.__nfHide = true;
     try {
       el.style.setProperty('display','none','important');
       el.style.setProperty('visibility','hidden','important');
       el.style.setProperty('opacity','0','important');
       el.style.setProperty('pointer-events','none','important');
+      el.style.setProperty('width','0','important');
+      el.style.setProperty('height','0','important');
       el.setAttribute('aria-hidden','true');
     } catch(e) {}
   }
   function run(){
-    document.querySelectorAll('a, div, span, button').forEach(function(el){
+    document.querySelectorAll('a, div, span, button, iframe').forEach(function(el){
       var text = (el.textContent || '').replace(/\s+/g,' ').trim();
       var href = (el.getAttribute && el.getAttribute('href')) || '';
+      var src = (el.getAttribute && el.getAttribute('src')) || '';
       var aria = (el.getAttribute && el.getAttribute('aria-label')) || '';
-      var title = (el.getAttribute && el.getAttribute('title')) || '';
-      var hit = /powered by netlify/i.test(text) || /powered by netlify/i.test(aria) || /powered by netlify/i.test(title);
-      var link = /netlify\.com/i.test(href);
-      if (hit || (link && text.length < 40 && /netlify/i.test(text))) {
-        nuke(el);
-        if (el.parentElement && el.parentElement !== document.body && (el.parentElement.children.length <= 3)) nuke(el.parentElement);
+      if (/powered by netlify/i.test(text) || /powered by netlify/i.test(aria) || /netlify\.com/i.test(href) || /netlify/i.test(src)) {
+        if (text.length < 80 || /powered by netlify/i.test(text) || /netlify/i.test(src)) {
+          nuke(el);
+          if (el.parentElement && el.parentElement !== document.body) nuke(el.parentElement);
+        }
       }
     });
+    // HUD Netlify costuma injetar no canto inferior direito
+    document.querySelectorAll('[id*="netlify"], [class*="netlify"], [data-netlify]').forEach(nuke);
   }
   run();
-  [300, 800, 1500, 3000, 6000].forEach(function(t){ setTimeout(run, t); });
+  [200, 600, 1200, 2500, 5000, 10000].forEach(function(t){ setTimeout(run, t); });
   try {
-    var obs = new MutationObserver(function(){ run(); });
-    obs.observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(run).observe(document.documentElement, { childList: true, subtree: true });
   } catch(e) {}
 })();
 </script>
