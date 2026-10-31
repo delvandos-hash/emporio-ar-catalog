@@ -734,6 +734,19 @@ async function fetchFrannyRoupas() {
 }
 
 /** Mescla grupos de roupas por categoria; itens por id_origem (não apaga Franny) */
+
+/** Marca produto novo para vitrine Lançamentos (3 dias no front) */
+function stampNovoDesde(obj, isNew, prev) {
+  if (!obj) return obj;
+  if (isNew) {
+    obj.novoDesde = new Date().toISOString();
+    if (!obj.badge) obj.badge = 'Novo';
+  } else if (prev && prev.novoDesde) {
+    obj.novoDesde = prev.novoDesde;
+  }
+  return obj;
+}
+
 function mergeRoupasGroups(listOfGroupArrays, prevRoupas = []) {
   const prevById = new Map();
   for (const g of prevRoupas || []) {
@@ -1006,7 +1019,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
             if (!foto) continue;
             nome = prev?.nome || `Item ${p.id}`;
           }
-          byId.set(p.id, {
+          byId.set(p.id, stampNovoDesde({
             nome: limparTexto(nome),
             volume: '—',
             varejo: prices.varejo,
@@ -1015,14 +1028,14 @@ async function fetchDandeAcessorios(existingGroups = []) {
             notas: desc || (prev?.notas || ''),
             foto,
             fotos: imgs.length ? imgs : foto ? [foto] : [],
-            badge: '',
+            badge: prev?.badge || '',
             fonte: 'acessorios',
             id_origem: String(p.id),
             url_origem: p.url || (prev && prev.url_origem) || '',
             total_estoque: totalEstoque,
             variacoes,
             cat: cat.nome,
-          });
+          }, !prev, prev));
           added++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
@@ -1197,15 +1210,16 @@ async function main() {
       const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
       
       const group = ensureBrandGroup(DATA, line, brand, cat);
-      group.items.push({ 
+      group.items.push(stampNovoDesde({ 
           nome, 
           volume, 
           varejo: prices.varejo, 
           atacado: prices.atacado, 
           disponivel: p.inStock === true ? 'Sim' : 'Não', 
           notas: notas || '', 
-          foto 
-      });
+          foto,
+          fonte: 'imarat',
+      }, true));
       
       indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
       if (ehMini) {
@@ -1244,15 +1258,16 @@ async function main() {
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
       const group = ensureBrandGroup(DATA, line, session, 'Brand');
-      group.items.push({ 
+      group.items.push(stampNovoDesde({ 
           nome, 
           volume, 
           varejo: prices.varejo, 
           atacado: prices.atacado, 
           disponivel: brandDisponivel(p), 
           notas: notas.slice(0, 500), 
-          foto 
-      });
+          foto,
+          fonte: 'brand',
+      }, true));
       indexNormal.add(`${limparParaComparacao(nome)}|${norm(session)}`); addedBrand++;
     }
   }
