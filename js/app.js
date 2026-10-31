@@ -3,16 +3,15 @@
  * Dados: Gist (principal) + fallback local data.js + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
-import { DATA as LOCAL_DATA, WHATSAPP as LOCAL_WHATSAPP, BRAND as LOCAL_BRAND } from './data.js';
 
 // Novo Gist (20/10/2026)
 const GIST_CATALOG_URL =
   'https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json';
 
 async function loadCatalogData() {
-  // 1) Gist primeiro (permite atualizar produtos sem deploy)
-  // 2) Depois API local
-  // 3) Fallback: data.js embutido
+  // 1) Gist primeiro (leve — não baixa data.js de 1.5MB)
+  // 2) API local
+  // 3) Fallback: data.js só se Gist falhar (import dinâmico)
   const urls = [GIST_CATALOG_URL, '/api/catalogo'];
 
   for (const url of urls) {
@@ -26,17 +25,33 @@ async function loadCatalogData() {
     }
   }
 
-  // Fallback local
-  return {
-    DATA: LOCAL_DATA,
-    WHATSAPP: LOCAL_WHATSAPP,
-    BRAND: LOCAL_BRAND
-  };
+  try {
+    const mod = await import('./data.js');
+    return {
+      DATA: mod.DATA,
+      WHATSAPP: mod.WHATSAPP,
+      BRAND: mod.BRAND,
+    };
+  } catch (e) {
+    console.error('Fallback data.js falhou', e);
+    return { DATA: {}, WHATSAPP: '5562991134488', BRAND: { name: 'Empório A.R', phone: '(62) 99113-4488' } };
+  }
 }
+
+// Loading visível enquanto busca o Gist
+try {
+  const el = document.getElementById('bootStatus');
+  if (el) el.textContent = 'Carregando catálogo…';
+} catch (e) {}
 
 const dadosDoServidor = await loadCatalogData();
 
 const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
+
+try {
+  const el = document.getElementById('bootStatus');
+  if (el) el.remove();
+} catch (e) {}
 
 /** ID estável do produto (deep link ?produto= e feed Google) */
 function normId(s) {
