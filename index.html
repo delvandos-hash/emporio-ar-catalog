@@ -1798,7 +1798,68 @@
     display: none !important;
   }
 
-</style>
+
+  .feat-card { text-align: center; }
+  .feat-card .feat-name,
+  .feat-card .feat-price {
+    display: block;
+    text-align: center;
+    width: 100%;
+  }
+  .feat-card .feat-name {
+    padding: .35rem .4rem 0;
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #111827;
+  }
+  .feat-card .feat-price {
+    padding: .2rem .4rem .45rem;
+    font-size: .8rem;
+    font-weight: 700;
+    color: #166534;
+  }
+  body[class*="theme-"] .feat-card .feat-name { color: #111827 !important; }
+  body[class*="theme-"] .feat-card .feat-price { color: #166534 !important; }
+
+
+  /* Carrinho legível em qualquer tema sazonal */
+  body[class*="theme-"] #cartModal .modal {
+    background: #1c1917 !important;
+    color: #fafaf9 !important;
+    border: 1px solid #78716c;
+  }
+  body[class*="theme-"] #cartModal .modal-header {
+    background: #292524 !important;
+    border-bottom-color: #44403c !important;
+  }
+  body[class*="theme-"] #cartModal .modal-header h3,
+  body[class*="theme-"] #cartModal .cart-label,
+  body[class*="theme-"] #cartModal .cart-hint,
+  body[class*="theme-"] #cartModal #cartList,
+  body[class*="theme-"] #cartModal .cart-item,
+  body[class*="theme-"] #cartModal .cart-item * {
+    color: #fafaf9 !important;
+  }
+  body[class*="theme-"] #cartModal .cart-input {
+    background: #0c0a09 !important;
+    color: #fafaf9 !important;
+    border: 1px solid #57534e !important;
+  }
+  body[class*="theme-"] #cartModal .cart-input::placeholder {
+    color: #a8a29e !important;
+  }
+  body[class*="theme-"] #cartModal .cart-hint {
+    font-size: .78rem;
+    color: #fdba74 !important;
+    margin: .35rem 0 .5rem;
+  }
+  .cart-hint { font-size: .78rem; color: #6b7280; margin: .35rem 0 .5rem; }
+
+
+  /* netlify-badge-superhide */
+  body a[href*="netlify"] { opacity: 0 !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; left: -9999px !important; }
+
 </head>
 <body>
 
@@ -1944,14 +2005,9 @@
       <div id="cartForm" class="cart-form" style="display:none;margin-top:.75rem">
         <label class="cart-label">Seu nome (opcional)</label>
         <input type="text" id="cartClientName" class="cart-input" placeholder="Como podemos te chamar?" maxlength="80" autocomplete="name" />
-        <label class="cart-label">Observações (opcional)</label>
-        <textarea id="cartObs" class="cart-input" rows="2" placeholder="Ex.: preferência de frete, cidade, retirada..." maxlength="300"></textarea>
-        <div class="cart-pref">
-          <span class="cart-label">Preferência de preço</span>
-          <label class="cart-radio"><input type="radio" name="cartPricePref" value="auto" checked /> Automático (atacado com 6+)</label>
-          <label class="cart-radio"><input type="radio" name="cartPricePref" value="varejo" /> Varejo</label>
-          <label class="cart-radio"><input type="radio" name="cartPricePref" value="atacado" /> Atacado</label>
-        </div>
+        <label class="cart-label">Coloque seu CEP</label>
+        <input type="text" id="cartObs" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
+        <p class="cart-hint" id="cartPriceHint">Preço de atacado aplica-se automaticamente a partir de 6 itens.</p>
       </div>
       <button class="btn-buy" id="cartCheckout" style="width:100%;margin-top:1rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
         📲 Enviar pedido no WhatsApp
@@ -1990,10 +2046,12 @@
       <button class="modal-close" id="shareSheetClose" type="button">×</button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:.55rem">
-      <p style="margin:0 0 .35rem;font-size:.85rem;color:#6b7280">Stories do Instagram e Status do WhatsApp: baixe a imagem ou copie o link e cole no story/status.</p>
+      <p style="margin:0 0 .35rem;font-size:.85rem;color:#6b7280">Instagram e WhatsApp não permitem postar Stories/Status direto pelo site. Use as opções abaixo:</p>
       <button type="button" class="share-opt" id="shareNative">📱 Compartilhar pelo celular</button>
-      <button type="button" class="share-opt" id="shareWhatsApp">📲 Enviar no WhatsApp</button>
-      <button type="button" class="share-opt" id="shareDownloadStory">🖼️ Baixar imagem p/ Stories ou Status</button>
+      <button type="button" class="share-opt" id="shareWhatsApp">📲 Enviar no WhatsApp (conversa)</button>
+      <button type="button" class="share-opt" id="shareIgStory">📸 Instagram Stories (baixar card)</button>
+      <button type="button" class="share-opt" id="shareWaStatus">🟢 WhatsApp Status (baixar card)</button>
+      <button type="button" class="share-opt" id="shareDownloadStory">🖼️ Baixar imagem do produto</button>
       <button type="button" class="share-opt" id="shareCopyLink">🔗 Copiar link do produto</button>
       <button type="button" class="share-opt" id="shareCopyText">📋 Copiar texto + link</button>
     </div>
