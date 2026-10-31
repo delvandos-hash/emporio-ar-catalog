@@ -1836,7 +1836,115 @@
   body[class*="theme-"] .feat-card .feat-price { color: #166534 !important; }
 
 
-  /* Carrinho legível em qualquer tema sazonal */
+  
+  /* netlify-badge-superhide */
+  body a[href*="netlify"] { opacity: 0 !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; left: -9999px !important; }
+
+
+  /* WhatsApp header sempre visível em qualquer tema */
+  header .btn-wa,
+  header a#shareWa {
+    background: #25D366 !important;
+    color: #fff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline-flex !important;
+  }
+  body[class*="theme-"] header .btn-wa,
+  body[class*="theme-"] header a#shareWa {
+    background: #25D366 !important;
+    color: #fff !important;
+  }
+
+
+  /* Carrinho — contraste base */
+  .cart-item {
+    display: flex;
+    gap: .75rem;
+    align-items: flex-start;
+    padding: .75rem 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .cart-item-info strong {
+    font-size: .92rem;
+    color: #111827;
+  }
+  .cart-item-meta {
+    color: #4b5563;
+    font-size: .78rem;
+  }
+  .cart-item-sub {
+    font-size: .78rem;
+    margin-top: .25rem;
+    color: #374151;
+    font-weight: 600;
+  }
+  .cart-remove {
+    flex-shrink: 0;
+    background: #fecaca !important;
+    color: #991b1b !important;
+    border: 1px solid #f87171 !important;
+    border-radius: 8px;
+    padding: .35rem .55rem;
+    font-size: .72rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .cart-remove:hover { background: #f87171 !important; color: #fff !important; }
+  .cart-qty button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #9ca3af;
+    background: #f9fafb;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+    color: #111827;
+  }
+  .cart-qty button:hover { background: #e5e7eb; }
+  .cart-qty span {
+    min-width: 28px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #111827;
+  }
+  .cart-mode {
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    padding: .45rem .6rem;
+    border-radius: 8px;
+  }
+  .cart-mode.is-varejo {
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+  }
+  .cart-mode.is-atacado {
+    color: #065f46;
+    background: #ecfdf5;
+    border: 1px solid #6ee7b7;
+  }
+  .cart-clear {
+    width: 100%;
+    margin-top: .5rem;
+    padding: .55rem;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    background: #f3f4f6;
+    color: #374151;
+    font-weight: 600;
+    font-size: .85rem;
+    cursor: pointer;
+  }
+  .cart-clear:hover { background: #e5e7eb; }
+
+  /* Carrinho legível em TODOS os temas sazonais */
   body[class*="theme-"] #cartModal .modal {
     background: #1c1917 !important;
     color: #fafaf9 !important;
@@ -1844,15 +1952,32 @@
   }
   body[class*="theme-"] #cartModal .modal-header {
     background: #292524 !important;
-    border-bottom-color: #44403c !important;
+    border-bottom: 1px solid #44403c !important;
   }
   body[class*="theme-"] #cartModal .modal-header h3,
   body[class*="theme-"] #cartModal .cart-label,
-  body[class*="theme-"] #cartModal .cart-hint,
-  body[class*="theme-"] #cartModal #cartList,
-  body[class*="theme-"] #cartModal .cart-item,
-  body[class*="theme-"] #cartModal .cart-item * {
+  body[class*="theme-"] #cartModal .cart-item-info strong {
     color: #fafaf9 !important;
+  }
+  body[class*="theme-"] #cartModal .cart-item-meta,
+  body[class*="theme-"] #cartModal .cart-item-sub {
+    color: #d6d3d1 !important;
+  }
+  body[class*="theme-"] #cartModal .cart-item {
+    border-bottom-color: #44403c !important;
+  }
+  body[class*="theme-"] #cartModal .cart-qty button {
+    background: #fafaf9 !important;
+    color: #111827 !important;
+    border-color: #a8a29e !important;
+  }
+  body[class*="theme-"] #cartModal .cart-qty span {
+    color: #fafaf9 !important;
+  }
+  body[class*="theme-"] #cartModal .cart-remove {
+    background: #b91c1c !important;
+    color: #fff !important;
+    border-color: #f87171 !important;
   }
   body[class*="theme-"] #cartModal .cart-input {
     background: #0c0a09 !important;
@@ -1863,15 +1988,30 @@
     color: #a8a29e !important;
   }
   body[class*="theme-"] #cartModal .cart-hint {
-    font-size: .78rem;
     color: #fdba74 !important;
-    margin: .35rem 0 .5rem;
   }
-  .cart-hint { font-size: .78rem; color: #6b7280; margin: .35rem 0 .5rem; }
-
-
-  /* netlify-badge-superhide */
-  body a[href*="netlify"] { opacity: 0 !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; left: -9999px !important; }
+  body[class*="theme-"] #cartModal .cart-mode.is-varejo {
+    color: #ffedd5 !important;
+    background: #7c2d12 !important;
+    border-color: #fb923c !important;
+  }
+  body[class*="theme-"] #cartModal .cart-mode.is-atacado {
+    color: #ecfdf5 !important;
+    background: #065f46 !important;
+    border-color: #34d399 !important;
+  }
+  body[class*="theme-"] #cartModal .cart-clear {
+    background: #44403c !important;
+    color: #fafaf9 !important;
+    border-color: #78716c !important;
+  }
+  body[class*="theme-"] #cartModal .cart-total {
+    background: #14532d !important;
+    color: #ecfdf5 !important;
+  }
+  body[class*="theme-"] #cartModal .cart-total strong {
+    color: #86efac !important;
+  }
 
 </style>
 </head>
@@ -1890,7 +2030,7 @@
   </a>
   <div class="tabs">
     <button type="button" class="tab btn-action" id="btnPdf" title="Baixar PDF">📄 PDF</button>
-    <a class="tab btn-action btn-wa" id="shareWa" href="#" target="_blank" rel="noopener">📲 WhatsApp</a>
+    <a class="tab btn-action btn-wa" id="shareWa" href="https://wa.me/5562991134488" target="_blank" rel="noopener" title="Falar no WhatsApp">📲 WhatsApp</a>
   </div>
 </header>
 
