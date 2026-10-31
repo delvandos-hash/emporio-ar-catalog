@@ -311,19 +311,7 @@ async function shareProduct(p) {
   if (!p) return;
   const url = getProductShareUrl(p);
   const text = getProductShareText(p);
-  const title = `${p.nome} · Empório A.R`;
-
-  // 1) Web Share API (abre menu do celular: WhatsApp, Instagram, etc.)
-  if (navigator.share) {
-    try {
-      await navigator.share({ title, text, url });
-      return;
-    } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      // cai no menu manual
-    }
-  }
-  // 2) Menu fallback
+  // Sempre abre o menu com opções (Stories, Status, WhatsApp, link…)
   openShareSheet(p, url, text);
 }
 
@@ -680,7 +668,7 @@ async function syncStockFromRoot() {
       }
     } catch (e) {}
 
-    const endpoints = ['/.netlify/functions/stock-sync', '/api/stock-sync'];
+    const endpoints = []; // estoque via Gist/Action — sem functions Netlify (economiza crédito)
     let data = null;
     for (const url of endpoints) {
       try {
@@ -813,17 +801,15 @@ function formatBRL(n) {
 
 function getCartMeta() {
   const nome = (document.getElementById('cartClientName')?.value || '').trim();
-  const obs = (document.getElementById('cartObs')?.value || '').trim();
-  const prefer = document.querySelector('input[name="cartPricePref"]:checked')?.value || 'auto';
-  return { nome, obs, prefer };
+  const cep = (document.getElementById('cartObs')?.value || '').trim();
+  return { nome, cep, obs: cep };
 }
 
 function buildCartWaMessage() {
   const totalItens = cartTotalQty();
   const meta = getCartMeta();
-  let useAtacado = totalItens >= 6;
-  if (meta.prefer === 'varejo') useAtacado = false;
-  if (meta.prefer === 'atacado') useAtacado = true;
+  // Atacado somente com 6+ itens — cliente não escolhe
+  const useAtacado = totalItens >= 6;
   const modo = useAtacado ? 'ATACADO (6+ itens)' : 'VAREJO';
   const agora = new Date();
   const dataHora = agora.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -847,7 +833,7 @@ function buildCartWaMessage() {
   msg += '────────────────\n';
   msg += `*Itens: ${totalItens}*\n`;
   msg += `*Total: R$ ${formatBRL(total)}*\n`;
-  if (meta.obs) msg += `\n📝 Obs.: ${meta.obs}\n`;
+  if (meta.cep) msg += `\n📮 CEP: *${meta.cep}*\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
@@ -1420,104 +1406,14 @@ function openDetails(p, opts = {}) {
 
 /** Atualiza estoque/variações de Roupas via proxy Netlify (se disponível) */
 async function refreshRoupasStock(p) {
-  if (!p || !p.id_origem) return;
-  try {
-    const metaEl = document.getElementById('modalMeta');
-    const metaPrev = metaEl ? metaEl.textContent : '';
-    if (metaEl && currentProduct && currentProduct.id_origem === p.id_origem) {
-      metaEl.textContent = (metaPrev || '') + ' · atualizando estoque…';
-    }
-    const url = `/api/roupas-stock?id=${encodeURIComponent(p.id_origem)}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) {
-      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
-      return;
-    }
-    const data = await res.json();
-    if (!data || !Array.isArray(data.variacoes)) {
-      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
-      return;
-    }
-
-    // Atualiza produto atual se ainda estiver aberto
-    if (currentProduct && currentProduct.id_origem === p.id_origem) {
-      currentProduct.variacoes = data.variacoes;
-      currentProduct.total_estoque = data.total_estoque;
-      currentProduct.disponivel = (data.total_estoque > 0) ? 'Sim' : 'Não';
-
-      const notasEl = document.getElementById('modalNotas');
-      if (notasEl) {
-        let html = '';
-        if (currentProduct.notas) {
-          html += `<strong>Descrição</strong><br>${String(currentProduct.notas).replace(/\n/g, '<br>')}`;
-        }
-        const prevSel = currentProduct.variacaoSelecionada?.id || null;
-        html += buildVariacoesHtml(currentProduct, prevSel);
-        if (html) {
-          notasEl.style.display = 'block';
-          notasEl.innerHTML = html;
-          bindVariacaoSelector();
-        }
-      }
-
-      const avail = isAvailable(currentProduct);
-      document.getElementById('modalMeta').textContent =
-        `${currentProduct.brand || 'Empório A.R'}${currentProduct.cat ? ' · ' + currentProduct.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
-    }
-  } catch (e) {
-    // silencioso — mantém snapshot
-  }
+  // Estoque ao vivo sem Netlify Functions: dados vêm do Gist (Action 2x/dia)
+  return;
 }
 
 /** Atualiza estoque/variações de Acessórios (Dande) via proxy Netlify */
 async function refreshDandeStock(p) {
-  if (!p || !p.id_origem) return;
-  try {
-    const metaEl = document.getElementById('modalMeta');
-    const metaPrev = metaEl ? metaEl.textContent : '';
-    if (metaEl && currentProduct && currentProduct.id_origem === p.id_origem) {
-      metaEl.textContent = (metaPrev || '') + ' · atualizando estoque…';
-    }
-    let url = `/api/dande-stock?id=${encodeURIComponent(p.id_origem)}`;
-    if (p.url_origem) url += `&url=${encodeURIComponent(p.url_origem)}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) {
-      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
-      return;
-    }
-    const data = await res.json();
-    if (!data || !Array.isArray(data.variacoes)) {
-      if (metaEl && metaPrev) metaEl.textContent = metaPrev;
-      return;
-    }
-
-    if (currentProduct && currentProduct.id_origem === p.id_origem) {
-      currentProduct.variacoes = data.variacoes;
-      currentProduct.total_estoque = data.total_estoque;
-      currentProduct.disponivel = (data.total_estoque > 0) ? 'Sim' : 'Não';
-
-      const notasEl = document.getElementById('modalNotas');
-      if (notasEl) {
-        let html = '';
-        if (currentProduct.notas) {
-          html += `<strong>Descrição</strong><br>${String(currentProduct.notas).replace(/\n/g, '<br>')}`;
-        }
-        const prevSel = currentProduct.variacaoSelecionada?.id || null;
-        html += buildVariacoesHtml(currentProduct, prevSel);
-        if (html) {
-          notasEl.style.display = 'block';
-          notasEl.innerHTML = html;
-          bindVariacaoSelector();
-        }
-      }
-
-      const avail = isAvailable(currentProduct);
-      document.getElementById('modalMeta').textContent =
-        `${currentProduct.brand || 'Empório A.R'}${currentProduct.cat ? ' · ' + currentProduct.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
-    }
-  } catch (e) {
-    // silencioso
-  }
+  // Estoque ao vivo sem Netlify Functions: dados vêm do Gist (Action 2x/dia)
+  return;
 }
 
 
@@ -2334,6 +2230,20 @@ document.getElementById('shareCopyText')?.addEventListener('click', async () => 
   alert(ok ? 'Texto copiado!' : 'Não foi possível copiar.');
   closeShareSheet();
 });
+
+document.getElementById('shareIgStory')?.addEventListener('click', async () => {
+  if (!currentProduct) return;
+  closeShareSheet();
+  await downloadStoryCard(currentProduct);
+  alert('Imagem salva! Abra o Instagram → Stories → Galeria e escolha a imagem do Empório A.R.');
+});
+document.getElementById('shareWaStatus')?.addEventListener('click', async () => {
+  if (!currentProduct) return;
+  closeShareSheet();
+  await downloadStoryCard(currentProduct);
+  alert('Imagem salva! Abra o WhatsApp → Status → Galeria e escolha a imagem do Empório A.R.');
+});
+
 document.getElementById('shareDownloadStory')?.addEventListener('click', async () => {
   if (!currentProduct) return;
   closeShareSheet();
