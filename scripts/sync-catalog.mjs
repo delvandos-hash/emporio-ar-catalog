@@ -690,7 +690,14 @@ async function fetchFrannyRoupas() {
 }
 
 /** Mescla grupos de roupas por categoria; itens por id_origem (não apaga Franny) */
-function mergeRoupasGroups(listOfGroupArrays) {
+function mergeRoupasGroups(listOfGroupArrays, prevRoupas = []) {
+  const prevById = new Map();
+  for (const g of prevRoupas || []) {
+    for (const it of g.items || []) {
+      const oid = String(it.id_origem || '');
+      if (oid) prevById.set(oid, it);
+    }
+  }
   const byCat = new Map();
   const seenIds = new Set();
   for (const groups of listOfGroupArrays) {
@@ -704,7 +711,9 @@ function mergeRoupasGroups(listOfGroupArrays) {
         const oid = String(it.id_origem || '');
         if (oid && seenIds.has(oid)) continue;
         if (oid) seenIds.add(oid);
-        bucket.items.push(it);
+        const prev = oid ? prevById.get(oid) : null;
+        const isNew = Boolean(oid && !prev);
+        bucket.items.push(stampNovoDesde({ ...it }, isNew, prev));
       }
     }
   }
@@ -1241,7 +1250,8 @@ async function main() {
       console.log('ADD_FRANNY=0 — pulando Franny');
     }
     if (chunks.length) {
-      DATA.roupas = mergeRoupasGroups(chunks);
+      const prevRoupasSnap = Array.isArray(DATA.roupas) ? DATA.roupas : [];
+      DATA.roupas = mergeRoupasGroups(chunks, prevRoupasSnap);
       const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
       console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
     }
