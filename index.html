@@ -1791,6 +1791,13 @@
     pointer-events: none !important;
   }
 
+
+  /* netlify-badge-killer */
+  a[href*="netlify.com"][style*="fixed"],
+  a[href*="netlify.com"][style*="Fixed"] {
+    display: none !important;
+  }
+
 </style>
 </head>
 <body>
@@ -1997,18 +2004,37 @@
 
 <script>
 (function hideNetlifyBadge(){
+  function nuke(el){
+    if (!el || el.__netlifyBadgeHidden) return;
+    el.__netlifyBadgeHidden = true;
+    try {
+      el.style.setProperty('display','none','important');
+      el.style.setProperty('visibility','hidden','important');
+      el.style.setProperty('opacity','0','important');
+      el.style.setProperty('pointer-events','none','important');
+      el.setAttribute('aria-hidden','true');
+    } catch(e) {}
+  }
   function run(){
-    document.querySelectorAll('a[href*="netlify.com"]').forEach(function(a){
-      var s = (a.getAttribute('style')||'') + ' ' + (a.parentElement && a.parentElement.getAttribute('style')||'');
-      if (/position:\s*fixed/i.test(s) || /Powered by Netlify/i.test(a.textContent||'') || /Powered by Netlify/i.test(a.getAttribute('aria-label')||'')) {
-        a.style.display = 'none';
-        if (a.parentElement && a.parentElement !== document.body) a.parentElement.style.display = 'none';
+    document.querySelectorAll('a, div, span, button').forEach(function(el){
+      var text = (el.textContent || '').replace(/\s+/g,' ').trim();
+      var href = (el.getAttribute && el.getAttribute('href')) || '';
+      var aria = (el.getAttribute && el.getAttribute('aria-label')) || '';
+      var title = (el.getAttribute && el.getAttribute('title')) || '';
+      var hit = /powered by netlify/i.test(text) || /powered by netlify/i.test(aria) || /powered by netlify/i.test(title);
+      var link = /netlify\.com/i.test(href);
+      if (hit || (link && text.length < 40 && /netlify/i.test(text))) {
+        nuke(el);
+        if (el.parentElement && el.parentElement !== document.body && (el.parentElement.children.length <= 3)) nuke(el.parentElement);
       }
     });
   }
   run();
-  setTimeout(run, 500);
-  setTimeout(run, 2000);
+  [300, 800, 1500, 3000, 6000].forEach(function(t){ setTimeout(run, t); });
+  try {
+    var obs = new MutationObserver(function(){ run(); });
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+  } catch(e) {}
 })();
 </script>
 
