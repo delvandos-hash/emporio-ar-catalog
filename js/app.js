@@ -122,7 +122,8 @@ function getProductShareText(p) {
   if (p.volume && p.volume !== '—') t += `Volume: ${p.volume}\n`;
   if (p.varejo) t += `Varejo: R$ ${p.varejo}\n`;
   if (p.atacado && p.atacado !== '—') t += `Atacado (6+): R$ ${p.atacado}\n`;
-  t += `\nVeja no catálogo:\n${link}`;
+  t += `\n👉 Abra o produto no catálogo (link):\n${link}\n`;
+  t += `\nCatálogo completo: https://catalogoemporio.netlify.app`;
   return t;
 }
 
@@ -167,60 +168,48 @@ function loadImageCors(src) {
   });
 }
 
-/** Card vertical 1080x1920 para Stories / Status */
-
-async function buildStoryCardBlob(p) {
-  try {
-    // reutiliza downloadStoryCard internamente via canvas se existir no fluxo
-    if (!p) return null;
-    const W = 1080, H = 1920;
-    const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#0c0a09';
-    ctx.fillRect(0, 0, W, H);
-    // fundo gradiente
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, '#1c1010');
-    g.addColorStop(1, '#0c0a09');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    // título
-    ctx.fillStyle = '#fdba74';
-    ctx.font = 'bold 52px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Empório A.R', W / 2, 160);
-    // nome
-    ctx.fillStyle = '#fafaf9';
-    ctx.font = 'bold 44px system-ui, sans-serif';
-    const nome = String(p.nome || '').slice(0, 48);
-    ctx.fillText(nome, W / 2, 280);
-    // preço
-    ctx.fillStyle = '#4ade80';
-    ctx.font = 'bold 48px system-ui, sans-serif';
-    ctx.fillText('R$ ' + (p.varejo || ''), W / 2, 360);
-    // foto
-    const src = p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '';
-    if (src) {
-      try {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
-        const size = 700;
-        const x = (W - size) / 2, y = 420;
-        ctx.drawImage(img, x, y, size, size);
-      } catch (e) {}
-    }
-    ctx.fillStyle = '#a8a29e';
-    ctx.font = '32px system-ui, sans-serif';
-    ctx.fillText('catalogoemporio.netlify.app', W / 2, H - 120);
-    return await new Promise((res) => canvas.toBlob(res, 'image/png', 0.92));
-  } catch (e) {
-    return null;
+/** Card vertical 1080×1920 — foto grande, sem achatar */
+function drawImageCover(ctx, img, x, y, w, h) {
+  const ir = img.width / img.height;
+  const ar = w / h;
+  let sx = 0, sy = 0, sw = img.width, sh = img.height;
+  if (ir > ar) {
+    // imagem mais larga: corta laterais
+    sw = img.height * ar;
+    sx = (img.width - sw) / 2;
+  } else {
+    // imagem mais alta: corta topo/base
+    sh = img.width / ar;
+    sy = (img.height - sh) / 2;
   }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
-async function downloadStoryCard(p) {
+function drawImageContain(ctx, img, x, y, w, h) {
+  const scale = Math.min(w / img.width, h / img.height);
+  const iw = img.width * scale;
+  const ih = img.height * scale;
+  const ix = x + (w - iw) / 2;
+  const iy = y + (h - ih) / 2;
+  ctx.drawImage(img, ix, iy, iw, ih);
+}
+
+async function loadProductImage(p) {
+  const src = p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '';
+  if (!src) return null;
+  const tryLoad = (url, cross) => new Promise((resolve) => {
+    const img = new Image();
+    if (cross) img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+  let img = await tryLoad(src, true);
+  if (!img) img = await tryLoad(src, false);
+  return img;
+}
+
+async function renderStoryCardCanvas(p) {
   const W = 1080, H = 1920;
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -230,113 +219,115 @@ async function downloadStoryCard(p) {
   // fundo
   const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, '#0f172a');
-  grad.addColorStop(0.55, '#14532d');
+  grad.addColorStop(0.5, '#14532d');
   grad.addColorStop(1, '#052e16');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  // card branco
-  const pad = 64;
-  const cardX = pad, cardY = 220, cardW = W - pad * 2, cardH = H - 420;
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = 'rgba(0,0,0,0.25)';
-  ctx.shadowBlur = 40;
-  ctx.shadowOffsetY = 12;
-  roundRect(ctx, cardX, cardY, cardW, cardH, 40);
-  ctx.fill();
-  ctx.shadowColor = 'transparent';
-
-  // logo / marca
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 42px system-ui, -apple-system, sans-serif';
+  // marca
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('EMPÓRIO A.R', W / 2, 120);
-  ctx.font = '28px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillText('Catálogo Digital', W / 2, 165);
+  ctx.fillText('Empório A.R', W / 2, 110);
 
-  // foto
-  const foto = p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '';
-  const img = await loadImageCors(foto);
-  const imgAreaY = cardY + 48;
-  const imgAreaH = 720;
-  const imgAreaX = cardX + 48;
-  const imgAreaW = cardW - 96;
-  ctx.fillStyle = '#f3f4f6';
-  roundRect(ctx, imgAreaX, imgAreaY, imgAreaW, imgAreaH, 24);
-  ctx.fill();
-  if (img) {
-    const scale = Math.min(imgAreaW / img.width, imgAreaH / img.height);
-    const iw = img.width * scale;
-    const ih = img.height * scale;
-    const ix = imgAreaX + (imgAreaW - iw) / 2;
-    const iy = imgAreaY + (imgAreaH - ih) / 2;
+  // área da foto — grande (quase a metade da tela)
+  const imgX = 60, imgY = 150, imgW = W - 120, imgH = 1100;
+  ctx.save();
+  // fundo da foto
+  ctx.fillStyle = '#0c0a09';
+  if (typeof roundRect === 'function') {
+    roundRect(ctx, imgX, imgY, imgW, imgH, 28);
+    ctx.fill();
+    roundRect(ctx, imgX, imgY, imgW, imgH, 28);
+    ctx.clip();
+  } else {
+    ctx.fillRect(imgX, imgY, imgW, imgH);
+  }
+  const img = await loadProductImage(p);
+  if (img && img.width) {
+    // cover: preenche a área sem distorcer
     try {
-      ctx.drawImage(img, ix, iy, iw, ih);
+      drawImageCover(ctx, img, imgX, imgY, imgW, imgH);
     } catch (e) {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = '32px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Foto indisponível', W / 2, imgAreaY + imgAreaH / 2);
+      try { drawImageContain(ctx, img, imgX, imgY, imgW, imgH); } catch (e2) {}
     }
   } else {
     ctx.fillStyle = '#9ca3af';
-    ctx.font = '32px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Sem foto', W / 2, imgAreaY + imgAreaH / 2);
+    ctx.font = '36px system-ui, sans-serif';
+    ctx.fillText('Foto indisponível', W / 2, imgY + imgH / 2);
   }
+  ctx.restore();
 
-  // textos
-  let ty = imgAreaY + imgAreaH + 56;
-  ctx.fillStyle = '#111827';
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
-  const nome = wrapText(ctx, p.nome || 'Produto', cardW - 100, 2);
-  nome.forEach((line, i) => {
-    ctx.fillText(line, W / 2, ty + i * 52);
-  });
-  ty += nome.length * 52 + 28;
+  // textos abaixo da foto
+  let ty = imgY + imgH + 70;
+  ctx.fillStyle = '#fafaf9';
+  ctx.font = 'bold 46px system-ui, -apple-system, sans-serif';
+  const lines = (typeof wrapText === 'function')
+    ? wrapText(ctx, p.nome || 'Produto', W - 120, 3)
+    : [String(p.nome || 'Produto').slice(0, 40)];
+  lines.forEach((line, i) => ctx.fillText(line, W / 2, ty + i * 54));
+  ty += lines.length * 54 + 24;
 
-  ctx.fillStyle = '#6b7280';
-  ctx.font = '30px system-ui, sans-serif';
   const meta = [p.brand, p.volume && p.volume !== '—' ? p.volume : ''].filter(Boolean).join(' · ');
   if (meta) {
+    ctx.fillStyle = '#d6d3d1';
+    ctx.font = '32px system-ui, sans-serif';
     ctx.fillText(meta, W / 2, ty);
     ty += 48;
   }
 
-  ctx.fillStyle = '#166534';
-  ctx.font = 'bold 48px system-ui, sans-serif';
-  if (p.varejo) ctx.fillText(`Varejo R$ ${p.varejo}`, W / 2, ty);
-  ty += 52;
+  ctx.fillStyle = '#4ade80';
+  ctx.font = 'bold 52px system-ui, sans-serif';
+  if (p.varejo) ctx.fillText('R$ ' + p.varejo, W / 2, ty);
+  ty += 50;
   if (p.atacado && p.atacado !== '—') {
-    ctx.fillStyle = '#15803d';
+    ctx.fillStyle = '#86efac';
     ctx.font = '36px system-ui, sans-serif';
-    ctx.fillText(`Atacado (6+) R$ ${p.atacado}`, W / 2, ty);
+    ctx.fillText('Atacado (6+) R$ ' + p.atacado, W / 2, ty);
   }
 
-  // rodapé
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.font = '28px system-ui, sans-serif';
-  ctx.fillText('Toque no link da bio · WhatsApp (62) 99113-4488', W / 2, H - 80);
+  ctx.fillText('Link do produto na legenda · catalogoemporio.netlify.app', W / 2, H - 70);
 
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        alert('Não foi possível gerar a imagem. Tente em outro aparelho.');
-        resolve(false);
-        return;
-      }
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `emporio-ar-${normId(p.nome) || 'produto'}-story.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      resolve(true);
-    }, 'image/jpeg', 0.92);
-  });
+  return canvas;
+}
+
+async function buildStoryCardBlob(p) {
+  try {
+    if (!p) return null;
+    const canvas = await renderStoryCardCanvas(p);
+    return await new Promise((res) => canvas.toBlob(res, 'image/png', 0.92));
+  } catch (e) {
+    return null;
+  }
+}
+
+
+async function downloadStoryCard(p) {
+  try {
+    const canvas = await renderStoryCardCanvas(p);
+    return await new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          alert('Não foi possível gerar a imagem. Tente em outro aparelho.');
+          resolve(false);
+          return;
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `emporio-ar-${normId(p.nome) || 'produto'}-story.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        resolve(true);
+      }, 'image/png', 0.92);
+    });
+  } catch (e) {
+    alert('Erro ao gerar imagem do produto.');
+    return false;
+  }
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -866,8 +857,11 @@ function cartKey(p) {
   return `${p.brand}|${p.nome}|${p.volume || ''}`;
 }
 
-function buildWaMessage(p) {
+function buildWaMessage(p, meta = {}) {
   let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
+  if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
+  if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
+  if (meta.nome || meta.cep) msg += '\n';
   msg += `*${p.nome}*\n`;
   msg += `Marca: ${p.brand || 'Empório A.R'}\n`;
   if (p.volume && p.volume !== '—' && !isVariacaoCatalogProduct(p)) msg += `Volume: ${p.volume}\n`;
@@ -880,6 +874,48 @@ function buildWaMessage(p) {
   if (p.atacado && p.atacado !== '—') msg += `Atacado (6+): *R$ ${p.atacado}*\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
+}
+
+let pendingBuyProduct = null;
+
+function openBuyMetaModal(p) {
+  pendingBuyProduct = p;
+  const ov = document.getElementById('buyMetaModal');
+  const title = document.getElementById('buyMetaProduct');
+  if (title) title.textContent = p.nome || 'Produto';
+  // pré-preenche com carrinho ou último uso
+  try {
+    const cartNome = document.getElementById('cartClientName')?.value || '';
+    const cartCep = document.getElementById('cartObs')?.value || '';
+    const saved = JSON.parse(localStorage.getItem('emporio_buy_meta') || '{}');
+    const n = document.getElementById('buyClientName');
+    const c = document.getElementById('buyClientCep');
+    if (n && !n.value) n.value = cartNome || saved.nome || '';
+    if (c && !c.value) c.value = cartCep || saved.cep || '';
+  } catch (e) {}
+  ov?.classList.add('open');
+}
+
+function closeBuyMetaModal() {
+  document.getElementById('buyMetaModal')?.classList.remove('open');
+  pendingBuyProduct = null;
+}
+
+function confirmBuyMeta() {
+  const p = pendingBuyProduct;
+  if (!p) return;
+  const nome = (document.getElementById('buyClientName')?.value || '').trim();
+  const cep = (document.getElementById('buyClientCep')?.value || '').trim();
+  try {
+    localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep }));
+    // sincroniza com campos do carrinho
+    const cn = document.getElementById('cartClientName');
+    const cc = document.getElementById('cartObs');
+    if (cn && nome) cn.value = nome;
+    if (cc && cep) cc.value = cep;
+  } catch (e) {}
+  closeBuyMetaModal();
+  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep })}`, '_blank');
 }
 
 function unitPrice(p, useAtacado) {
@@ -948,7 +984,8 @@ function openWhatsApp(p) {
       p.variacaoSelecionada = sel;
     }
   }
-  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p)}`, '_blank');
+  // pede nome + CEP antes de abrir o WhatsApp (igual espírito do carrinho)
+  openBuyMetaModal(p);
 }
 
 function addToCart(p, qty = 1) {
@@ -985,6 +1022,7 @@ function addToCart(p, qty = 1) {
     cat: p.cat || ''
   });
   updateCartUI();
+  showCartToast(qty > 1 ? `Adicionado (${qty}) ao carrinho` : 'Adicionado ao carrinho');
 }
 
 function setCartQty(index, qty) {
@@ -1628,6 +1666,126 @@ function buildFeaturedHtml() {
 }
 
 
+
+function genderLabel(g) {
+  const v = String(g || 'Todos');
+  if (v === 'Todos' || v.toLowerCase() === 'todos') return 'Todas as sessões';
+  if (v === 'roupas') return 'Roupas';
+  if (v === 'acessorios') return 'Acessórios';
+  if (v === 'Brand' || v.toLowerCase() === 'brand') return 'Brand';
+  return v;
+}
+
+function updateNavCrumb() {
+  const el = document.getElementById('navCrumb');
+  if (!el) return;
+  const g = state.gender;
+  const c = state.category;
+  const parts = [];
+  parts.push(`<button type="button" data-nav="home">Início</button>`);
+  if (g && g !== 'Todos') {
+    parts.push(`<span class="sep">›</span>`);
+    parts.push(`<button type="button" data-nav="session">${genderLabel(g)}</button>`);
+  }
+  if (c && c !== 'Todos') {
+    parts.push(`<span class="sep">›</span>`);
+    parts.push(`<span class="current">${c}</span>`);
+  }
+  el.innerHTML = parts.join('');
+  const back = document.getElementById('navBackSub');
+  if (back) back.classList.toggle('show', !!(c && c !== 'Todos'));
+  const lab = document.getElementById('categoryRowLabel');
+  if (lab) {
+    const gl = String(g || '').toLowerCase();
+    lab.textContent = (gl === 'roupas' || gl === 'acessorios' || gl === 'brand')
+      ? 'Subcategoria'
+      : 'Categoria';
+  }
+}
+
+function goNavHome() {
+  state.gender = 'Todos';
+  state.category = 'Todos';
+  document.querySelectorAll('#genderFilters .fbtn').forEach(b => {
+    b.classList.toggle('active', b.dataset.value === 'Todos');
+  });
+  updateCategoryFiltersForGender('Todos');
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goNavSession() {
+  state.category = 'Todos';
+  const el = document.getElementById('categoryFilters');
+  el?.querySelectorAll('.fbtn').forEach(b => {
+    b.classList.toggle('active', b.dataset.value === 'Todos');
+  });
+  render();
+  document.getElementById('categoryFilters')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+
+
+function showCartToast(msg) {
+  const el = document.getElementById('toastCart');
+  if (!el) return;
+  el.textContent = msg || 'Adicionado ao carrinho';
+  el.classList.add('show');
+  clearTimeout(showCartToast._t);
+  showCartToast._t = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function filtersAreActive() {
+  return (
+    (state.gender && state.gender !== 'Todos') ||
+    (state.category && state.category !== 'Todos') ||
+    (state.price && state.price !== 'Todos') ||
+    (state.stock && state.stock !== 'Todos') ||
+    (state.volume && state.volume !== 'Todos') ||
+    (state.vitrine && state.vitrine !== 'Todos') ||
+    !!(state.search && state.search.trim())
+  );
+}
+
+function updateClearFiltersBtn() {
+  const btn = document.getElementById('btnClearFilters');
+  if (!btn) return;
+  btn.classList.toggle('show', filtersAreActive());
+}
+
+function clearAllFilters() {
+  state.gender = 'Todos';
+  state.category = 'Todos';
+  state.price = 'Todos';
+  state.stock = 'Todos';
+  state.volume = 'Todos';
+  state.vitrine = 'Todos';
+  state.search = '';
+  const q = document.getElementById('q');
+  if (q) q.value = '';
+  document.querySelectorAll('#genderFilters .fbtn').forEach(b => {
+    b.classList.toggle('active', b.dataset.value === 'Todos');
+  });
+  document.querySelectorAll('#priceFilters .fbtn, #stockFilters .fbtn, #volumeFilters .fbtn, #vitrineFilters .fbtn').forEach(b => {
+    const row = b.closest('.filters');
+    const isDefault = b.dataset.value === 'Todos';
+    b.classList.toggle('active', isDefault);
+  });
+  updateCategoryFiltersForGender('Todos');
+  const adv = document.getElementById('filtersAdvanced');
+  if (adv) adv.open = false;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateCategoryGridMode() {
+  const el = document.getElementById('categoryFilters');
+  if (!el) return;
+  const g = String(state.gender || '').toLowerCase();
+  const useGrid = (g === 'roupas' || g === 'acessorios' || g === 'brand');
+  el.classList.toggle('is-grid', useGrid);
+}
+
 function render() {
   if (state.category !== 'Todos' && !sectionActive(state.category)) {
     state.category = 'Todos';
@@ -1905,6 +2063,9 @@ document.querySelectorAll('#genderFilters .fbtn').forEach(btn => {
     state.category = 'Todos';
     updateCategoryFiltersForGender(state.gender);
     render();
+    setTimeout(() => {
+      document.getElementById('categoryFilters')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   });
 });
 
@@ -2189,8 +2350,8 @@ const SEASONAL_THEMES = [
   { id: 'cliente', month: 9, day: 15, label: '🌟 Dia do Cliente — obrigado por comprar no Empório A.R!', emoji: '🌟' },
   { id: 'criancas', month: 10, day: 12, label: '🎈 Dia das Crianças — Empório A.R', emoji: '🎈' },
   { id: 'professores', month: 10, day: 15, label: '📚 Dia dos Professores — Empório A.R', emoji: '📚' },
-  { id: 'halloween', month: 10, day: 31, label: '🎃 Halloween no Empório A.R — ofertas assustadoras!', emoji: '🎃' },
-  { id: 'finados', month: 11, day: 2, label: '🕯️ Finados — Empório A.R', emoji: '🕯️' },
+  { id: 'halloween', month: 10, day: 31, daysBefore: 3, daysAfter: 1, label: '🎃 Halloween no Empório A.R — ofertas assustadoras!', emoji: '🎃' },
+  { id: 'finados', month: 11, day: 2, daysBefore: 0, daysAfter: 0, label: '🕯️ Finados — Empório A.R', emoji: '🕯️' },
   { id: 'republica', month: 11, day: 15, label: '🇧🇷 Proclamação da República — Empório A.R', emoji: '🇧🇷' },
   { id: 'consciencia-negra', month: 11, day: 20, label: '✊ Consciência Negra — Empório A.R', emoji: '✊' },
   { id: 'black-friday', month: 11, day: 27, label: '🖤 Black Friday no Empório A.R — não perca!', emoji: '🖤' },
@@ -2258,8 +2419,10 @@ function getActiveSeasonalTheme() {
     for (const theme of SEASONAL_THEMES) {
       const event = resolveThemeDate(theme, year);
       const delta = daysBetween(event, today); // positivo = depois do evento
-      // janela: 3 dias antes (-3) até 2 dias depois (+2)
-      if (delta >= -3 && delta <= 2) {
+      // padrão: 3 dias antes → 2 dias depois; tema pode sobrescrever (ex.: Finados só no dia)
+      const before = Number.isFinite(theme.daysBefore) ? theme.daysBefore : 3;
+      const after = Number.isFinite(theme.daysAfter) ? theme.daysAfter : 2;
+      if (delta >= -before && delta <= after) {
         const dist = Math.abs(delta);
         if (dist < bestDist) {
           bestDist = dist;
@@ -2374,6 +2537,40 @@ document.getElementById('shareWhatsApp')?.addEventListener('click', () => {
     el.value = v;
   });
 })();
+
+
+document.getElementById('buyMetaClose')?.addEventListener('click', closeBuyMetaModal);
+document.getElementById('buyMetaModal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'buyMetaModal') closeBuyMetaModal();
+});
+document.getElementById('buyMetaConfirm')?.addEventListener('click', confirmBuyMeta);
+document.getElementById('buyClientCep')?.addEventListener('input', () => {
+  const el = document.getElementById('buyClientCep');
+  if (!el) return;
+  let v = el.value.replace(/\D/g, '').slice(0, 8);
+  if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5);
+  el.value = v;
+});
+
+
+document.getElementById('navCrumb')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-nav]');
+  if (!btn) return;
+  if (btn.dataset.nav === 'home') goNavHome();
+  if (btn.dataset.nav === 'session') goNavSession();
+});
+document.getElementById('btnBackSubcat')?.addEventListener('click', () => goNavSession());
+
+
+document.getElementById('btnClearFilters')?.addEventListener('click', clearAllFilters);
+document.getElementById('btnTop')?.addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+window.addEventListener('scroll', () => {
+  const btn = document.getElementById('btnTop');
+  if (!btn) return;
+  btn.classList.toggle('show', window.scrollY > 450);
+}, { passive: true });
 
 updateCartUI();
 render();
