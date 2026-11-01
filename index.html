@@ -2040,6 +2040,217 @@
     z-index: -1 !important;
   }
 
+
+  body[class*="theme-"] #buyMetaModal .modal {
+    background: #1c1917 !important;
+    color: #fafaf9 !important;
+  }
+  body[class*="theme-"] #buyMetaModal .modal-header {
+    background: #292524 !important;
+  }
+  body[class*="theme-"] #buyMetaModal .cart-label,
+  body[class*="theme-"] #buyMetaModal .modal-header h3,
+  body[class*="theme-"] #buyMetaModal #buyMetaProduct {
+    color: #fafaf9 !important;
+  }
+  body[class*="theme-"] #buyMetaModal .cart-input {
+    background: #0c0a09 !important;
+    color: #fafaf9 !important;
+    border: 1px solid #57534e !important;
+  }
+  body[class*="theme-"] #buyMetaModal .cart-hint { color: #fdba74 !important; }
+
+
+  /* Navegação: sessão + subcategoria */
+  .filters-bar {
+    position: sticky;
+    top: 0;
+    z-index: 150;
+    background: rgba(15, 12, 10, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: .55rem 0 .35rem;
+    margin: 0 -0.25rem;
+  }
+  body:not([class*="theme-"]) .filters-bar {
+    background: rgba(247, 245, 242, 0.94);
+  }
+  .nav-crumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem;
+    padding: .35rem .85rem .5rem;
+    font-size: .8rem;
+    color: #a8a29e;
+  }
+  body:not([class*="theme-"]) .nav-crumb { color: #6b7280; }
+  .nav-crumb button {
+    border: none;
+    background: transparent;
+    color: #fdba74;
+    font-weight: 700;
+    font-size: .8rem;
+    cursor: pointer;
+    padding: .15rem .25rem;
+  }
+  body:not([class*="theme-"]) .nav-crumb button { color: #9a7f45; }
+  .nav-crumb .sep { opacity: .55; }
+  .nav-crumb .current {
+    color: #fafaf9;
+    font-weight: 700;
+  }
+  body:not([class*="theme-"]) .nav-crumb .current { color: #111827; }
+  .filter-row-label {
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #a8a29e;
+    padding: .15rem .85rem 0;
+  }
+  body:not([class*="theme-"]) .filter-row-label { color: #6b7280; }
+  #categoryFilters {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: .35rem;
+    scrollbar-width: thin;
+  }
+  #categoryFilters .fbtn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .filters-advanced summary {
+    cursor: pointer;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #fdba74;
+    padding: .35rem .85rem;
+    list-style: none;
+  }
+  body:not([class*="theme-"]) .filters-advanced summary { color: #9a7f45; }
+  .filters-advanced summary::-webkit-details-marker { display: none; }
+  .nav-back-sub {
+    display: none;
+    margin: 0 .85rem .4rem;
+  }
+  .nav-back-sub.show { display: inline-flex; }
+  .nav-back-sub button {
+    border: 1px solid #78716c;
+    background: transparent;
+    color: #fafaf9;
+    border-radius: 999px;
+    padding: .35rem .75rem;
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  body:not([class*="theme-"]) .nav-back-sub button {
+    color: #374151;
+    border-color: #d1d5db;
+  }
+
+
+  /* UX mobile — toast, limpar filtros, grid subcat, topo, sessão ativa */
+  .toast-cart {
+    position: fixed;
+    left: 50%;
+    bottom: 5.5rem;
+    transform: translateX(-50%) translateY(120%);
+    background: #14532d;
+    color: #ecfdf5;
+    font-weight: 700;
+    font-size: .88rem;
+    padding: .65rem 1.15rem;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    z-index: 5000;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .28s ease, opacity .28s ease;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast-cart.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .btn-clear-filters {
+    display: none;
+    margin: .25rem .85rem .4rem;
+    border: 1px solid #f87171;
+    background: rgba(185, 28, 28, 0.12);
+    color: #fecaca;
+    border-radius: 999px;
+    padding: .4rem .85rem;
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  body:not([class*="theme-"]) .btn-clear-filters {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fca5a5;
+  }
+  .btn-clear-filters.show { display: inline-flex; align-items: center; gap: .35rem; }
+  #categoryFilters.is-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
+    overflow-x: visible;
+    flex-wrap: unset;
+    padding: 0 .85rem .45rem;
+  }
+  #categoryFilters.is-grid .fbtn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.2;
+    min-height: 44px;
+  }
+  #categoryFilters.is-grid .fbtn[data-value="Todos"] {
+    grid-column: 1 / -1;
+  }
+  .btn-top {
+    position: fixed;
+    right: 1rem;
+    bottom: 5.5rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: #292524;
+    color: #fafaf9;
+    font-size: 1.15rem;
+    font-weight: 700;
+    box-shadow: 0 6px 18px rgba(0,0,0,.3);
+    z-index: 400;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease;
+    cursor: pointer;
+  }
+  body:not([class*="theme-"]) .btn-top {
+    background: #1f2937;
+    color: #fff;
+  }
+  .btn-top.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* sessão ativa mais forte */
+  #genderFilters .fbtn.active {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.55), 0 4px 12px rgba(0,0,0,.2);
+    font-weight: 800;
+  }
+  body:not([class*="theme-"]) #genderFilters .fbtn.active {
+    box-shadow: 0 0 0 2px rgba(184, 154, 90, 0.55), 0 2px 8px rgba(0,0,0,.08);
+  }
+
 </style>
 </head>
 <body>
@@ -2090,6 +2301,10 @@
 </div>
 
 <div class="filters-bar">
+  <div class="nav-crumb" id="navCrumb" aria-label="Navegação">
+    <button type="button" data-nav="home">Início</button>
+  </div>
+  <div class="filter-row-label">Sessão</div>
   <div class="filters" id="genderFilters">
     <button class="fbtn active" data-filter="gender" data-value="Todos">Todos</button>
     <button class="fbtn" data-filter="gender" data-value="Masculino">Masculino</button>
@@ -2099,6 +2314,7 @@
     <button class="fbtn" data-filter="gender" data-value="acessorios">Acessórios</button>
     <button class="fbtn" data-filter="gender" data-value="Brand">Brand</button>
   </div>
+  <div class="filter-row-label" id="categoryRowLabel">Categoria</div>
   <div class="filters" id="categoryFilters">
     <button class="fbtn active" data-filter="category" data-value="Todos">Todas</button>
     <button class="fbtn" data-filter="category" data-value="Perfumes">Perfumes</button>
@@ -2107,6 +2323,12 @@
     <button class="fbtn" data-filter="category" data-value="Outros">Outros</button>
     <button class="fbtn" data-filter="category" data-value="Scoop Premiado">Scoop Premiado</button>
   </div>
+  <button type="button" class="btn-clear-filters" id="btnClearFilters">✕ Limpar filtros</button>
+  <div class="nav-back-sub" id="navBackSub">
+    <button type="button" id="btnBackSubcat">← Todas as categorias</button>
+  </div>
+  <details class="filters-advanced" id="filtersAdvanced">
+    <summary>Mais filtros (preço, estoque, volume…)</summary>
   <div class="filters" id="priceFilters">
     <button class="fbtn active" data-filter="price" data-value="Todos">Todos preços</button>
     <button class="fbtn" data-filter="price" data-value="0-100">Até R$ 100</button>
@@ -2130,6 +2352,7 @@
     <button class="fbtn active" data-filter="vitrine" data-value="Todos">Catálogo completo</button>
     <button class="fbtn" data-filter="vitrine" data-value="Lancamentos">Só lançamentos</button>
   </div>
+  </details>
 </div>
 
 <main id="catalog"></main>
@@ -2222,6 +2445,28 @@
 </div>
 
 
+
+<!-- Dados do cliente antes de Comprar no WhatsApp -->
+<div class="modal-overlay" id="buyMetaModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h3>Finalizar compra</h3>
+      <button class="modal-close" id="buyMetaClose" type="button">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="buyMetaProduct" style="margin:0 0 .75rem;font-size:.9rem;opacity:.9"></p>
+      <label class="cart-label">Seu nome (opcional)</label>
+      <input type="text" id="buyClientName" class="cart-input" placeholder="Como podemos te chamar?" maxlength="80" autocomplete="name" />
+      <label class="cart-label">Coloque seu CEP</label>
+      <input type="text" id="buyClientCep" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
+      <p class="cart-hint">Esses dados vão na mensagem do WhatsApp para agilizar seu atendimento.</p>
+      <button class="btn-buy" id="buyMetaConfirm" type="button" style="width:100%;margin-top:.85rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
+        📲 Continuar no WhatsApp
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Menu compartilhar produto -->
 <div class="modal-overlay" id="shareSheet">
   <div class="modal share-sheet" style="max-width:400px">
@@ -2283,6 +2528,10 @@
   } catch(e) {}
 })();
 </script>
+
+
+<div class="toast-cart" id="toastCart" role="status" aria-live="polite">Adicionado ao carrinho</div>
+<button type="button" class="btn-top" id="btnTop" title="Voltar ao topo" aria-label="Voltar ao topo">↑</button>
 
 </body>
 </html>
