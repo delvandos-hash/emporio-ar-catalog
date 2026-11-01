@@ -1782,30 +1782,7 @@
     background: #fafaf9 !important;
   }
 
-
-  /* Esconde badge "Powered by Netlify" */
-  body > a[href*="netlify.com"],
-  body > div[style*="position: fixed"][style*="bottom"] a[href*="netlify"],
-  iframe[src*="netlify"],
-  .netlify-badge,
-  #netlify-badge,
-  a[href="https://www.netlify.com"][style*="position"],
-  a[href*="netlify.com"][style*="position: fixed"],
-  a[href*="netlify.com"][style*="position:fixed"] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
-
-
-  /* netlify-badge-killer */
-  a[href*="netlify.com"][style*="fixed"],
-  a[href*="netlify.com"][style*="Fixed"] {
-    display: none !important;
-  }
-
-
+  /* (legado removido: regras amplas quebravam WhatsApp do header) */
   .feat-card { text-align: center; }
   .feat-card .feat-name,
   .feat-card .feat-price {
@@ -1837,8 +1814,6 @@
 
 
   
-  /* netlify-badge-superhide */
-  body a[href*="netlify"] { opacity: 0 !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; left: -9999px !important; }
 
 
   /* WhatsApp header sempre visível em qualquer tema */
@@ -2011,6 +1986,40 @@
   }
   body[class*="theme-"] #cartModal .cart-total strong {
     color: #86efac !important;
+  }
+
+
+  /* WhatsApp header: nunca empurrar para fora (bug do badge netlify) */
+  header a#shareWa,
+  header a.btn-wa {
+    position: static !important;
+    left: auto !important;
+    width: auto !important;
+    height: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline-flex !important;
+    overflow: visible !important;
+    background: #25D366 !important;
+    color: #fff !important;
+  }
+
+
+  /* Badge Netlify — só o badge oficial (não mexe em wa.me nem shareWa) */
+  a[href="https://www.netlify.com"],
+  a[href="https://netlify.com"],
+  a[href^="https://www.netlify.com/"],
+  a[href^="https://netlify.com/"],
+  a[href="https://www.netlify.com"][target],
+  iframe[src*="netlify.com/"],
+  iframe[src*="app.netlify.com/"] {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
   }
 
 </style>
@@ -2219,40 +2228,52 @@
 
 <script>
 (function hideNetlifyBadge(){
+  function isHeaderControl(el){
+    if (!el) return false;
+    if (el.id === 'shareWa' || el.id === 'btnPdf' || el.id === 'logoHome') return true;
+    if (el.closest && el.closest('header')) {
+      // dentro do header só mexe se for claramente o badge
+      return !/powered by netlify/i.test((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || ''));
+    }
+    return false;
+  }
   function nuke(el){
     if (!el || el.__nfHide) return;
+    if (isHeaderControl(el)) return;
     el.__nfHide = true;
     try {
-      el.style.setProperty('display','none','important');
-      el.style.setProperty('visibility','hidden','important');
       el.style.setProperty('opacity','0','important');
       el.style.setProperty('pointer-events','none','important');
       el.style.setProperty('width','0','important');
       el.style.setProperty('height','0','important');
-      el.setAttribute('aria-hidden','true');
+      el.style.setProperty('overflow','hidden','important');
+      el.style.setProperty('position','absolute','important');
+      el.style.setProperty('left','-9999px','important');
     } catch(e) {}
   }
   function run(){
     document.querySelectorAll('a, div, span, button, iframe').forEach(function(el){
+      if (isHeaderControl(el)) return;
       var text = (el.textContent || '').replace(/\s+/g,' ').trim();
+      var aria = (el.getAttribute && el.getAttribute('aria-label')) || '';
       var href = (el.getAttribute && el.getAttribute('href')) || '';
       var src = (el.getAttribute && el.getAttribute('src')) || '';
-      var aria = (el.getAttribute && el.getAttribute('aria-label')) || '';
-      if (/powered by netlify/i.test(text) || /powered by netlify/i.test(aria) || /netlify\.com/i.test(href) || /netlify/i.test(src)) {
-        if (text.length < 80 || /powered by netlify/i.test(text) || /netlify/i.test(src)) {
-          nuke(el);
-          if (el.parentElement && el.parentElement !== document.body) nuke(el.parentElement);
+      var hitText = /powered by netlify/i.test(text) || /powered by netlify/i.test(aria);
+      // só site da Netlify, nunca wa.me?text=...netlify.app
+      var hitHref = /^(https?:)?\/\/(www\.)?netlify\.com(\/|$)/i.test(href);
+      var hitSrc = /netlify\.com|app\.netlify\.com/i.test(src);
+      if (hitText || hitHref || hitSrc) {
+        nuke(el);
+        if (el.parentElement && el.parentElement !== document.body && el.parentElement.children.length <= 2) {
+          var pt = (el.parentElement.textContent || '').replace(/\s+/g,' ').trim();
+          if (/powered by netlify/i.test(pt) && pt.length < 40) nuke(el.parentElement);
         }
       }
     });
-    // HUD Netlify costuma injetar no canto inferior direito
-    document.querySelectorAll('[id*="netlify"], [class*="netlify"], [data-netlify]').forEach(nuke);
   }
   run();
-  [200, 600, 1200, 2500, 5000, 10000].forEach(function(t){ setTimeout(run, t); });
-  try {
-    new MutationObserver(run).observe(document.documentElement, { childList: true, subtree: true });
-  } catch(e) {}
+  [300, 1000, 3000, 8000].forEach(function(t){ setTimeout(run, t); });
+  try { new MutationObserver(run).observe(document.documentElement, { childList: true, subtree: true }); } catch(e) {}
 })();
 </script>
 
