@@ -2022,6 +2022,24 @@
     left: -9999px !important;
   }
 
+
+  /* Badge Netlify real = iframe #nl-badge-frame (HUD free) */
+  #nl-badge-frame,
+  iframe#nl-badge-frame,
+  iframe[title="Powered by Netlify"],
+  iframe[title*="Powered by Netlify"] {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    max-width: 0 !important;
+    max-height: 0 !important;
+    border: 0 !important;
+    visibility: hidden !important;
+    z-index: -1 !important;
+  }
+
 </style>
 </head>
 <body>
@@ -2228,52 +2246,41 @@
 
 <script>
 (function hideNetlifyBadge(){
-  function isHeaderControl(el){
-    if (!el) return false;
-    if (el.id === 'shareWa' || el.id === 'btnPdf' || el.id === 'logoHome') return true;
-    if (el.closest && el.closest('header')) {
-      // dentro do header só mexe se for claramente o badge
-      return !/powered by netlify/i.test((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || ''));
-    }
-    return false;
-  }
-  function nuke(el){
+  function nukeFrame(el){
     if (!el || el.__nfHide) return;
-    if (isHeaderControl(el)) return;
     el.__nfHide = true;
     try {
+      el.style.setProperty('display','none','important');
       el.style.setProperty('opacity','0','important');
       el.style.setProperty('pointer-events','none','important');
       el.style.setProperty('width','0','important');
       el.style.setProperty('height','0','important');
-      el.style.setProperty('overflow','hidden','important');
-      el.style.setProperty('position','absolute','important');
-      el.style.setProperty('left','-9999px','important');
+      el.style.setProperty('visibility','hidden','important');
+      el.remove();
     } catch(e) {}
   }
   function run(){
-    document.querySelectorAll('a, div, span, button, iframe').forEach(function(el){
-      if (isHeaderControl(el)) return;
-      var text = (el.textContent || '').replace(/\s+/g,' ').trim();
-      var aria = (el.getAttribute && el.getAttribute('aria-label')) || '';
-      var href = (el.getAttribute && el.getAttribute('href')) || '';
-      var src = (el.getAttribute && el.getAttribute('src')) || '';
-      var hitText = /powered by netlify/i.test(text) || /powered by netlify/i.test(aria);
-      // só site da Netlify, nunca wa.me?text=...netlify.app
-      var hitHref = /^(https?:)?\/\/(www\.)?netlify\.com(\/|$)/i.test(href);
-      var hitSrc = /netlify\.com|app\.netlify\.com/i.test(src);
-      if (hitText || hitHref || hitSrc) {
-        nuke(el);
-        if (el.parentElement && el.parentElement !== document.body && el.parentElement.children.length <= 2) {
-          var pt = (el.parentElement.textContent || '').replace(/\s+/g,' ').trim();
-          if (/powered by netlify/i.test(pt) && pt.length < 40) nuke(el.parentElement);
-        }
-      }
-    });
+    var f = document.getElementById('nl-badge-frame');
+    if (f) nukeFrame(f);
+    document.querySelectorAll('iframe[title*="Powered by Netlify"], iframe[title*="Netlify"]').forEach(nukeFrame);
   }
   run();
-  [300, 1000, 3000, 8000].forEach(function(t){ setTimeout(run, t); });
-  try { new MutationObserver(run).observe(document.documentElement, { childList: true, subtree: true }); } catch(e) {}
+  [200, 500, 1000, 2000, 4000, 8000].forEach(function(t){ setTimeout(run, t); });
+  try {
+    new MutationObserver(function(muts){
+      for (var i=0;i<muts.length;i++){
+        var m = muts[i];
+        for (var j=0;j<(m.addedNodes||[]).length;j++){
+          var n = m.addedNodes[j];
+          if (n && n.id === 'nl-badge-frame') nukeFrame(n);
+          if (n && n.querySelector) {
+            var f = n.querySelector('#nl-badge-frame, iframe[title*="Powered by Netlify"]');
+            if (f) nukeFrame(f);
+          }
+        }
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  } catch(e) {}
 })();
 </script>
 
