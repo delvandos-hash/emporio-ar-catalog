@@ -1880,11 +1880,14 @@ function applyViewMode() {
     const saved = localStorage.getItem(VIEW_KEY);
     if (saved === 'list' || saved === 'grid') state.viewMode = saved;
   } catch (e) {}
+  const isList = state.viewMode === 'list';
   document.querySelectorAll('.products').forEach((el) => {
-    el.classList.toggle('view-list', state.viewMode === 'list');
+    el.classList.toggle('view-list', isList);
   });
-  document.getElementById('viewGrid')?.classList.toggle('active', state.viewMode === 'grid');
-  document.getElementById('viewList')?.classList.toggle('active', state.viewMode === 'list');
+  const g = document.getElementById('viewGrid');
+  const l = document.getElementById('viewList');
+  if (g) g.classList.toggle('active', !isList);
+  if (l) l.classList.toggle('active', isList);
 }
 
 function render() {
@@ -2711,11 +2714,14 @@ document.getElementById('viewGrid')?.addEventListener('click', () => {
   state.viewMode = 'grid';
   try { localStorage.setItem(VIEW_KEY, 'grid'); } catch (e) {}
   applyViewMode();
+  // re-render garante classes nos .products recém-montados
+  render();
 });
 document.getElementById('viewList')?.addEventListener('click', () => {
   state.viewMode = 'list';
   try { localStorage.setItem(VIEW_KEY, 'list'); } catch (e) {}
   applyViewMode();
+  render();
 });
 document.getElementById('btnFavOnly')?.addEventListener('click', () => {
   state.favoritesOnly = !state.favoritesOnly;
