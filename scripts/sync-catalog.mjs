@@ -211,6 +211,7 @@ function mapBrandSession(raw) {
   if (n.includes('arabic collection') || n === 'arabic') return 'ARABIC COLLECTION';
   if (n.includes('sapatinho')) return 'SAPATINHO GOOD GIRL';
   if (n.includes('flaconete')) return 'FLACONETE BRAND';
+  if (n.includes('tubete')) return 'TUBETES BRAND';
   if (n.includes('dream brand') || (n.includes('dream') && n.includes('80'))) return 'DREAM BRAND 80/100ML';
   if (n.includes('colecao dream') || n.includes('coleçao dream') || n === 'colecao dream') return 'COLEÇÂO DREAM';
   if (n.includes('colecao brand') || n.includes('coleçao brand')) return 'COLEÇÃO BRAND';
@@ -219,10 +220,15 @@ function mapBrandSession(raw) {
     if (n.includes('dream') || n.includes('maison') || n.includes('brand body')) return null;
     return 'BODY SPLASH';
   }
+  // nome do produto às vezes traz tubete sem categoria
   return null;
 }
 
-function isAllowedBrandProduct(p) { return mapBrandSession(p.categoria_nome || p.categoria || '') != null; }
+function isAllowedBrandProduct(p) {
+  if (mapBrandSession(p.categoria_nome || p.categoria || '') != null) return true;
+  const nome = norm(p.nome || p.name || '');
+  return nome.includes('tubete');
+}
 function brandDisponivel(p) {
   if (p.status === false) return 'Não';
   if (p.controlar_estoque && p.total_estoque != null && Number(p.total_estoque) <= 0) return 'Não';
@@ -230,7 +236,11 @@ function brandDisponivel(p) {
 }
 function isArabicMiniBrand(p, session) { return session === 'ARABIC COLLECTION' && /25\s*ML/i.test(String(p.nome || '')); }
 
-function priceBrand(orig, isArabicMini) {
+function priceBrand(orig, isArabicMini, session) {
+  // Tubetes: preço fixo
+  if (session === 'TUBETES BRAND' || (typeof session === 'string' && /tubete/i.test(session))) {
+    return { varejo: '82,00', atacado: '58,00' };
+  }
   if (isArabicMini) return { varejo: '125,00', atacado: '85,00' };
   if (orig <= 100) return { varejo: fmtBRL(orig + 60), atacado: fmtBRL(orig + 40) };
   return { varejo: fmtBRL(orig + 90), atacado: fmtBRL(orig + 70) };
@@ -1311,9 +1321,9 @@ async function main() {
 
   if (ADD_BRAND_NEW) {
     for (const p of brandAllowed) {
-      const nome = p.nome || ''; if (!nome) continue; const session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session) continue;
+      const nome = p.nome || ''; if (!nome) continue; let session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session && norm(nome).includes('tubete')) session = 'TUBETES BRAND'; if (!session) continue;
       const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(session)}`) || indexNormal.has(limparParaComparacao(nome)); if (duplicado) continue;
-      const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session));
+      const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
       const group = ensureBrandGroup(DATA, line, session, 'Brand');
