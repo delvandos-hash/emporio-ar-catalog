@@ -683,7 +683,7 @@ function loadCart() {
 function persistCart() {
   localStorage.setItem(CART_KEY, JSON.stringify(cart));
 }
-const cart = loadCart();
+let cart = loadCart();
 let currentProduct = null;
 let searchTimer = null;
 
@@ -1140,6 +1140,8 @@ function renderCart() {
     if (!cart.length) return;
     if (confirm('Limpar todos os itens do pedido?')) {
       cart = [];
+      try { localStorage.removeItem('emporio_cart_v1'); } catch (e) {}
+      try { persistCart(); } catch (e) {}
       updateCartUI();
       renderCart();
     }
@@ -1857,22 +1859,29 @@ function loadRecentSearches() {
 }
 function pushRecentSearch(q) {
   const t = String(q || '').trim();
-  if (t.length < 2) return;
+  // evita lixo de teclado (repetição / sem letra)
+  if (t.length < 2 || t.length > 40) return;
+  if (!/[a-zA-Zà-úÀ-Ú0-9]/.test(t)) return;
+  const letters = (t.match(/[a-zA-Zà-úÀ-Ú]/g) || []).length;
+  if (letters < 2) return;
   let arr = loadRecentSearches().filter((x) => x.toLowerCase() !== t.toLowerCase());
   arr.unshift(t);
-  arr = arr.slice(0, 8);
+  arr = arr.slice(0, 6);
   try { localStorage.setItem(RECENT_KEY, JSON.stringify(arr)); } catch (e) {}
   renderRecentSearches();
 }
 function renderRecentSearches() {
   const el = document.getElementById('recentSearches');
   if (!el) return;
-  const arr = loadRecentSearches();
+  const arr = loadRecentSearches().filter((q) => {
+    const t = String(q || '').trim();
+    return t.length >= 2 && t.length <= 40 && /[a-zA-Zà-úÀ-Ú]/.test(t);
+  });
   if (!arr.length) { el.innerHTML = ''; return; }
   el.innerHTML = arr.map((q) => {
     const safe = String(q).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
     return `<button type="button" class="recent-chip" data-q="${safe}">${safe}</button>`;
-  }).join('');
+  }).join('') + `<button type="button" class="recent-clear" id="recentClear">Limpar</button>`;
 }
 
 function applyViewMode() {
@@ -2730,15 +2739,54 @@ document.getElementById('btnFavOnly')?.addEventListener('click', () => {
   render();
 });
 document.getElementById('recentSearches')?.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'recentClear') {
+    try { localStorage.removeItem(RECENT_KEY); } catch (err) {}
+    renderRecentSearches();
+    return;
+  }
+
   const chip = e.target.closest('.recent-chip');
   if (!chip) return;
   const q = chip.getAttribute('data-q') || '';
   const input = document.getElementById('q');
   if (input) input.value = q;
   state.search = q;
+  document.getElementById('searchWrap')?.classList.remove('is-focused');
+  document.getElementById('recentSearches')?.classList.remove('open');
   render();
 });
 renderRecentSearches();
+
+(function setupSearchDropdown() {
+  const input = document.getElementById('q');
+  const wrap = document.getElementById('searchWrap') || input?.closest('.search');
+  const box = document.getElementById('recentSearches');
+  if (!input || !wrap) return;
+  const open = () => {
+    renderRecentSearches();
+    if (box && box.children.length) {
+      wrap.classList.add('is-focused');
+      box.classList.add('open');
+    }
+  };
+  const close = () => {
+    wrap.classList.remove('is-focused');
+    box?.classList.remove('open');
+  };
+  input.addEventListener('focus', open);
+  input.addEventListener('click', open);
+  input.addEventListener('input', () => {
+    // mantém aberto enquanto digita se houver histórico
+    if (box && box.children.length) {
+      wrap.classList.add('is-focused');
+      box.classList.add('open');
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) close();
+  });
+})();
+
 try {
   const vm = localStorage.getItem(VIEW_KEY);
   if (vm === 'list' || vm === 'grid') state.viewMode = vm;
