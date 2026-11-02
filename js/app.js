@@ -424,7 +424,9 @@ const state = {
   volume: 'Todos',
   search: '',
   sort: 'nome-asc',
-  vitrine: 'Todos' // Todos | Lancamentos | Destaques
+  vitrine: 'Todos' // Todos | Lancamentos | Destaques,
+  viewMode: 'grid',
+  favoritesOnly: false
 };
 
 /** Sinônimos de busca (sem acento, minúsculo) */
@@ -539,7 +541,7 @@ function isLancamentoLegado(item, cat) {
   return false;
 }
 
-/** Filtro "Só lançamentos" e cards: recente OU legado */
+/** Filtro "Só novidades" e cards: recente OU legado */
 function isLancamentoItem(item, cat) {
   return isNovoRecente(item) || isLancamentoLegado(item, cat);
 }
@@ -858,6 +860,7 @@ function cartKey(p) {
 }
 
 function buildWaMessage(p, meta = {}) {
+  const qty = Math.max(1, Math.min(99, parseInt(meta.qty, 10) || 1));
   let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
   if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
@@ -870,6 +873,7 @@ function buildWaMessage(p, meta = {}) {
     msg += `Variação / Tamanho: *${variacao.nome}*\n`;
   }
   if (p.cat && isVariacaoCatalogProduct(p)) msg += `Categoria: ${p.cat}\n`;
+  msg += `Qtd: *${qty}*\n`;
   msg += `Varejo: *R$ ${p.varejo}*\n`;
   if (p.atacado && p.atacado !== '—') msg += `Atacado (6+): *R$ ${p.atacado}*\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
@@ -883,6 +887,8 @@ function openBuyMetaModal(p) {
   const ov = document.getElementById('buyMetaModal');
   const title = document.getElementById('buyMetaProduct');
   if (title) title.textContent = p.nome || 'Produto';
+  const qtyEl = document.getElementById('buyQty');
+  if (qtyEl) qtyEl.value = '1';
   // pré-preenche com carrinho ou último uso
   try {
     const cartNome = document.getElementById('cartClientName')?.value || '';
@@ -901,21 +907,34 @@ function closeBuyMetaModal() {
   pendingBuyProduct = null;
 }
 
+function cepDigits(cep) {
+  return String(cep || '').replace(/\D/g, '');
+}
+function updateCepWarn(inputId, warnId) {
+  const el = document.getElementById(inputId);
+  const warn = document.getElementById(warnId);
+  if (!el || !warn) return;
+  const d = cepDigits(el.value);
+  const incomplete = d.length > 0 && d.length < 8;
+  warn.classList.toggle('show', incomplete);
+}
+
 function confirmBuyMeta() {
   const p = pendingBuyProduct;
   if (!p) return;
   const nome = (document.getElementById('buyClientName')?.value || '').trim();
   const cep = (document.getElementById('buyClientCep')?.value || '').trim();
+  const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
+  updateCepWarn('buyClientCep', 'buyCepWarn');
   try {
     localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep }));
-    // sincroniza com campos do carrinho
     const cn = document.getElementById('cartClientName');
     const cc = document.getElementById('cartObs');
     if (cn && nome) cn.value = nome;
     if (cc && cep) cc.value = cep;
   } catch (e) {}
   closeBuyMetaModal();
-  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep })}`, '_blank');
+  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, qty })}`, '_blank');
 }
 
 function unitPrice(p, useAtacado) {
@@ -1099,7 +1118,8 @@ function renderCart() {
     ? '<div class="cart-mode is-atacado">✓ Preço de ATACADO aplicado (6+ itens)</div>'
     : `<div class="cart-mode is-varejo">Varejo — faltam <strong>${6 - totalItens}</strong> item(ns) para preço de atacado</div>`;
 
-  list.innerHTML = modeHtml + itemsHtml + `
+  const sticky = `<div class="cart-sticky-summary"><span>Resumo do pedido</span>Itens: ${totalItens} · Total: R$ ${formatBRL(total)}</div>`;
+  list.innerHTML = sticky + modeHtml + itemsHtml + `
     <div class="cart-total">
       <div>Itens: ${totalItens}</div>
       <strong>Total: R$ ${formatBRL(total)}</strong>
@@ -1114,6 +1134,14 @@ function renderCart() {
   });
   list.querySelectorAll('[data-qty-plus]').forEach(btn => {
     btn.addEventListener('click', () => setCartQty(Number(btn.dataset.qtyPlus), cart[Number(btn.dataset.qtyPlus)].qty + 1));
+  });
+  document.getElementById('cartClearBtn')?.addEventListener('click', () => {
+    if (!cart.length) return;
+    if (confirm('Limpar todos os itens do pedido?')) {
+      cart = [];
+      updateCartUI();
+      renderCart();
+    }
   });
 }
 
@@ -1424,7 +1452,12 @@ function bindVariacaoSelector() {
   });
 }
 
+let detailsScrollY = 0;
+
 function openDetails(p, opts = {}) {
+  if (!opts.fromNav) {
+    detailsScrollY = window.scrollY || window.pageYOffset || 0;
+  }
   const live = lookupLiveStock(p, p.brand, p.cat);
   if (live) p = { ...p, disponivel: live };
   currentProduct = p;
@@ -1553,10 +1586,15 @@ function closeModal() {
   const overlay = document.getElementById('modal');
   if (!overlay.classList.contains('open')) return;
   overlay.classList.add('closing');
+  const y = detailsScrollY || 0;
   const done = () => {
     overlay.classList.remove('open', 'closing');
     currentProduct = null;
     setProductUrl(null);
+    // restaura posição da lista
+    requestAnimationFrame(() => {
+      window.scrollTo(0, y);
+    });
   };
   setTimeout(done, 380);
 }
@@ -1656,9 +1694,9 @@ function buildFeaturedHtml() {
       <span class="feat-price">R$ ${item.varejo}</span>
     </button>`;
   }).join('');
-  return `<section class="featured-strip" aria-label="Lançamentos">
+  return `<section class="featured-strip" aria-label="Novidades">
     <div class="featured-head">
-      <h2>✨ Lançamentos</h2>
+      <h2>✨ Novidades</h2>
       <button type="button" class="fbtn" id="btnVerLancamentos">Ver todos</button>
     </div>
     <div class="featured-row">${cards}</div>
@@ -1786,6 +1824,68 @@ function updateCategoryGridMode() {
   el.classList.toggle('is-grid', useGrid);
 }
 
+
+const FAV_KEY = 'emporio_favs_v1';
+const RECENT_KEY = 'emporio_recent_search_v1';
+const VIEW_KEY = 'emporio_view_mode';
+
+function loadFavs() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch (e) { return []; }
+}
+function saveFavs(arr) {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(arr.slice(0, 200))); } catch (e) {}
+}
+function favId(p) {
+  return String(p.id_origem || p.id || productId(p) || p.nome || '').trim();
+}
+function isFav(p) {
+  const id = favId(p);
+  return loadFavs().includes(id);
+}
+function toggleFav(p) {
+  const id = favId(p);
+  if (!id) return;
+  let arr = loadFavs();
+  if (arr.includes(id)) arr = arr.filter((x) => x !== id);
+  else arr.unshift(id);
+  saveFavs(arr);
+}
+
+function loadRecentSearches() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch (e) { return []; }
+}
+function pushRecentSearch(q) {
+  const t = String(q || '').trim();
+  if (t.length < 2) return;
+  let arr = loadRecentSearches().filter((x) => x.toLowerCase() !== t.toLowerCase());
+  arr.unshift(t);
+  arr = arr.slice(0, 8);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(arr)); } catch (e) {}
+  renderRecentSearches();
+}
+function renderRecentSearches() {
+  const el = document.getElementById('recentSearches');
+  if (!el) return;
+  const arr = loadRecentSearches();
+  if (!arr.length) { el.innerHTML = ''; return; }
+  el.innerHTML = arr.map((q) => {
+    const safe = String(q).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    return `<button type="button" class="recent-chip" data-q="${safe}">${safe}</button>`;
+  }).join('');
+}
+
+function applyViewMode() {
+  try {
+    const saved = localStorage.getItem(VIEW_KEY);
+    if (saved === 'list' || saved === 'grid') state.viewMode = saved;
+  } catch (e) {}
+  document.querySelectorAll('.products').forEach((el) => {
+    el.classList.toggle('view-list', state.viewMode === 'list');
+  });
+  document.getElementById('viewGrid')?.classList.toggle('active', state.viewMode === 'grid');
+  document.getElementById('viewList')?.classList.toggle('active', state.viewMode === 'list');
+}
+
 function render() {
   if (state.category !== 'Todos' && !sectionActive(state.category)) {
     state.category = 'Todos';
@@ -1805,6 +1905,7 @@ function render() {
       if (!matchesSearch(item, g.brand, g.cat, state.search)) return false;
       if (!matchesVolumeFilter(item, g.cat, state.volume, g.brand)) return false;
       if (state.vitrine === 'Lancamentos' && !isLancamentoItem(item, g.cat)) return false;
+      if (state.favoritesOnly && !isFav({ ...item, brand: g.brand, cat: g.cat })) return false;
       return true;
     });
     if (!items.length) continue;
@@ -1885,7 +1986,10 @@ function render() {
           : (fotoCard
             ? `<div class="photo photo-click loaded" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes"><img src="${fotoCard}" alt="${item.nome}" width="80" height="80" decoding="async" referrerpolicy="no-referrer" loading="lazy" onload="this.classList.add('is-loaded');this.parentElement.classList.add('loaded')" onerror="this.onerror=null;this.style.opacity='0.3';this.parentElement.classList.add('placeholder')"></div>`
             : `<div class="photo placeholder photo-click" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes">SEM<br>FOTO</div>`);
+        const isNovo = isNovoRecente(item) || isLancamentoItem(item, cat);
         const badgeEsg = avail ? '' : '<span class="badge-esgotado">ESGOTADO</span>';
+        const badgeNovo = (avail && isNovo) ? '<span class="badge-novo">NOVO</span>' : '';
+        const badgeAtac = (avail && item.atacado && item.atacado !== '—') ? '<span class="badge-atacado">ATACADO 6+</span>' : '';
         const cardClass = avail ? 'card' : 'card esgotado';
         const stockHtml = avail
           ? '<span class="stock-label stock-ok">Disponível</span>'
@@ -1897,9 +2001,13 @@ function render() {
           ? `<button class="btn-sm btn-buy" data-p="${pdata}">Comprar</button>`
           : `<button class="btn-sm btn-buy btn-disabled" disabled>Esgotado</button>`;
 
+        const favOn = isFav(item);
         html += `
-          <div class="${cardClass}">
+          <div class="${cardClass}${isNovo ? ' has-novo' : ''}">
+            <button type="button" class="fav-btn${favOn ? ' on' : ''}" data-fav="${pdata}" aria-label="Favoritar">${favOn ? '♥' : '♡'}</button>
+            ${badgeNovo}
             ${badgeEsg}
+            ${badgeAtac}
             ${photoHtml}
             <div class="info">
               <div class="name">${item.nome}</div>
@@ -1921,6 +2029,23 @@ function render() {
     html += `</div>`;
   }
   main.innerHTML = buildFeaturedHtml() + html;
+
+  applyViewMode();
+  main.querySelectorAll('.fav-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const p = JSON.parse(decodeURIComponent(btn.dataset.fav));
+        toggleFav(p);
+        const on = isFav(p);
+        btn.classList.toggle('on', on);
+        btn.textContent = on ? '♥' : '♡';
+        if (state.favoritesOnly) render();
+      } catch (err) {}
+    });
+  });
+
   main.querySelectorAll('.feat-card').forEach(btn => {
     btn.addEventListener('click', () => {
       try { openDetails(JSON.parse(decodeURIComponent(btn.getAttribute('data-p')))); } catch (e) {}
@@ -2046,6 +2171,7 @@ document.getElementById('q').addEventListener('input', e => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     state.search = e.target.value;
+    if (state.search.trim().length >= 2) { clearTimeout(window.__recentSearchT); window.__recentSearchT = setTimeout(() => pushRecentSearch(state.search), 700); };
     render();
   }, 280);
 });
@@ -2143,8 +2269,8 @@ function updateCategoryFiltersForGender(gender) {
     <button class="fbtn" data-filter="category" data-value="Perfumes">Perfumes</button>
     <button class="fbtn" data-filter="category" data-value="Miniaturas">Miniaturas</button>
     <button class="fbtn" data-filter="category" data-value="Óleos">Óleos</button>
-    <button class="fbtn" data-filter="category" data-value="Outros">Outros</button>
-    <button class="fbtn" data-filter="category" data-value="Scoop Premiado">Scoop Premiado</button>`;
+    <button class="fbtn" data-filter="category" data-value="Scoop Premiado">Scoop Premiado</button>
+    <button class="fbtn" data-filter="category" data-value="Outros">Outros</button>`;
     el.querySelectorAll('.fbtn').forEach(btn => {
       btn.addEventListener('click', () => {
         el.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
@@ -2544,6 +2670,13 @@ document.getElementById('buyMetaModal')?.addEventListener('click', (e) => {
   if (e.target.id === 'buyMetaModal') closeBuyMetaModal();
 });
 document.getElementById('buyMetaConfirm')?.addEventListener('click', confirmBuyMeta);
+
+document.getElementById('buyClientCep')?.addEventListener('input', () => updateCepWarn('buyClientCep', 'buyCepWarn'));
+document.getElementById('buyClientCep')?.addEventListener('blur', () => updateCepWarn('buyClientCep', 'buyCepWarn'));
+document.getElementById('cartObs')?.addEventListener('input', () => updateCepWarn('cartObs', 'cartCepWarn'));
+document.getElementById('cartObs')?.addEventListener('blur', () => updateCepWarn('cartObs', 'cartCepWarn'));
+document.getElementById('cartCheckout')?.addEventListener('click', () => updateCepWarn('cartObs', 'cartCepWarn'), true);
+
 document.getElementById('buyClientCep')?.addEventListener('input', () => {
   const el = document.getElementById('buyClientCep');
   if (!el) return;
@@ -2571,6 +2704,38 @@ window.addEventListener('scroll', () => {
   if (!btn) return;
   btn.classList.toggle('show', window.scrollY > 450);
 }, { passive: true });
+
+
+document.getElementById('viewGrid')?.addEventListener('click', () => {
+  state.viewMode = 'grid';
+  try { localStorage.setItem(VIEW_KEY, 'grid'); } catch (e) {}
+  applyViewMode();
+});
+document.getElementById('viewList')?.addEventListener('click', () => {
+  state.viewMode = 'list';
+  try { localStorage.setItem(VIEW_KEY, 'list'); } catch (e) {}
+  applyViewMode();
+});
+document.getElementById('btnFavOnly')?.addEventListener('click', () => {
+  state.favoritesOnly = !state.favoritesOnly;
+  document.getElementById('btnFavOnly')?.classList.toggle('active', state.favoritesOnly);
+  document.getElementById('btnFavOnly')?.classList.toggle('fav-filter-btn', true);
+  render();
+});
+document.getElementById('recentSearches')?.addEventListener('click', (e) => {
+  const chip = e.target.closest('.recent-chip');
+  if (!chip) return;
+  const q = chip.getAttribute('data-q') || '';
+  const input = document.getElementById('q');
+  if (input) input.value = q;
+  state.search = q;
+  render();
+});
+renderRecentSearches();
+try {
+  const vm = localStorage.getItem(VIEW_KEY);
+  if (vm === 'list' || vm === 'grid') state.viewMode = vm;
+} catch (e) {}
 
 updateCartUI();
 render();
