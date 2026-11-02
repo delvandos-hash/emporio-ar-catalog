@@ -862,6 +862,10 @@ function cartKey(p) {
 
 function buildWaMessage(p, meta = {}) {
   const qty = Math.max(1, Math.min(99, parseInt(meta.qty, 10) || 1));
+  const useAtacado = qty >= 6 && p.atacado && p.atacado !== '—';
+  const unitStr = useAtacado ? p.atacado : p.varejo;
+  const unit = parsePrice(unitStr);
+  const sub = unit * qty;
   let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
   if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
@@ -875,8 +879,14 @@ function buildWaMessage(p, meta = {}) {
   }
   if (p.cat && isVariacaoCatalogProduct(p)) msg += `Categoria: ${p.cat}\n`;
   msg += `Qtd: *${qty}*\n`;
-  msg += `Varejo: *R$ ${p.varejo}*\n`;
-  if (p.atacado && p.atacado !== '—') msg += `Atacado (6+): *R$ ${p.atacado}*\n`;
+  if (useAtacado) {
+    msg += `Tabela: *ATACADO (6+)*\n`;
+    msg += `Preço unit.: *R$ ${p.atacado}*\n`;
+  } else {
+    msg += `Tabela: *VAREJO*\n`;
+    msg += `Preço unit.: *R$ ${p.varejo}*\n`;
+  }
+  if (unit > 0) msg += `Subtotal: *R$ ${formatBRL(sub)}*\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
@@ -2002,7 +2012,9 @@ function render() {
         const isNovo = isNovoRecente(item) || isLancamentoItem(item, cat);
         const badgeEsg = avail ? '' : '<span class="badge-esgotado">ESGOTADO</span>';
         const badgeNovo = (avail && isNovo) ? '<span class="badge-novo">NOVO</span>' : '';
-        const badgeAtac = (avail && item.atacado && item.atacado !== '—') ? '<span class="badge-atacado">ATACADO 6+</span>' : '';
+        const atacHint = (avail && item.atacado && item.atacado !== '—')
+          ? '<span class="price-atacado-hint">Atacado a partir de 6 itens</span>'
+          : '';
         const cardClass = avail ? 'card' : 'card esgotado';
         const stockHtml = avail
           ? '<span class="stock-label stock-ok">Disponível</span>'
@@ -2020,14 +2032,14 @@ function render() {
             <button type="button" class="fav-btn${favOn ? ' on' : ''}" data-fav="${pdata}" aria-label="Favoritar">${favOn ? '♥' : '♡'}</button>
             ${badgeNovo}
             ${badgeEsg}
-            ${badgeAtac}
-            ${photoHtml}
+                        ${photoHtml}
             <div class="info">
               <div class="name">${item.nome}</div>
               <div class="meta">${item.volume || '—'} · ${stockHtml}</div>
               <div class="prices">
                 <div><span class="price-label">Varejo</span><span class="price-v">${varejoShow}</span></div>
                 <div><span class="price-label">Atacado</span><span class="price-a">${atacadoShow}</span></div>
+                ${atacHint || ''}
               </div>
               <div class="card-actions">
                 <button class="btn-sm btn-details" data-p="${pdata}">Detalhes</button>
