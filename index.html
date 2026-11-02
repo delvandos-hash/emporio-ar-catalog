@@ -2617,6 +2617,62 @@
   }
   .recent-searches:empty { display: none !important; }
 
+
+  /* Selos clean: NOVO/ESGOTADO na foto; atacado só nos preços */
+  .fav-btn {
+    position: absolute !important;
+    top: 0.45rem !important;
+    right: 0.45rem !important;
+    left: auto !important;
+    z-index: 5 !important;
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+    border: none !important;
+    background: rgba(255,255,255,.9) !important;
+    color: #6b7280 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12) !important;
+  }
+  .fav-btn.on { color: #e11d48 !important; }
+  body[class*="theme-"] .fav-btn {
+    background: rgba(0,0,0,.45) !important;
+    color: #e7e5e4 !important;
+  }
+  body[class*="theme-"] .fav-btn.on { color: #fb7185 !important; }
+  .badge-novo {
+    position: absolute !important;
+    top: 0.4rem !important;
+    left: 0.4rem !important;
+    right: auto !important;
+    z-index: 3 !important;
+    font-size: 0.62rem !important;
+    font-weight: 800 !important;
+    padding: 0.18rem 0.42rem !important;
+    border-radius: 6px !important;
+    background: #7c3aed !important;
+    color: #fff !important;
+    letter-spacing: 0.02em !important;
+  }
+  .badge-esgotado {
+    position: absolute !important;
+    top: 0.4rem !important;
+    left: 0.4rem !important;
+    right: auto !important;
+    z-index: 3 !important;
+  }
+  .card.has-novo .badge-esgotado { top: 1.85rem !important; }
+  /* remove ATACADO 6+ da foto */
+  .badge-atacado { display: none !important; }
+  .price-atacado-hint {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #0f766e;
+    margin-top: 0.15rem;
+  }
+  body[class*="theme-"] .price-atacado-hint { color: #5eead4; }
+  .card .name { padding-right: 2.5rem; }
+
 </style>
 
 <link rel="manifest" href="manifest.webmanifest" />
