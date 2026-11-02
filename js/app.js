@@ -18,7 +18,8 @@ async function loadCatalogData() {
     try {
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) continue;
-      const j = await res.json();
+      const text = await res.text();
+      const j = JSON.parse(text.replace(/^\uFEFF/, ''));
       if (j && j.DATA) return j;
     } catch (e) {
       // tenta o próximo
@@ -424,7 +425,7 @@ const state = {
   volume: 'Todos',
   search: '',
   sort: 'nome-asc',
-  vitrine: 'Todos' // Todos | Lancamentos | Destaques,
+  vitrine: 'Todos', // Todos | Lancamentos | Destaques
   viewMode: 'grid',
   favoritesOnly: false
 };
