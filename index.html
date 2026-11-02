@@ -9,7 +9,7 @@
 <link rel="dns-prefetch" href="https://imaratperfumaria.com" />
 <meta name="google-site-verification" content="lKzWdohg2uloqmePWRyr8cir7ZgrJavVad9IsFK8gp0" />
 
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
 <meta name="theme-color" content="#1a1a1a" />
 <title>Empório A.R | Catálogo Digital — Perfumes, Roupas e Acessórios</title>
 <meta name="description" content="Catálogo online Empório A.R. Perfumes árabes originais, roupas e acessórios. Preços de varejo e atacado. Pedido pelo WhatsApp (62) 99113-4488." />
@@ -2251,7 +2251,252 @@
     box-shadow: 0 0 0 2px rgba(184, 154, 90, 0.55), 0 2px 8px rgba(0,0,0,.08);
   }
 
+
+  /* Filtros responsivos — sem corte em telas estreitas */
+  .filters-bar {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    max-width: 100%;
+    padding: .25rem .85rem .35rem;
+    box-sizing: border-box;
+  }
+  .fbtn {
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    line-height: 1.2;
+    min-height: 40px;
+    text-align: center;
+  }
+  #genderFilters,
+  #categoryFilters:not(.is-grid) {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  #categoryFilters.is-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
+    max-width: 100%;
+    padding: 0 .85rem .45rem;
+    box-sizing: border-box;
+  }
+  @media (max-width: 380px) {
+    .fbtn { font-size: .72rem; padding: .4rem .55rem; }
+    .filter-row-label { font-size: .64rem; }
+  }
+
+
+  /* Favoritos, busca recente, lista/grade */
+  .view-toggle {
+    display: inline-flex;
+    gap: .25rem;
+    margin-left: auto;
+  }
+  .view-toggle button {
+    border: 1px solid #57534e;
+    background: transparent;
+    color: #e7e5e4;
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  body:not([class*="theme-"]) .view-toggle button {
+    border-color: #d1d5db;
+    color: #374151;
+  }
+  .view-toggle button.active {
+    background: #ea580c;
+    border-color: #ea580c;
+    color: #fff;
+  }
+  .toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    width: 100%;
+  }
+  .recent-searches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    padding: .25rem 0 .15rem;
+    max-width: 100%;
+  }
+  .recent-searches:empty { display: none; }
+  .recent-chip {
+    border: 1px solid #78716c;
+    background: rgba(255,255,255,.06);
+    color: #e7e5e4;
+    border-radius: 999px;
+    padding: .28rem .65rem;
+    font-size: .72rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  body:not([class*="theme-"]) .recent-chip {
+    border-color: #d1d5db;
+    color: #374151;
+    background: #fff;
+  }
+  .fav-btn {
+    position: absolute;
+    top: .45rem;
+    left: .45rem;
+    z-index: 3;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,.45);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fav-btn.on { color: #fb7185; }
+  .card { position: relative; }
+  .products.view-list .card {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: .65rem;
+    align-items: stretch;
+  }
+  .products.view-list .card .photo,
+  .products.view-list .card .photo-click {
+    width: 96px;
+    height: 96px;
+    min-height: 96px;
+    border-radius: 12px;
+    object-fit: cover;
+  }
+  .products.view-list .card .info { padding: .35rem .35rem .5rem 0; }
+  .products.view-list .card .card-actions { flex-wrap: wrap; }
+  .fav-filter-btn.active {
+    background: #be123c !important;
+    border-color: #fb7185 !important;
+    color: #fff !important;
+  }
+
+
+  /* iOS PWA safe-area + badges + resumo carrinho */
+  header {
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+    padding-left: calc(1.25rem + env(safe-area-inset-left, 0px));
+    padding-right: calc(1.25rem + env(safe-area-inset-right, 0px));
+  }
+  .filters-bar {
+    top: env(safe-area-inset-top, 0px);
+  }
+  .cart-fab {
+    bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+    right: calc(1rem + env(safe-area-inset-right, 0px));
+  }
+  .btn-top {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    right: calc(1rem + env(safe-area-inset-right, 0px));
+  }
+  .toast-cart {
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .badge-novo, .badge-atacado {
+    position: absolute;
+    z-index: 2;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.2rem 0.45rem;
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+  }
+  .badge-novo {
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #7c3aed;
+    color: #fff;
+  }
+  .badge-atacado {
+    top: 2rem;
+    right: 0.5rem;
+    background: #0f766e;
+    color: #ecfdf5;
+  }
+  .badge-esgotado {
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+  .card.has-novo .badge-esgotado { top: 2.1rem; }
+  .cart-sticky-summary {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: -.25rem 0 .65rem;
+    padding: .65rem .75rem;
+    border-radius: 10px;
+    background: #14532d;
+    color: #ecfdf5;
+    font-weight: 700;
+    font-size: .9rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  }
+  body:not([class*="theme-"]) .cart-sticky-summary {
+    background: #f0fdf4;
+    color: #14532d;
+    border: 1px solid #bbf7d0;
+  }
+  .cart-sticky-summary span {
+    display: block;
+    font-size: .78rem;
+    font-weight: 600;
+    opacity: .9;
+  }
+  .buy-qty-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: .5rem 0 .75rem;
+  }
+  .buy-qty-row label { font-size: .85rem; font-weight: 600; }
+  .buy-qty-row input {
+    width: 72px;
+    padding: .45rem .5rem;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: center;
+  }
+  body[class*="theme-"] .buy-qty-row input {
+    background: #0c0a09;
+    color: #fafaf9;
+    border-color: #57534e;
+  }
+  .cep-hint-warn {
+    color: #fbbf24;
+    font-size: .75rem;
+    margin: .25rem 0 0;
+    display: none;
+  }
+  .cep-hint-warn.show { display: block; }
+
 </style>
+
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#0c0a09" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Empório A.R" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
 </head>
 <body>
 
@@ -2288,6 +2533,14 @@
   <div class="search">
     <input type="search" id="q" placeholder="Buscar por nome, marca, notas, volume..." autocomplete="off" />
   </div>
+  <div class="recent-searches" id="recentSearches" aria-label="Buscas recentes"></div>
+  <div class="toolbar-row">
+    <button type="button" class="fbtn" id="btnFavOnly" title="Só favoritos">♥ Favoritos</button>
+    <div class="view-toggle" role="group" aria-label="Visualização">
+      <button type="button" id="viewGrid" class="active" title="Grade">▦</button>
+      <button type="button" id="viewList" title="Lista">☰</button>
+    </div>
+  </div>
   <select class="filter-select" id="sortBy" title="Ordenar por">
     <option value="nome-asc">Nome A–Z</option>
     <option value="nome-desc">Nome Z–A</option>
@@ -2320,8 +2573,8 @@
     <button class="fbtn" data-filter="category" data-value="Perfumes">Perfumes</button>
     <button class="fbtn" data-filter="category" data-value="Miniaturas">Miniaturas</button>
     <button class="fbtn" data-filter="category" data-value="Óleos">Óleos</button>
-    <button class="fbtn" data-filter="category" data-value="Outros">Outros</button>
     <button class="fbtn" data-filter="category" data-value="Scoop Premiado">Scoop Premiado</button>
+    <button class="fbtn" data-filter="category" data-value="Outros">Outros</button>
   </div>
   <button type="button" class="btn-clear-filters" id="btnClearFilters">✕ Limpar filtros</button>
   <div class="nav-back-sub" id="navBackSub">
@@ -2350,7 +2603,7 @@
   </div>
   <div class="filters" id="vitrineFilters">
     <button class="fbtn active" data-filter="vitrine" data-value="Todos">Catálogo completo</button>
-    <button class="fbtn" data-filter="vitrine" data-value="Lancamentos">Só lançamentos</button>
+    <button class="fbtn" data-filter="vitrine" data-value="Lancamentos">Só novidades</button>
   </div>
   </details>
 </div>
@@ -2414,6 +2667,7 @@
         <input type="text" id="cartClientName" class="cart-input" placeholder="Como podemos te chamar?" maxlength="80" autocomplete="name" />
         <label class="cart-label">Coloque seu CEP</label>
         <input type="text" id="cartObs" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
+        <p class="cep-hint-warn" id="cartCepWarn">CEP incompleto — pode enviar assim mesmo.</p>
         <p class="cart-hint" id="cartPriceHint">Preço de atacado aplica-se automaticamente a partir de 6 itens.</p>
       </div>
       <button class="btn-buy" id="cartCheckout" style="width:100%;margin-top:1rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
@@ -2457,8 +2711,13 @@
       <p id="buyMetaProduct" style="margin:0 0 .75rem;font-size:.9rem;opacity:.9"></p>
       <label class="cart-label">Seu nome (opcional)</label>
       <input type="text" id="buyClientName" class="cart-input" placeholder="Como podemos te chamar?" maxlength="80" autocomplete="name" />
+      <div class="buy-qty-row">
+        <label for="buyQty">Quantidade</label>
+        <input type="number" id="buyQty" min="1" max="99" value="1" inputmode="numeric" />
+      </div>
       <label class="cart-label">Coloque seu CEP</label>
       <input type="text" id="buyClientCep" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
+      <p class="cep-hint-warn" id="buyCepWarn">CEP incompleto — pode enviar assim mesmo.</p>
       <p class="cart-hint">Esses dados vão na mensagem do WhatsApp para agilizar seu atendimento.</p>
       <button class="btn-buy" id="buyMetaConfirm" type="button" style="width:100%;margin-top:.85rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
         📲 Continuar no WhatsApp
@@ -2533,5 +2792,12 @@
 <div class="toast-cart" id="toastCart" role="status" aria-live="polite">Adicionado ao carrinho</div>
 <button type="button" class="btn-top" id="btnTop" title="Voltar ao topo" aria-label="Voltar ao topo">↑</button>
 
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  });
+}
+</script>
 </body>
 </html>
