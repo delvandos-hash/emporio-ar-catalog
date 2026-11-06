@@ -38,6 +38,11 @@ const dadosDoServidor = await loadCatalogData();
 
 const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
 
+try {
+  const el = document.getElementById('bootStatus');
+  if (el) el.remove();
+} catch (e) {}
+
 /** ID estável do produto (deep link ?produto= e feed Google) */
 function normId(s) {
   return String(s || '')
