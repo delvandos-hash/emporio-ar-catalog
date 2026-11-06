@@ -2681,7 +2681,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Empório A.R" />
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/themes-seasonal.css" />
 </head>
 <body>
 
@@ -2703,7 +2702,7 @@
 </header>
 
 
-<div id="seasonalBanner" class="seasonal-banner" style="display:none" aria-hidden="true" role="status"></div>
+<div class="seasonal-banner halloween-banner" id="seasonalBanner" aria-hidden="true">🎃 Halloween no Empório A.R — ofertas assustadoras até 02/11!</div>
 
 <div class="notice">
   <div class="notice-inner">
@@ -2853,7 +2852,6 @@
         <label class="cart-label">Coloque seu CEP</label>
         <input type="text" id="cartObs" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
         <p class="cep-hint-warn" id="cartCepWarn">CEP incompleto — pode enviar assim mesmo.</p>
-        <p class="cep-city-info" id="cartCepCity" style="display:none;margin:.25rem 0 0;font-size:.85rem;color:#059669"></p>
         <p class="cart-hint" id="cartPriceHint">Preço de atacado aplica-se automaticamente a partir de 6 itens.</p>
       </div>
       <button class="btn-buy" id="cartCheckout" style="width:100%;margin-top:1rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
@@ -2904,7 +2902,6 @@
       <label class="cart-label">Coloque seu CEP</label>
       <input type="text" id="buyClientCep" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
       <p class="cep-hint-warn" id="buyCepWarn">CEP incompleto — pode enviar assim mesmo.</p>
-      <p class="cep-city-info" id="buyCepCity" style="display:none;margin:.25rem 0 0;font-size:.85rem;color:#059669"></p>
       <p class="cart-hint">Esses dados vão na mensagem do WhatsApp para agilizar seu atendimento.</p>
       <button class="btn-buy" id="buyMetaConfirm" type="button" style="width:100%;margin-top:.85rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
         📲 Continuar no WhatsApp
@@ -2933,8 +2930,6 @@
   </div>
 </div>
 
-<script src="js/cep-helper.js"></script>
-<script src="js/themes.js"></script>
 <script type="module" src="js/app.js"></script>
 
 <script>
