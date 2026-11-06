@@ -1,36 +1,94 @@
+# Empório A.R — Catálogo Perfumes / Roupas / Acessórios
+# Homologação com segurança (baseado no padrão Beauty)
+
 [build]
   publish = "."
-  functions = "netlify/functions"
+  command = "echo static+functions"
 
-[[headers]]
-  for = "/netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
 
+# === Redirects de API / Feed ===
 [[redirects]]
   from = "/api/catalogo"
   to = "/.netlify/functions/get-catalog"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/stock-sync"
   to = "/.netlify/functions/stock-sync"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/roupas-stock"
   to = "/.netlify/functions/roupas-stock"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/dande-stock"
   to = "/.netlify/functions/dande-stock"
   status = 200
-  
+  force = true
+
+[[redirects]]
+  from = "/api/cep"
+  to = "/.netlify/functions/cep"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/feed.xml"
   to = "/.netlify/functions/get-feed"
   status = 200
+  force = true
+
+# Bloqueio de arquivos sensíveis (nunca publicar custo / markup / sourceUrl)
+[[redirects]]
+  from = "/data/*"
+  to = "/.netlify/functions/blocked"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/catalogo.generated.json"
+  to = "/.netlify/functions/blocked"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/js/data.internal.js"
+  to = "/.netlify/functions/blocked"
+  status = 404
+  force = true
+
+# === Security Headers (padrão Beauty) ===
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data: https: blob:; connect-src 'self' https://gist.githubusercontent.com https://viacep.com.br https://brasilapi.com.br https://imaratperfumaria.com https://*.netlify.app; script-src 'self' 'unsafe-inline' https://plausible.io; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=60, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
 
 [[headers]]
   for = "/manifest.webmanifest"
@@ -44,3 +102,13 @@
     Content-Type = "application/javascript; charset=utf-8"
     Cache-Control = "no-cache"
 
+[[headers]]
+  for = "/feed.xml"
+  [headers.values]
+    Content-Type = "application/xml; charset=utf-8"
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
