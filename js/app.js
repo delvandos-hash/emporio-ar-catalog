@@ -925,7 +925,18 @@ function openBuyMetaModal(p) {
     const n = document.getElementById('buyClientName');
     const c = document.getElementById('buyClientCep');
     if (n && !n.value) n.value = cartNome || saved.nome || '';
-    if (c && !c.value) c.value = cartCep || saved.cep || '';
+    if (c && !c.value) {
+      c.value = cartCep || saved.cep || '';
+      if (saved.cidade) document.getElementById('buyCepCity').value = saved.cidade;
+      if (saved.uf) document.getElementById('buyCepUf').value = saved.uf;
+      if (saved.cidade && saved.uf) {
+        c.dataset.cepCity = saved.cidade;
+        c.dataset.cepUf = saved.uf;
+        c.dataset.cepValid = 'true';
+        document.getElementById('buyCepStatus').textContent = 'Endereço salvo anteriormente.';
+        document.getElementById('buyCepStatus').dataset.state = 'success';
+      }
+    }
   } catch (e) {}
   ov?.classList.add('open');
 }
@@ -947,22 +958,125 @@ function updateCepWarn(inputId, warnId) {
   warn.classList.toggle('show', incomplete);
 }
 
-function confirmBuyMeta() {
+async function lookupCep(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return { ok: false, reason: 'Campo de CEP não encontrado.' };
+  const digits = cepDigits(input.value);
+  const prefix = inputId === 'cartObs' ? 'cart' : 'buy';
+  const cityEl = document.getElementById(prefix + 'CepCity');
+  const ufEl = document.getElementById(prefix + 'CepUf');
+  const statusEl = document.getElementById(prefix + 'CepStatus');
+  const setStatus = (message, state = '') => {
+    if (statusEl) {
+      statusEl.textContent = message;
+      statusEl.dataset.state = state;
+    }
+  };
+  if (digits.length !== 8) {
+    if (cityEl) cityEl.value = '';
+    if (ufEl) ufEl.value = '';
+    setStatus(digits.length ? 'Digite os 8 números do CEP.' : '');
+    input.dataset.cepCity = '';
+    input.dataset.cepUf = '';
+    input.dataset.cepValid = '';
+    return { ok: false, reason: 'Informe um CEP com 8 dígitos.' };
+  }
+
+  const requestId = String((Number(input.dataset.cepRequest || 0) + 1));
+  input.dataset.cepRequest = requestId;
+  setStatus('Consultando CEP…', 'loading');
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) throw new Error('Falha na consulta');
+    const data = await response.json();
+    if (input.dataset.cepRequest !== requestId) return { ok: false, reason: 'Consulta substituída.' };
+    if (data.erro || !data.localidade || !data.uf) {
+      if (cityEl) cityEl.value = '';
+      if (ufEl) ufEl.value = '';
+      input.dataset.cepCity = '';
+      input.dataset.cepUf = '';
+      input.dataset.cepValid = 'false';
+      setStatus('CEP não encontrado. Confira os números.', 'error');
+      return { ok: false, reason: 'CEP não encontrado.' };
+    }
+    input.dataset.cepCity = data.localidade;
+    input.dataset.cepUf = data.uf;
+    input.dataset.cepValid = 'true';
+    if (cityEl) cityEl.value = data.localidade;
+    if (ufEl) ufEl.value = data.uf;
+    setStatus('Endereço localizado.', 'success');
+    return { ok: true, cep: digits, cidade: data.localidade, uf: data.uf };
+  } catch (error) {
+    if (input.dataset.cepRequest !== requestId) return { ok: false, reason: 'Consulta substituída.' };
+    input.dataset.cepValid = '';
+    setStatus('Não foi possível consultar agora. Tente novamente.', 'error');
+    return { ok: false, reason: 'Não foi possível validar o CEP.' };
+  }
+}
+
+async function ensureCep(inputId) {
+  const input = document.getElementById(inputId);
+  const digits = cepDigits(input?.value);
+  if (!digits) return { ok: true, cep: '', cidade: '', uf: '' };
+  if (digits.length !== 8) {
+    updateCepWarn(inputId, inputId === 'cartObs' ? 'cartCepWarn' : 'buyCepWarn');
+    return { ok: false, reason: 'Informe os 8 dígitos do CEP.' };
+  }
+  if (input.dataset.cepValid === 'true' && input.dataset.cepCity && input.dataset.cepUf) {
+    return { ok: true, cep: digits, cidade: input.dataset.cepCity, uf: input.dataset.cepUf };
+  }
+  return await lookupCep(inputId);
+}
+
+function bindCepField(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('input', () => {
+    let value = cepDigits(input.value).slice(0, 8);
+    if (value.length > 5) value = value.slice(0, 5) + '-' + value.slice(5);
+    input.value = value;
+    input.dataset.cepValid = '';
+    input.dataset.cepCity = '';
+    input.dataset.cepUf = '';
+    const prefix = inputId === 'cartObs' ? 'cart' : 'buy';
+    const city = document.getElementById(prefix + 'CepCity');
+    const uf = document.getElementById(prefix + 'CepUf');
+    if (city) city.value = '';
+    if (uf) uf.value = '';
+    updateCepWarn(inputId, inputId === 'cartObs' ? 'cartCepWarn' : 'buyCepWarn');
+    if (cepDigits(value).length === 8) lookupCep(inputId);
+    else {
+      const status = document.getElementById(prefix + 'CepStatus');
+      if (status) { status.textContent = ''; status.dataset.state = ''; }
+    }
+  });
+  input.addEventListener('blur', () => {
+    if (cepDigits(input.value).length === 8 && input.dataset.cepValid !== 'true') lookupCep(inputId);
+  });
+}
+
+async function confirmBuyMeta() {
   const p = pendingBuyProduct;
   if (!p) return;
   const nome = (document.getElementById('buyClientName')?.value || '').trim();
-  const cep = (document.getElementById('buyClientCep')?.value || '').trim();
+  const cepResult = await ensureCep('buyClientCep');
+  if (!cepResult.ok) {
+    alert(cepResult.reason || 'Não foi possível validar o CEP.');
+    return;
+  }
+  const { cep, cidade, uf } = cepResult;
   const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
-  updateCepWarn('buyClientCep', 'buyCepWarn');
   try {
-    localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep }));
+    localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep, cidade, uf }));
     const cn = document.getElementById('cartClientName');
     const cc = document.getElementById('cartObs');
     if (cn && nome) cn.value = nome;
     if (cc && cep) cc.value = cep;
   } catch (e) {}
   closeBuyMetaModal();
-  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, qty })}`, '_blank');
+  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, cidade, uf, qty })}`, '_blank');
 }
 
 function unitPrice(p, useAtacado) {
@@ -977,7 +1091,13 @@ function formatBRL(n) {
 function getCartMeta() {
   const nome = (document.getElementById('cartClientName')?.value || '').trim();
   const cep = (document.getElementById('cartObs')?.value || '').trim();
-  return { nome, cep, obs: cep };
+  const input = document.getElementById('cartObs');
+  return {
+    nome, cep,
+    cidade: input?.dataset.cepCity || '',
+    uf: input?.dataset.cepUf || '',
+    obs: cep
+  };
 }
 
 function buildCartWaMessage() {
@@ -2399,8 +2519,23 @@ document.getElementById('cartClose').addEventListener('click', () => {
 document.getElementById('cartModal').addEventListener('click', e => {
   if (e.target.id === 'cartModal') document.getElementById('cartModal').classList.remove('open');
 });
-document.getElementById('cartCheckout').addEventListener('click', () => {
+document.getElementById('cartCheckout').addEventListener('click', async () => {
   if (!cart.length) return;
+  const cepResult = await ensureCep('cartObs');
+  if (!cepResult.ok) {
+    alert(cepResult.reason || 'Não foi possível validar o CEP.');
+    return;
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem('emporio_buy_meta') || '{}');
+    localStorage.setItem('emporio_buy_meta', JSON.stringify({
+      ...saved,
+      nome: document.getElementById('cartClientName')?.value?.trim() || saved.nome || '',
+      cep: cepResult.cep,
+      cidade: cepResult.cidade,
+      uf: cepResult.uf
+    }));
+  } catch (e) {}
   window.open(`https://wa.me/${WHATSAPP}?text=${buildCartWaMessage()}`, '_blank');
 });
 
@@ -2737,19 +2872,8 @@ document.getElementById('buyMetaModal')?.addEventListener('click', (e) => {
 });
 document.getElementById('buyMetaConfirm')?.addEventListener('click', confirmBuyMeta);
 
-document.getElementById('buyClientCep')?.addEventListener('input', () => updateCepWarn('buyClientCep', 'buyCepWarn'));
-document.getElementById('buyClientCep')?.addEventListener('blur', () => updateCepWarn('buyClientCep', 'buyCepWarn'));
-document.getElementById('cartObs')?.addEventListener('input', () => updateCepWarn('cartObs', 'cartCepWarn'));
-document.getElementById('cartObs')?.addEventListener('blur', () => updateCepWarn('cartObs', 'cartCepWarn'));
-document.getElementById('cartCheckout')?.addEventListener('click', () => updateCepWarn('cartObs', 'cartCepWarn'), true);
-
-document.getElementById('buyClientCep')?.addEventListener('input', () => {
-  const el = document.getElementById('buyClientCep');
-  if (!el) return;
-  let v = el.value.replace(/\D/g, '').slice(0, 8);
-  if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5);
-  el.value = v;
-});
+bindCepField('buyClientCep');
+bindCepField('cartObs');
 
 
 document.getElementById('navCrumb')?.addEventListener('click', (e) => {
