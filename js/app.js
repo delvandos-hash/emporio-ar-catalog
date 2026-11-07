@@ -1726,7 +1726,7 @@ function buildVariacoesHtml(p, selectedIds) {
     const qty = Number(v.estoque) || 0, ok = qty > 0, id = String(v.id || v.nome || '');
     const sel = selected.has(id) ? ' selected' : '', disabled = ok ? '' : ' disabled';
     const label = escapeHtml(v.nome || '—'), stock = ok ? `${qty} un.` : 'Esgotado';
-    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}><span class="var-chip-name">${label}</span><span class="var-chip-stock">${stock}</span></button>`;
+    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-estoque="${qty}" aria-pressed="${selected.has(id) ? 'true' : 'false'}"${disabled}><span class="var-chip-name">${label}</span><span class="var-chip-stock">${stock}</span></button>`;
   }).join('');
   return `<div class="variacoes-box" id="variacoesBox"><strong>Escolha uma ou mais variações</strong><div class="var-chips">${chips}</div><p class="var-hint" id="varHint">Selecione todas as opções que deseja comprar</p></div>`;
 }
@@ -1746,6 +1746,7 @@ function bindVariacaoSelector() {
   if (!box) return;
   box.querySelectorAll('.var-chip:not([disabled])').forEach(btn => btn.addEventListener('click', () => {
     btn.classList.toggle('selected');
+    btn.setAttribute('aria-pressed', btn.classList.contains('selected') ? 'true' : 'false');
     const selected = getSelectedVariacoes();
     if (currentProduct) { currentProduct.variacoesSelecionadas = selected; currentProduct.variacaoSelecionada = selected[0] || null; }
     const hint = document.getElementById('varHint');
