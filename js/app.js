@@ -12,7 +12,7 @@ async function loadCatalogData() {
     const res = await fetch('/api/catalogo', { cache: 'no-store' });
     if (res.ok) {
       const text = await res.text();
-      const payload = JSON.parse(text.replace(/^\\uFEFF/, ''));
+      const payload = JSON.parse(text.replace(/^\uFEFF/, ''));
       if (payload && payload.DATA && typeof payload.DATA === 'object') return payload;
     }
   } catch (e) {
