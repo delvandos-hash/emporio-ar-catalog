@@ -677,7 +677,20 @@ function applyOverride(item, brand) {
 function loadCart() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-    return Array.isArray(raw) ? raw : [];
+    if (!Array.isArray(raw)) return [];
+    // localStorage pode ser editado pelo próprio navegador: aceitar apenas campos esperados.
+    return raw.filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => ({
+        nome: String(item.nome || 'Produto').slice(0, 180),
+        brand: String(item.brand || '').slice(0, 120),
+        volume: String(item.volume || '').slice(0, 60),
+        varejo: String(item.varejo ?? ''),
+        atacado: String(item.atacado ?? ''),
+        disponivel: item.disponivel === 'Não' ? 'Não' : 'Sim',
+        qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty) || 1))),
+        variacaoNome: String(item.variacaoNome || '').slice(0, 100),
+        cat: String(item.cat || '').slice(0, 100)
+      }));
   } catch { return []; }
 }
 function persistCart() {
@@ -1999,8 +2012,8 @@ function render() {
         const item = validateProductPrices(rawItem);
         const avail = isAvailable(item);
         const isScoop = (item.badge === 'Scoop') || (item.nome || '').toLowerCase().includes('scoop');
-        const varejoShow = item.varejo ? `R$ ${item.varejo}` : '—';
-        const atacadoShow = item.atacado && item.atacado !== '—' ? `R$ ${item.atacado}` : '—';
+        const varejoShow = item.varejo ? `R$ ${escapeHtml(item.varejo)}` : '—';
+        const atacadoShow = item.atacado && item.atacado !== '—' ? `R$ ${escapeHtml(item.atacado)}` : '—';
         const pdata = encodeURIComponent(JSON.stringify({
           nome: item.nome,
           brand: b.brand,
@@ -2190,6 +2203,7 @@ function downloadCatalogPDF() {
     alert('Permita pop-ups para gerar o PDF.');
     return;
   }
+  try { w.opener = null; } catch (e) {}
   w.document.write(htmlDoc);
   w.document.close();
 }
