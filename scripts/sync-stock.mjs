@@ -216,7 +216,10 @@ async function main() {
     });
     if (!response.ok) { const errorText = await response.text(); throw new Error(`GitHub API ${response.status}: ${errorText}`); }
     console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
-  } catch (error) { console.error('❌ Erro ao enviar para o GitHub Gist:', error); }
+  } catch (error) {
+    console.error('❌ Erro ao enviar para o GitHub Gist:', error);
+    throw error; // faz a Action falhar em vez de sinalizar sucesso sem atualizar o catálogo público
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
