@@ -13,7 +13,7 @@ export function normalizePublicImagePath(value) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "";
   let decoded;
   try { decoded = decodeURIComponent(value); } catch { return ""; }
-  if (decoded.includes("%") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded) ||
+  if (decoded.startsWith("//") || decoded.includes("%") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded) ||
       decoded.includes("?") || decoded.includes("#") ||
       decoded.split("/").some((part) => part === "." || part === "..") || decoded.length > 2048) return "";
   return decoded;
