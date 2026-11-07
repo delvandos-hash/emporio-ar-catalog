@@ -45,3 +45,32 @@ test("consulta favoritos por Set sem reler ou reconstruir o armazenamento", () =
   assert.equal(isFavoriteId(snapshot, "p_publico", "marca-produto-100ml"), true);
   assert.equal(isFavoriteId(snapshot, "ausente", "marca-produto-100ml"), false);
 });
+
+
+test("filtro global reúne favoritos de todas as origens sem descartar grupos", async () => {
+  const { filterFavoriteGroups } = await import("../js/favorites.js");
+  const groups = [
+    { line: "feminino", cat: "Perfumes", brand: "Marca A", items: [{ public_id: "fav-a" }, { public_id: "no-a" }] },
+    { line: "masculino", cat: "Perfumes", brand: "Marca B", items: [{ public_id: "fav-b" }] },
+    { line: "unissex", cat: "Novidades", brand: "Marca C", items: [{ public_id: "no-c" }] },
+    { line: "acessorios", cat: "Acessórios", brand: "Marca D", items: [{ public_id: "fav-d" }] },
+  ];
+  const filtered = filterFavoriteGroups(groups, (item) => ["fav-a", "fav-b", "fav-d"].includes(item.public_id));
+  assert.deepEqual(
+    filtered.map((group) => [group.line, group.items.map((item) => item.public_id)]),
+    [
+      ["feminino", ["fav-a"]],
+      ["masculino", ["fav-b"]],
+      ["acessorios", ["fav-d"]],
+    ]
+  );
+});
+
+test("filtro global não depende de filtros de origem e devolve lista vazia sem favoritos", async () => {
+  const { filterFavoriteGroups } = await import("../js/favorites.js");
+  const groups = [
+    { line: "feminino", cat: "Perfumes", items: [{ public_id: "x" }] },
+    { line: "roupas", cat: "Roupas", items: [{ public_id: "y" }] },
+  ];
+  assert.deepEqual(filterFavoriteGroups(groups, () => false), []);
+});
