@@ -190,7 +190,7 @@ function drawImageContain(ctx, img, x, y, w, h) {
 }
 
 async function loadProductImage(p) {
-  const src = absSophiaImg(p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '');
+  const src = resolveCatalogImageUrl(p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '');
   if (!src) return null;
   const tryLoad = (url, cross) => new Promise((resolve) => {
     const img = new Image();
@@ -543,16 +543,13 @@ function isLancamentoItem(item, cat) {
 
 function fonteLancamento(item, line, cat) {
   const f = String(item.fonte || '').toLowerCase();
-  if (f.includes('acessor') || f === 'dande') return 'acessorios';
-  if (f.includes('roup') || f.includes('franny') || f.includes('sophia')) return 'roupas';
-  if (f.includes('brand')) return 'brand';
-  if (f.includes('imarat')) return 'imarat';
+  if (['acessorios', 'roupas', 'brand', 'perfumaria'].includes(f)) return f;
   const c = String(cat || item.cat || '');
   if (c === 'Brand' || c.startsWith('Brand')) return 'brand';
   const ln = String(line || item.line || '').toLowerCase();
   if (ln === 'roupas') return 'roupas';
   if (ln === 'acessorios' || ln === 'acessórios') return 'acessorios';
-  if (['masculino', 'feminino', 'unissex'].includes(ln)) return 'imarat';
+  if (['masculino', 'feminino', 'unissex'].includes(ln)) return 'perfumaria';
   return 'outros';
 }
 
@@ -1428,9 +1425,10 @@ function buildDetailsNavList() {
         line: g.line || '',
         cat: g.cat || '',
         fonte: item.fonte || '',
-        id_origem: item.id_origem || '',
-        url_origem: item.url_origem || '',
-        variacoes: item.variacoes || [],
+        public_id: item.public_id || '',
+        public_id: item.public_id || '',
+        public_id: item.public_id || '',
+                        variacoes: item.variacoes || [],
         total_estoque: item.total_estoque
       });
     }
@@ -1465,26 +1463,24 @@ function showDetailsAt(index, direction) {
 
 
 function isRoupasProduct(p) {
-  return (p.line || '').toLowerCase() === 'roupas' || (p.fonte || '') === 'roupas' || (p.fonte || '') === 'sophiamoda';
+  return (p.line || '').toLowerCase() === 'roupas' || (p.fonte || '') === 'roupas';
 }
 function isAcessoriosProduct(p) {
-  return (p.line || '').toLowerCase() === 'acessorios' || (p.fonte || '') === 'acessorios' || (p.fonte || '') === 'dande';
+  return (p.line || '').toLowerCase() === 'acessorios' || (p.fonte || '') === 'acessorios';
 }
 /** Produtos com descrição + variações + galeria (Roupas e Acessórios) */
 function isVariacaoCatalogProduct(p) {
   return isRoupasProduct(p) || isAcessoriosProduct(p);
 }
 
-function absSophiaImg(u) {
+function resolveCatalogImageUrl(u) {
   if (!u) return '';
   const s = String(u).trim();
   if (!s) return '';
   try {
     const url = new URL(s, window.location.origin);
     if (url.protocol !== 'https:' || url.username || url.password) return '';
-    const sameOrigin = url.origin === window.location.origin;
-    const approvedCdn = ['arquivos-cdn.facilzap.app.br', 'acdn-us.mitiendanube.com'].includes(url.hostname.toLowerCase());
-    if (!sameOrigin && !approvedCdn) return '';
+    if (url.origin !== window.location.origin || url.pathname !== '/api/product-image') return '';
     return url.toString();
   } catch (e) {
     return '';
@@ -1495,7 +1491,7 @@ function buildPhotoGallery(p) {
   const raw = Array.isArray(p.fotos) && p.fotos.length
     ? p.fotos
     : (p.foto ? [p.foto] : []);
-  const fotos = raw.map(absSophiaImg).filter(Boolean);
+  const fotos = raw.map(resolveCatalogImageUrl).filter(Boolean);
   if (!fotos.length) {
     return { html: 'SEM FOTO', isEmpty: true, fotos: [] };
   }
@@ -1711,13 +1707,7 @@ function openDetails(p, opts = {}) {
   }
 
   // Estoque ao vivo
-  if (roupas && p.id_origem) {
-    refreshRoupasStock(p).catch(() => {});
-  } else if (acessorios && p.id_origem) {
-    refreshDandeStock(p).catch(() => {});
-  }
-
-  const btnAdd = document.getElementById('modalAddCart');
+    const btnAdd = document.getElementById('modalAddCart');
   const btnBuy = document.getElementById('modalBuy');
   const btnShare = document.getElementById('modalShare');
   if (btnShare) {
@@ -1756,17 +1746,7 @@ function openDetails(p, opts = {}) {
   }
 }
 
-/** Atualiza estoque/variações de Roupas via proxy Netlify (se disponível) */
-async function refreshRoupasStock(p) {
-  // Estoque ao vivo sem Netlify Functions: dados vêm do Gist (Action 2x/dia)
-  return;
-}
-
-/** Atualiza estoque/variações de Acessórios (Dande) via proxy Netlify */
-async function refreshDandeStock(p) {
-  // Estoque ao vivo sem Netlify Functions: dados vêm do Gist (Action 2x/dia)
-  return;
-}
+/* O estoque é atualizado pelo snapshot sincronizado do catálogo. */
 
 
 
@@ -1791,7 +1771,7 @@ function closeModal() {
 
 function collectFeatured(limit = 12) {
   // Híbrido: 1º novidades ≤3 dias (mistura fontes); 2º completa com legado (categoria/badge)
-  const bucketsRecente = { imarat: [], brand: [], roupas: [], acessorios: [], outros: [] };
+  const bucketsRecente = { perfumaria: [], brand: [], roupas: [], acessorios: [], outros: [] };
   const legado = [];
   const seen = new Set();
 
@@ -1819,7 +1799,7 @@ function collectFeatured(limit = 12) {
   // legado: embaralha leve por nome para não fixar sempre os mesmos no topo
   legado.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
 
-  const order = ['imarat', 'roupas', 'acessorios', 'brand', 'outros'];
+  const order = ['perfumaria', 'roupas', 'acessorios', 'brand', 'outros'];
   const out = [];
   let i = 0;
   while (out.length < limit) {
@@ -1870,12 +1850,13 @@ function buildFeaturedHtml() {
       line: item.line || '',
       cat: item.cat || '',
       fonte: item.fonte || '',
-      id_origem: item.id_origem || '',
-      url_origem: item.url_origem || '',
-      variacoes: item.variacoes || [],
+        public_id: item.public_id || '',
+        public_id: item.public_id || '',
+        public_id: item.public_id || '',
+                  variacoes: item.variacoes || [],
       total_estoque: item.total_estoque
     }));
-    const foto = absSophiaImg(item.foto);
+    const foto = resolveCatalogImageUrl(item.foto);
     return `<button type="button" class="feat-card" data-p="${pdata}">
       ${foto ? `<img src="${escapeHtml(foto)}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : '<div class="feat-ph">SEM FOTO</div>'}
       <span class="feat-name">${escapeHtml(item.nome)}</span>
@@ -2024,7 +2005,7 @@ function saveFavs(arr) {
   try { localStorage.setItem(FAV_KEY, JSON.stringify(arr.slice(0, 200))); } catch (e) {}
 }
 function favId(p) {
-  return String(p.id_origem || p.id || productId(p) || p.nome || '').trim();
+  return String(p.public_id || productId(p) || p.nome || '').trim();
 }
 function isFav(p) {
   const id = favId(p);
@@ -2173,12 +2154,13 @@ function render() {
           line: b.line || '',
           cat: cat || item.cat || '',
           fonte: item.fonte || '',
-          id_origem: item.id_origem || '',
-          url_origem: item.url_origem || '',
-          variacoes: item.variacoes || [],
+        public_id: item.public_id || '',
+        public_id: item.public_id || '',
+        public_id: item.public_id || '',
+                              variacoes: item.variacoes || [],
           total_estoque: item.total_estoque
         }));
-        const fotoCard = absSophiaImg(item.foto);
+        const fotoCard = resolveCatalogImageUrl(item.foto);
         const photoHtml = isScoop
           ? ''
           : (fotoCard
