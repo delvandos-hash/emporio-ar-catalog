@@ -22,6 +22,10 @@ test("migra rota legada do Preview #5 para alias privado da Imarat", () => {
     ""
   );
 });
+test("bloqueia caminhos protocol-relative que poderiam trocar o host", () => {
+  assert.equal(normalizePublicImagePath("//evil.example/image.webp"), "");
+});
+
 test("bloqueia traversal literal, codificado e duplamente codificado", () => {
   assert.equal(normalizeProductImagePath("/uploads/products/../private.txt"), "");
   assert.equal(normalizeProductImagePath("/uploads/products/%2e%2e/private.txt"), "");
