@@ -110,6 +110,9 @@ test("gera referência opaca para estoque ao vivo sem publicar IDs de origem", (
   assert.equal(JSON.stringify(result).includes("987654"), false);
   assert.equal(JSON.stringify(result).includes("tamanho-privado"), false);
   assert.equal(toPublicCatalog(source).roupas[0].items[0].stock_ref, item.stock_ref);
+  const secondPass = toPublicCatalog(result).roupas[0].items[0];
+  assert.equal(secondPass.stock_ref, item.stock_ref);
+  assert.equal(secondPass.stock_route, "b");
 });
 
 test("rejeita DATA inválido", () => {
