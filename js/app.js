@@ -915,7 +915,7 @@ function openBuyMetaModal(p) {
   pendingBuyProduct = p;
   const ov = document.getElementById('buyMetaModal');
   const title = document.getElementById('buyMetaProduct');
-  if (title) title.textContent = p.nome || 'Produto';
+  if (title) title.textContent = (p.nome || 'Produto') + (p.variacoesSelecionadas?.length ? ` · ${p.variacoesSelecionadas.length} variações` : '');
   const qtyEl = document.getElementById('buyQty');
   if (qtyEl) qtyEl.value = '1';
   // pré-preenche com carrinho ou último uso
@@ -1244,7 +1244,7 @@ function renderCart() {
     <div class="cart-item">
       <div class="cart-item-info">
         <strong>${escapeHtml(p.nome)}</strong><br>
-        <span class="cart-item-meta">${escapeHtml(p.brand || '')} · ${escapeHtml(p.volume || '—')} · ${label}: R$ ${formatBRL(unit)}</span>
+        <span class="cart-item-meta">${escapeHtml(p.brand || '')} · ${escapeHtml(p.volume || '—')}${p.variacaoNome ? ' · Variação: ' + escapeHtml(p.variacaoNome) : ''} · ${label}: R$ ${formatBRL(unit)}</span>
         <div class="cart-qty">
           <button type="button" data-qty-minus="${i}" aria-label="Diminuir">−</button>
           <span>${p.qty}</span>
