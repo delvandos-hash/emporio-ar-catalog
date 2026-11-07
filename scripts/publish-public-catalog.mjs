@@ -19,7 +19,7 @@ const hasPublishFlag = process.argv.includes("--publish");
 
 export function parseCatalogData(source) {
   if (typeof source !== "string") throw new Error("Fonte data.js inválida");
-  const match = source.match(/export const DATA = ([\\s\\S]*?);\\s*\\nexport const WHATSAPP/);
+  const match = source.match(/export const DATA = ([\s\S]*?);\s*\nexport const WHATSAPP/);
   if (!match) throw new Error("DATA não encontrado em js/data.js");
   const parsed = JSON.parse(match[1]);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
