@@ -7,6 +7,31 @@ const CDN_HOSTS = new Set([
   "acdn-us.mitiendanube.com",
 ]);
 const PROXY_ORIGIN = "https://catalogo-interno.invalid";
+const PRODUCT_PATH_PREFIX = "/uploads/products/";
+
+export function normalizeProductImagePath(value) {
+  if (typeof value !== "string" || !value.startsWith(PRODUCT_PATH_PREFIX)) return "";
+  let decoded;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return "";
+  }
+  if (
+    decoded.includes("%") ||
+    decoded.includes("\\") ||
+    /[\u0000-\u001f\u007f]/.test(decoded) ||
+    decoded.split("/").some((part) => part === "." || part === "..")
+  ) return "";
+
+  try {
+    const url = new URL(decoded, PROXY_ORIGIN);
+    if (url.origin !== PROXY_ORIGIN || url.search || url.hash || !url.pathname.startsWith(PRODUCT_PATH_PREFIX)) return "";
+    return url.pathname;
+  } catch {
+    return "";
+  }
+}
 
 export function sanitizePublicImageUrl(value, options = {}) {
   if (typeof value !== "string" || !value.trim()) return "";
@@ -16,8 +41,8 @@ export function sanitizePublicImageUrl(value, options = {}) {
     const raw = value.trim();
     const proxyUrl = new URL(raw, PROXY_ORIGIN);
     if (proxyUrl.origin === PROXY_ORIGIN && proxyUrl.pathname === "/api/product-image") {
-      const path = proxyUrl.searchParams.get("path") || "";
-      if (!path.startsWith("/uploads/products/") || path.includes("\\") || path.includes("..")) return "";
+      const path = normalizeProductImagePath(proxyUrl.searchParams.get("path") || "");
+      if (!path) return "";
       return proxyUrl.pathname + "?path=" + encodeURIComponent(path);
     }
 
@@ -26,8 +51,10 @@ export function sanitizePublicImageUrl(value, options = {}) {
     if (url.protocol !== "https:" || url.username || url.password || url.hash) return "";
 
     if (url.hostname.toLowerCase() === "imaratperfumaria.com") {
-      if (!url.pathname.startsWith("/uploads/products/") || url.search) return "";
-      return "/api/product-image?path=" + encodeURIComponent(url.pathname);
+      if (!url.pathname.startsWith(PRODUCT_PATH_PREFIX) || url.search) return "";
+      const path = normalizeProductImagePath(url.pathname);
+      if (!path) return "";
+      return "/api/product-image?path=" + encodeURIComponent(path);
     }
 
     if (!CDN_HOSTS.has(url.hostname.toLowerCase())) return "";
