@@ -33,8 +33,12 @@ export function sanitizePublicImageUrl(value, options = {}) {
     const raw = value.trim();
     const existing = new URL(raw, PROXY_ORIGIN);
     if (existing.origin === PROXY_ORIGIN && existing.pathname === "/api/product-image") {
-      const source = existing.searchParams.get("source") || "";
       const path = normalizePublicImagePath(existing.searchParams.get("path") || "");
+      // Compatibilidade com o formato anterior do Preview #5/#4:
+      // naquela versão, somente imagens da Imarat passavam pelo proxy
+      // e a rota não carregava o parâmetro "source".
+      const requestedSource = existing.searchParams.get("source") || "";
+      const source = requestedSource || (path.startsWith("/uploads/products/") ? "p" : "");
       if (!IMAGE_SOURCES.has(source) || !path || (source === "p" && !path.startsWith("/uploads/products/"))) return "";
       return "/api/product-image?source=" + source + "&path=" + encodeURIComponent(path);
     }
