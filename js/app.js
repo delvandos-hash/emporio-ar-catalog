@@ -1,18 +1,13 @@
 /**
  * Empório A.R - Catálogo Digital
- * Dados: Gist (principal) + fallback local data.js + estoque ao vivo
+ * Dados: API pública sanitizada + fallback local data.js + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 
-// Novo Gist (20/10/2026)
-const GIST_CATALOG_URL =
-  'https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json';
-
 async function loadCatalogData() {
-  // 1) Gist primeiro (leve — não baixa data.js de 1.5MB)
-  // 2) API local
-  // 3) Fallback: data.js só se Gist falhar (import dinâmico)
-  const urls = [GIST_CATALOG_URL, '/api/catalogo'];
+  // A API sanitiza os dados antes de entregá-los ao navegador.
+  // O Gist não é mais consultado diretamente pelo cliente.
+  const urls = ['/api/catalogo'];
 
   for (const url of urls) {
     try {
