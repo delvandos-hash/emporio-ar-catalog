@@ -9,6 +9,7 @@ on:
       - 'scripts/public-image-url.mjs'
       - 'netlify/functions/get-catalog.mjs'
       - 'netlify/functions/product-image.mjs'
+      - 'netlify/functions/get-feed.js'
       - 'js/app.js'
       - 'js/data.js'
   workflow_dispatch:
