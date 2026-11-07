@@ -73,7 +73,7 @@ function parseVariantsFromHtml(html, id) {
   return null;
 }
 
-function toVariacoes(variants) {
+export function toVariacoes(variants) {
   return (variants || []).map((v, index) => {
     const opts = [v.option0, v.option1, v.option2].filter(Boolean);
     return {
