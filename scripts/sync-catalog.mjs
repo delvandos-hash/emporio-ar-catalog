@@ -1436,7 +1436,7 @@ async function main() {
     DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
   }
 
-  for (const groups of Object.values(DATA)) for (const group of groups || []) for (const item of group.items || []) { delete item.original; delete item.custo; delete item.precoCusto; delete item.preco_custo; delete item.cost; delete item.costPrice; }
+  for (const groups of Object.values(DATA)) for (const group of groups || []) for (const item of group.items || []) { delete item.original; delete item.custo; delete item.precoCusto; delete item.preco_custo; delete item.cost; delete item.costPrice; if (item.url_origem) { try { const sourceUrl = new URL(String(item.url_origem)); item.url_origem = sourceUrl.pathname + sourceUrl.search; } catch {} } }
 
   const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount}+${frannyCount} Roupas +${acessoriosCount} Acc | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
   fs.writeFileSync(dataPath, out, 'utf8');
