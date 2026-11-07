@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildPublicPayload, parseCatalogData } from "./publish-public-catalog.mjs";
 
-const source = `export const DATA = {
+const catalog = {
   perfumes: [{
     brand: "Marca",
     cat: "Perfumes",
@@ -19,6 +19,7 @@ const source = `export const DATA = {
     }]
   }]
 };
+const source = `export const DATA = ${JSON.stringify(catalog)};
 export const WHATSAPP = "5562991134488";
 `;
 
