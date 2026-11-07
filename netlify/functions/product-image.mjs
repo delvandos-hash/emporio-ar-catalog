@@ -10,7 +10,7 @@ const MAX_BYTES = 8 * 1024 * 1024;
 export default async (req) => {
   const headers = {
     "X-Content-Type-Options": "nosniff",
-    "Cache-Control": "public, max-age=86400",
+    "Cache-Control": "no-store",
     "Cross-Origin-Resource-Policy": "same-origin",
   };
 
@@ -41,6 +41,10 @@ export default async (req) => {
 
     const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
     if (!ALLOWED_TYPES.has(contentType)) return new Response("Tipo de arquivo não permitido", { status: 415, headers });
+    const declaredSize = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredSize) && declaredSize > MAX_BYTES) {
+      return new Response("Imagem muito grande", { status: 413, headers });
+    }
 
     const bytes = await response.arrayBuffer();
     if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) {
@@ -49,7 +53,7 @@ export default async (req) => {
 
     return new Response(bytes, {
       status: 200,
-      headers: { ...headers, "Content-Type": contentType, "Content-Length": String(bytes.byteLength) },
+      headers: { ...headers, "Cache-Control": "public, max-age=86400", "Content-Type": contentType, "Content-Length": String(bytes.byteLength) },
     });
   } catch {
     return new Response("Imagem temporariamente indisponível", { status: 502, headers });
