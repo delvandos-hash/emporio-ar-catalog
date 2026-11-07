@@ -10,7 +10,7 @@ function safeBase(value) {
 }
 
 export function normalizePublicImagePath(value) {
-  if (typeof value !== "string" || !value.startsWith("/")) return "";
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "";
   let decoded;
   try { decoded = decodeURIComponent(value); } catch { return ""; }
   if (decoded.includes("%") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded) ||
