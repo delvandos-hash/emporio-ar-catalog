@@ -160,3 +160,11 @@ test("usa a primeira foto pública quando foto contém somente nome relativo inv
   assert.equal(item.foto, "/api/product-image?source=b&path=%2Fstores%2Fa%2Fproduto.webp");
   assert.deepEqual(item.fotos, [item.foto]);
 });
+
+test("não preserva nomes de origem em chaves de linha públicas", () => {
+  const result = toPublicCatalog({
+    "fornecedor-privado": [{ brand: "Marca", cat: "Categoria", items: [{ nome: "Produto", fonte: "fornecedor-privado" }] }]
+  });
+  assert.deepEqual(Object.keys(result), ["outros"]);
+  assert.equal(JSON.stringify(result).includes("fornecedor-privado"), false);
+});
