@@ -3,6 +3,12 @@
  * Estoque ao vivo Roupas — Sophia Moda e Franny (FacilZap)
  * id pode vir como "123" (Sophia) ou "franny-123" (Franny)
  */
+import { createHash } from "node:crypto";
+
+function makeStockRef(source, originId) {
+  return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
+}
+
 const SOURCES = {
   sophia: {
     // tenta domínio próprio e, se cair, FacilZap
@@ -112,14 +118,16 @@ export default async (req) => {
   try {
     const url = new URL(req.url);
     const rawId = url.searchParams.get("id");
-    if (!rawId) {
+    const stockRef = url.searchParams.get("ref") || "";
+    if (!rawId && !stockRef) {
       return new Response(JSON.stringify({ erro: "id obrigatório" }), {
         status: 400,
         headers,
       });
     }
 
-    const { source, id } = parseId(rawId);
+    const parsed = rawId ? parseId(rawId) : { source: "sophia", id: "" };
+    const { source, id } = parsed;
     if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
     if (!src || !id) {
@@ -152,13 +160,14 @@ export default async (req) => {
           const produtos = data.produtos || [];
           if (!produtos.length) break;
 
-          const found = produtos.find((p) => String(p.id) === String(id));
+          const found = produtos.find((p) => stockRef
+            ? makeStockRef(source === "franny" ? "roupas" : "roupas", source === "franny" ? `franny-${p.id}` : p.id) === stockRef
+            : String(p.id) === String(id));
           if (found) {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: String(found.id),
-                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
+                id: stockRef || String(found.id),
                 fonte: source,
                 nome: found.nome,
                 total_estoque: total,
@@ -184,13 +193,14 @@ export default async (req) => {
           if (!data) break;
           const produtos = data.produtos || [];
           if (!produtos.length) break;
-          const found = produtos.find((p) => String(p.id) === String(id));
+          const found = produtos.find((p) => stockRef
+            ? makeStockRef("roupas", source === "franny" ? `franny-${p.id}` : p.id) === stockRef
+            : String(p.id) === String(id));
           if (found) {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: String(found.id),
-                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
+                id: stockRef || String(found.id),
                 fonte: source,
                 nome: found.nome,
                 total_estoque: total,
