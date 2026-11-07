@@ -112,7 +112,7 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Cache-Control': 'public, max-age=60',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
   };
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers, body: '' };
