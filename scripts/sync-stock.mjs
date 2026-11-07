@@ -9,8 +9,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
-const IMARAT_API = 'https://imaratperfumaria.com/api/products';
-const BRAND_BASE = 'https://brandcollectionpy.com.br';
+const IMARAT_API = process.env.IMARAT_API_URL;
+const BRAND_BASE = process.env.BRAND_BASE_URL;
 const BRAND_SELLER = 'darlanaugusto';
 
 function norm(s) {
@@ -159,6 +159,8 @@ function resolve(item, brand, map, byName) {
 }
 
 async function main() {
+  const missingSources = ['IMARAT_API_URL','BRAND_BASE_URL'].filter((key) => !process.env[key]);
+  if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Buscando Imarat...');
   const imarat = await fetchImarat();
   console.log(`Imarat: ${imarat.fetched}/${imarat.total}`);
@@ -191,6 +193,8 @@ async function main() {
       }
     }
   }
+
+  for (const groups of Object.values(DATA)) for (const group of groups || []) for (const item of group.items || []) { delete item.original; delete item.custo; delete item.precoCusto; delete item.preco_custo; delete item.cost; delete item.costPrice; }
 
   const out = '/** Empório A.R — estoque sincronizado ' + new Date().toISOString() + ' (Imarat+Brand) */\n' + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
 
