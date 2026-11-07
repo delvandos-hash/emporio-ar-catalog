@@ -1426,8 +1426,6 @@ function buildDetailsNavList() {
         cat: g.cat || '',
         fonte: item.fonte || '',
         public_id: item.public_id || '',
-        public_id: item.public_id || '',
-        public_id: item.public_id || '',
                         variacoes: item.variacoes || [],
         total_estoque: item.total_estoque
       });
@@ -1851,8 +1849,6 @@ function buildFeaturedHtml() {
       cat: item.cat || '',
       fonte: item.fonte || '',
         public_id: item.public_id || '',
-        public_id: item.public_id || '',
-        public_id: item.public_id || '',
                   variacoes: item.variacoes || [],
       total_estoque: item.total_estoque
     }));
@@ -2154,8 +2150,6 @@ function render() {
           line: b.line || '',
           cat: cat || item.cat || '',
           fonte: item.fonte || '',
-        public_id: item.public_id || '',
-        public_id: item.public_id || '',
         public_id: item.public_id || '',
                               variacoes: item.variacoes || [],
           total_estoque: item.total_estoque
