@@ -148,7 +148,8 @@ export default async (req) => {
       let baseUsable = false;
 
       for (const catId of srcTry.categories) {
-        for (let page = 1; page <= 5; page++) {
+        const maxCategoryPages = source === "franny" ? 30 : 8;
+        for (let page = 1; page <= maxCategoryPages; page++) {
           let data;
           try {
             data = await fetchCategoryPage(srcTry, catId, page, cookie);
