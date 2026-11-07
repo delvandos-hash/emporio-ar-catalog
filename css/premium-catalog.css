@@ -2,6 +2,8 @@
    Camada exclusivamente visual: não altera dados, filtros, preços, estoque,
    calendário sazonal, carrinho, integrações ou regras de publicação. */
 
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
 :root {
   --premium-ivory: #fbf8f2;
   --premium-paper: #fffdf9;
@@ -12,12 +14,14 @@
   --premium-muted: #81796d;
   --premium-line: #e9e1d5;
   --premium-shadow: 0 12px 34px rgba(56, 43, 24, .075);
+  --premium-font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --premium-font-ui: "DM Sans", "Avenir Next", Avenir, "Segoe UI", sans-serif;
 }
 
 html { scroll-behavior: smooth; }
 body {
-  font-family: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
-  letter-spacing: .005em;
+  font-family: var(--premium-font-ui);
+  letter-spacing: 0;
 }
 body:not([class*="theme-"]) {
   background:
@@ -40,24 +44,30 @@ body:not([class*="theme-"]) header {
   box-shadow: 0 0 0 4px rgba(221, 198, 151, .10);
 }
 .brand h1 {
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: .13em;
-  font-size: 1.08rem;
+  font-family: var(--premium-font-display);
+  letter-spacing: .09em;
+  font-size: 1.55rem;
+  line-height: 1;
   font-weight: 600;
 }
 .brand span {
   display: inline-block;
-  margin-top: .18rem;
+  margin-top: .22rem;
   color: #dfcfad;
-  font-size: .68rem;
-  letter-spacing: .19em;
+  font-family: var(--premium-font-ui);
+  font-size: .66rem;
+  font-weight: 500;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
 .tabs { gap: .55rem; }
 .tab {
   border-radius: 999px;
   padding: .58rem .95rem;
-  letter-spacing: .025em;
+  font-family: var(--premium-font-ui);
+  font-size: .86rem;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 body:not([class*="theme-"]) .tab:not(.btn-wa) {
   border: 1px solid rgba(231, 215, 184, .35);
@@ -84,6 +94,8 @@ body:not([class*="theme-"]) .search input {
   background: rgba(255,253,249,.96) !important;
   color: var(--premium-ink) !important;
   box-shadow: 0 5px 18px rgba(56,43,24,.045);
+  font-family: var(--premium-font-ui);
+  font-size: .94rem;
 }
 body:not([class*="theme-"]) .search input::placeholder { color: #9a9184; }
 body:not([class*="theme-"]) .search input:focus {
@@ -95,12 +107,14 @@ body:not([class*="theme-"]) .search input:focus {
   border-radius: 999px;
   border-color: var(--premium-line);
   color: var(--premium-ink);
+  font-family: var(--premium-font-ui);
+  font-size: .88rem;
 }
 body:not([class*="theme-"]) .filter-select {
   background: var(--premium-paper);
   border-color: #e2d8c8;
 }
-.stats { letter-spacing: .025em; }
+.stats { letter-spacing: 0; font-family: var(--premium-font-ui); }
 .filters-bar {
   max-width: 1240px;
   margin-top: .55rem;
@@ -111,15 +125,18 @@ body:not([class*="theme-"]) .filters-bar {
 .nav-crumb { padding-left: .2rem; }
 .filter-row-label {
   color: var(--premium-muted);
-  font-size: .67rem;
+  font-family: var(--premium-font-ui);
+  font-size: .68rem;
   font-weight: 700;
-  letter-spacing: .14em;
+  letter-spacing: .11em;
   text-transform: uppercase;
 }
 .filters { gap: .48rem; }
 .fbtn {
   border-radius: 999px;
   padding: .52rem .95rem;
+  font-family: var(--premium-font-ui);
+  font-size: .86rem;
   font-weight: 600;
   transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
 }
@@ -148,6 +165,7 @@ body:not([class*="theme-"]) .fbtn.active {
   padding: 1rem;
   gap: .95rem;
   box-shadow: 0 4px 18px rgba(45,35,22,.045);
+  font-family: var(--premium-font-ui);
 }
 body:not([class*="theme-"]) .card {
   background: var(--premium-paper);
@@ -179,10 +197,11 @@ body:not([class*="theme-"]) .featured-strip {
   padding: 0 .15rem;
 }
 .featured-head h2 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.25rem;
+  font-family: var(--premium-font-display);
+  font-size: 1.8rem;
+  line-height: 1.05;
   font-weight: 600;
-  letter-spacing: .015em;
+  letter-spacing: .005em;
 }
 .featured-row {
   gap: .85rem;
@@ -195,6 +214,7 @@ body:not([class*="theme-"]) .featured-strip {
   padding: .65rem;
   border-radius: 17px;
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  font-family: var(--premium-font-ui);
 }
 body:not([class*="theme-"]) .feat-card {
   border: 1px solid #e9e0d2;
@@ -212,17 +232,23 @@ body:not([class*="theme-"]) .feat-card:hover {
   background: #f8f4ed;
 }
 .feat-card .feat-name {
-  font-size: .76rem;
-  line-height: 1.35;
-  font-weight: 650;
+  font-family: var(--premium-font-ui);
+  font-size: .78rem;
+  line-height: 1.4;
+  font-weight: 600;
 }
-.feat-card .feat-price { font-size: .84rem; }
+.feat-card .feat-price {
+  font-family: var(--premium-font-ui);
+  font-size: .86rem;
+  font-weight: 700;
+}
 body:not([class*="theme-"]) .feat-card .feat-name { color: #393126; }
 body:not([class*="theme-"]) .feat-card .feat-price { color: #80663b; }
 .modal {
   border-radius: 22px;
   border: 1px solid #e8decd;
   box-shadow: 0 28px 80px rgba(26,20,13,.28);
+  font-family: var(--premium-font-ui);
 }
 body:not([class*="theme-"]) .modal {
   background: #fffdf9;
@@ -233,6 +259,7 @@ body:not([class*="theme-"]) .modal-header {
 }
 footer {
   padding: 2.2rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px));
+  font-family: var(--premium-font-ui);
 }
 body:not([class*="theme-"]) footer {
   border-top: 1px solid #e9dfcf;
@@ -245,7 +272,9 @@ footer img {
 footer strong {
   display: inline-block;
   margin-top: .4rem;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--premium-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
   letter-spacing: .08em;
 }
 body:not([class*="theme-"]) footer strong { color: #5b4930; }
@@ -262,7 +291,7 @@ body:not([class*="theme-"]) footer strong { color: #5b4930; }
   }
   .brand { gap: .75rem; }
   .brand img { width: 48px; height: 48px; }
-  .brand h1 { font-size: .98rem; }
+  .brand h1 { font-size: 1.38rem; }
   .toolbar { margin-top: 1rem; padding-left: .85rem; padding-right: .85rem; }
   #catalog { padding-left: .85rem; padding-right: .85rem; }
   .featured-strip {
@@ -271,7 +300,7 @@ body:not([class*="theme-"]) footer strong { color: #5b4930; }
     padding: .9rem .8rem .75rem;
     border-radius: 18px;
   }
-  .featured-head h2 { font-size: 1.12rem; }
+  .featured-head h2 { font-size: 1.55rem; }
   .feat-card { flex-basis: 148px; }
   .feat-card img, .feat-ph { height: 122px; }
   .products { grid-template-columns: 1fr; gap: .75rem; }
