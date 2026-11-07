@@ -2969,6 +2969,90 @@ footer img{opacity:.85}
 @media(max-width:640px){.editorial-hero{margin:1rem .8rem 0;min-height:245px;padding:1.35rem;border-radius:17px}.editorial-hero-mark{width:112px;height:112px;position:absolute;right:14px;top:18px;opacity:.62}.editorial-hero-mark strong{font-size:2.1rem}.editorial-hero-mark span,.editorial-hero-mark i{font-size:.38rem}.editorial-hero-copy{max-width:82%}.editorial-hero h2{font-size:2.15rem}.editorial-hero-text{font-size:.78rem;max-width:270px}.editorial-cta{margin-top:1rem}.toolbar{padding:0 .8rem}.filters-bar{margin:.8rem;padding:.85rem}#catalog{padding:0 .8rem;margin-top:1rem}.featured-strip{padding:.9rem .7rem}.feat-card{min-width:132px}.card-actions{grid-template-columns:1fr!important}.btn-details{display:none!important}}
 @media(max-width:380px){.products{gap:.55rem!important}.info{padding:.68rem .6rem!important}.name{font-size:.76rem!important}.price-v,.price-a{font-size:.82rem!important}.btn-sm{font-size:.6rem!important}}
 
+
+  /* Refinamento do redesign — cards editoriais e modal de detalhes */
+  .featured-strip {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: .55rem 0 .75rem !important;
+  }
+  .featured-head { padding: 0 .15rem .35rem !important; }
+  .featured-head h2 {
+    color: #332725 !important;
+    font-size: 1.18rem !important;
+    letter-spacing: -.025em !important;
+  }
+  .featured-row { gap: .85rem !important; padding: .35rem .1rem .8rem !important; }
+  .feat-card {
+    flex: 0 0 154px !important;
+    min-width: 154px !important;
+    padding: .65rem !important;
+    text-align: left !important;
+    background: #fffdfa !important;
+    border: 1px solid #e8ddcf !important;
+    border-radius: 14px !important;
+    box-shadow: 0 5px 16px rgba(48,32,29,.055) !important;
+  }
+  .feat-card img {
+    width: 100% !important;
+    aspect-ratio: 1 / 1.08 !important;
+    object-fit: contain !important;
+    border-radius: 9px !important;
+    background: #f4efe7 !important;
+  }
+  .feat-card .feat-name {
+    text-align: left !important;
+    color: #332725 !important;
+    padding: .55rem .1rem .15rem !important;
+    font-size: .76rem !important;
+    font-weight: 600 !important;
+    min-height: 3.2em !important;
+    max-height: 3.2em !important;
+  }
+  .feat-card .feat-price {
+    text-align: left !important;
+    color: #92764e !important;
+    padding: .2rem .1rem .25rem !important;
+    font-size: .82rem !important;
+  }
+  /* Modal de detalhes: acabamento marfim/café, sem fundo azul */
+  #modal .modal {
+    background: #f7f2e9 !important;
+    color: #332725 !important;
+    border: 1px solid rgba(180,154,112,.5) !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+  }
+  #modal .modal-header {
+    background: linear-gradient(120deg,#211c1a 0%,#40302f 100%) !important;
+    border-bottom: 1px solid rgba(180,154,112,.28) !important;
+    align-items: center !important;
+    padding: 1rem 1.1rem !important;
+  }
+  #modal .modal-header h3 { color: #f5ead8 !important; }
+  #modal .modal-back,
+  #modal .modal-close {
+    background: rgba(255,250,242,.1) !important;
+    color: #f5ead8 !important;
+    border: 1px solid rgba(232,213,163,.28) !important;
+  }
+  #modal .modal-body { background: #f7f2e9 !important; color: #332725 !important; }
+  #modal .modal-meta { color: #75675d !important; }
+  #modal .modal-notas {
+    background: #eee5d8 !important;
+    border: 1px solid #e2d4c2 !important;
+    color: #493b35 !important;
+  }
+  #modal .price-label { color: #75675d !important; }
+  #modal .modal-prices .price-v,
+  #modal .modal-prices .price-a { color: #76515f !important; }
+  #modal .modal-photo {
+    background: #fffdfa !important;
+    border: 1px solid #e9dfd3 !important;
+  }
+
 </style>
 
 <link rel="manifest" href="manifest.webmanifest" />
