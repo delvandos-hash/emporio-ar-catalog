@@ -131,7 +131,7 @@ export default async (req) => {
     if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
     if (!src || (!id && !stockRef)) {
-      return new Response(JSON.stringify({ erro: "fonte/id inválidos", rawId }), {
+      return new Response(JSON.stringify({ erro: "fonte/id inválidos" }), {
         status: 400,
         headers,
       });
@@ -168,7 +168,7 @@ export default async (req) => {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: stockRef || String(found.id),
+                id: stockRef || null,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -218,7 +218,7 @@ export default async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ erro: "produto não encontrado", id }),
+      JSON.stringify({ erro: "produto não encontrado" }),
       { status: 404, headers }
     );
   } catch (error) {
