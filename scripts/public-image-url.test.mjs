@@ -11,6 +11,17 @@ test("preserva somente proxy válido e caminho permitido", () => {
   assert.equal(sanitizePublicImageUrl("/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fc.webp", options), "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fc.webp");
   assert.equal(sanitizePublicImageUrl("/api/product-image?source=p&path=%2Fetc%2Fpasswd", options), "");
 });
+
+test("migra rota legada do Preview #5 para alias privado da Imarat", () => {
+  assert.equal(
+    sanitizePublicImageUrl("/api/product-image?path=%2Fuploads%2Fproducts%2Fc.webp", options),
+    "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fc.webp"
+  );
+  assert.equal(
+    sanitizePublicImageUrl("/api/product-image?path=%2Fprivate%2Fsecret.webp", options),
+    ""
+  );
+});
 test("bloqueia traversal literal, codificado e duplamente codificado", () => {
   assert.equal(normalizeProductImagePath("/uploads/products/../private.txt"), "");
   assert.equal(normalizeProductImagePath("/uploads/products/%2e%2e/private.txt"), "");
