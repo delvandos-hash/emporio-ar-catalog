@@ -128,7 +128,7 @@ exports.handler = async (event) => {
       })),
     ]);
     const body = {
-      ok: true,
+      ok: !imarat.error && !brand.error,
       updatedAt: new Date().toISOString(),
       mapA: imarat.map || {},
       byNameA: imarat.byName || {},
