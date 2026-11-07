@@ -105,6 +105,7 @@ test("gera referência opaca para estoque ao vivo sem publicar IDs de origem", (
   const result = toPublicCatalog(source);
   const item = result.roupas[0].items[0];
   assert.match(item.stock_ref, /^s_[a-f0-9]{24}$/);
+  assert.equal(item.stock_route, "b");
   assert.equal(JSON.stringify(result).includes("franny-987654"), false);
   assert.equal(JSON.stringify(result).includes("987654"), false);
   assert.equal(JSON.stringify(result).includes("tamanho-privado"), false);
