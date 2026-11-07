@@ -40,17 +40,26 @@ test("limita corpo real e bloqueia redirecionamentos", async () => {
   const redirect = await runWith({ fetchImpl: async (_url, opts) => { mode = opts.redirect; throw new TypeError("redirect"); } });
   assert.equal(mode, "error"); assert.equal(redirect.status, 502);
 });
-test("entrega imagem pela origem configurada com cabeçalhos seguros", async () => {
+async function assertImageDelivery({ source, path, expectedOrigin }) {
   let requested;
-  const response = await runWith({ source: "a", path: "/products/a.webp", fetchImpl: async url => {
+  const response = await runWith({ source, path, fetchImpl: async url => {
     requested = String(url);
     return new Response(new Uint8Array([1,2,3]), { status: 200, headers: { "content-type": "image/webp; charset=binary" } });
   }});
   assert.equal(response.status, 200);
-  assert.equal(new URL(requested).origin, "https://primary.example");
+  assert.equal(new URL(requested).origin, expectedOrigin);
   assert.equal(response.headers.get("content-type"), "image/webp");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
   assert.equal(response.headers.get("cache-control"), "public, max-age=86400");
   assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1,2,3]);
+}
+test("entrega imagem pela origem primária Facilzap", async () => {
+  await assertImageDelivery({ source: "a", path: "/products/a.webp", expectedOrigin: "https://primary.example" });
+});
+test("entrega imagem pela origem secundária Nuvemshop", async () => {
+  await assertImageDelivery({ source: "b", path: "/stores/x/b.webp", expectedOrigin: "https://secondary.example" });
+});
+test("entrega imagem pela origem de produtos Imarat", async () => {
+  await assertImageDelivery({ source: "p", path: "/uploads/products/c.webp", expectedOrigin: "https://products.example" });
 });
