@@ -771,7 +771,7 @@ async function syncStockFromRoot() {
       }
     } catch (e) {}
 
-    const endpoints = []; // estoque via Gist/Action — sem functions Netlify (economiza crédito)
+    const endpoints = ['/api/stock-sync']; // consulta ao vivo das origens privadas via Netlify Function
     let data = null;
     for (const url of endpoints) {
       try {
