@@ -2660,33 +2660,33 @@ refreshCategoryFilterVisibility();
 ensureBrandCategoryFilters();
 updateShareLink();
 
-/** Temas comemorativos BR: ativo de 3 dias antes até 2 dias depois de cada data */
+/** Temas sazonais: regra alinhada ao catálogo Beauty — feriados no dia, campanhas em janela e Natal de 01/12 a 30/12 */
 const SEASONAL_THEMES = [
   // month: 1-12 · janela: 3 dias antes → 2 dias depois
-  { id: 'ano-novo', month: 1, day: 1, label: '✨ Feliz Ano Novo no Empório A.R!', emoji: '✨' },
+  { id: 'ano-novo', month: 1, day: 1, daysBefore: 0, daysAfter: 0, label: '✨ Feliz Ano Novo no Empório A.R!', emoji: '✨' },
   { id: 'carnaval', month: 2, day: 17, label: '🎭 Carnaval no Empório A.R — venha se fantasiar de perfume!', emoji: '🎭' },
   { id: 'mulheres', month: 3, day: 8, label: '💐 Dia Internacional da Mulher — Empório A.R', emoji: '💐' },
   { id: 'consumidor', month: 3, day: 15, label: '🛍️ Dia do Consumidor — condições especiais no Empório A.R', emoji: '🛍️' },
   { id: 'pascoa', month: 4, day: 5, label: '🐰 Feliz Páscoa no Empório A.R!', emoji: '🐰' },
-  { id: 'tiradentes', month: 4, day: 21, label: '🇧🇷 Tiradentes — Empório A.R', emoji: '🇧🇷' },
-  { id: 'trabalho', month: 5, day: 1, label: '⚒️ Dia do Trabalho — ofertas no Empório A.R', emoji: '⚒️' },
+  { id: 'tiradentes', month: 4, day: 21, daysBefore: 0, daysAfter: 0, label: '🇧🇷 Tiradentes — Empório A.R', emoji: '🇧🇷' },
+  { id: 'trabalho', month: 5, day: 1, daysBefore: 0, daysAfter: 0, label: '⚒️ Dia do Trabalho — ofertas no Empório A.R', emoji: '⚒️' },
   { id: 'maes', month: 5, day: 10, label: '💝 Dia das Mães — o presente perfeito no Empório A.R', emoji: '💝' },
   { id: 'namorados', month: 6, day: 12, label: '💕 Dia dos Namorados — Empório A.R', emoji: '💕' },
-  { id: 'sao-joao', month: 6, day: 24, label: '🌽 São João no Empório A.R!', emoji: '🌽' },
-  { id: 'amigos', month: 7, day: 20, label: '🤝 Dia do Amigo — Empório A.R', emoji: '🤝' },
+  { id: 'sao-joao', month: 6, day: 24, daysBefore: 0, daysAfter: 0, label: '🌽 São João no Empório A.R!', emoji: '🌽' },
+  { id: 'amigos', month: 7, day: 20, daysBefore: 0, daysAfter: 0, label: '🤝 Dia do Amigo — Empório A.R', emoji: '🤝' },
   { id: 'pais', month: 8, day: 9, label: '👔 Dia dos Pais — Empório A.R', emoji: '👔' },
-  { id: 'independencia', month: 9, day: 7, label: '🇧🇷 Independência do Brasil — Empório A.R', emoji: '🇧🇷' },
+  { id: 'independencia', month: 9, day: 7, daysBefore: 0, daysAfter: 0, label: '🇧🇷 Independência do Brasil — Empório A.R', emoji: '🇧🇷' },
   { id: 'cliente', month: 9, day: 15, label: '🌟 Dia do Cliente — obrigado por comprar no Empório A.R!', emoji: '🌟' },
   { id: 'criancas', month: 10, day: 12, label: '🎈 Dia das Crianças — Empório A.R', emoji: '🎈' },
-  { id: 'professores', month: 10, day: 15, label: '📚 Dia dos Professores — Empório A.R', emoji: '📚' },
+  { id: 'professores', month: 10, day: 15, daysBefore: 0, daysAfter: 0, label: '📚 Dia dos Professores — Empório A.R', emoji: '📚' },
   { id: 'halloween', month: 10, day: 31, daysBefore: 3, daysAfter: 1, label: '🎃 Halloween no Empório A.R — ofertas assustadoras!', emoji: '🎃' },
   { id: 'finados', month: 11, day: 2, daysBefore: 0, daysAfter: 0, label: '🕯️ Finados — Empório A.R', emoji: '🕯️' },
-  { id: 'republica', month: 11, day: 15, label: '🇧🇷 Proclamação da República — Empório A.R', emoji: '🇧🇷' },
-  { id: 'consciencia-negra', month: 11, day: 20, label: '✊ Consciência Negra — Empório A.R', emoji: '✊' },
+  { id: 'republica', month: 11, day: 15, daysBefore: 0, daysAfter: 0, label: '🇧🇷 Proclamação da República — Empório A.R', emoji: '🇧🇷' },
+  { id: 'consciencia-negra', month: 11, day: 20, daysBefore: 0, daysAfter: 0, label: '✊ Consciência Negra — Empório A.R', emoji: '✊' },
   { id: 'black-friday', month: 11, day: 27, label: '🖤 Black Friday no Empório A.R — não perca!', emoji: '🖤' },
   { id: 'cyber-monday', month: 11, day: 30, label: '💻 Cyber Monday no Empório A.R!', emoji: '💻' },
-  { id: 'natal', month: 12, day: 25, label: '🎄 Feliz Natal no Empório A.R!', emoji: '🎄' },
-  { id: 'vira-ano', month: 12, day: 31, label: '🥂 Réveillon no Empório A.R!', emoji: '🥂' },
+  { id: 'natal', month: 12, day: 25, daysBefore: 24, daysAfter: 5, label: '🎄 Feliz Natal no Empório A.R!', emoji: '🎄' },
+  { id: 'vira-ano', month: 12, day: 31, daysBefore: 0, daysAfter: 0, label: '🥂 Réveillon no Empório A.R!', emoji: '🥂' },
 ];
 
 function brazilTodayParts() {
