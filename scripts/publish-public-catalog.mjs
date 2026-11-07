@@ -45,6 +45,41 @@ export function buildPublicPayload(source, now = new Date().toISOString()) {
   };
 }
 
+export async function getCompleteGistFileContent(file, fetchImpl = fetch) {
+  if (!file || typeof file !== "object") {
+    throw new Error("Metadados do arquivo catalogo.json inválidos.");
+  }
+
+  let content = file.content;
+  if (file.truncated === true || typeof content !== "string") {
+    let rawUrl;
+    try {
+      rawUrl = new URL(file.raw_url);
+    } catch {
+      throw new Error("Arquivo truncado e endereço raw indisponível; publicação cancelada.");
+    }
+    if (rawUrl.protocol !== "https:" || rawUrl.hostname !== "gist.githubusercontent.com") {
+      throw new Error("Endereço raw do Gist não autorizado; publicação cancelada.");
+    }
+
+    const response = await fetchImpl(rawUrl, { method: "GET", redirect: "error" });
+    if (!response.ok) {
+      throw new Error(\`Não foi possível obter o arquivo integral do Gist (HTTP \${response.status}).\`);
+    }
+    content = await response.text();
+  }
+
+  if (typeof content !== "string" || !content.trim()) {
+    throw new Error("Conteúdo integral de catalogo.json indisponível; publicação cancelada.");
+  }
+  try {
+    JSON.parse(content.replace(/^\\uFEFF/, ""));
+  } catch {
+    throw new Error("O conteúdo integral de catalogo.json não é JSON válido; publicação cancelada.");
+  }
+  return content;
+}
+
 async function gistRequest(token, method = "GET", body) {
   const response = await fetch(`${API}/gists/${GIST_ID}`, {
     method,
@@ -86,20 +121,16 @@ async function main() {
   if (!before.files || !before.files[GIST_FILE]) {
     throw new Error(`Gist não contém o arquivo esperado ${GIST_FILE}; publicação cancelada.`);
   }
-  const currentRaw = before.files[GIST_FILE].content;
-  if (typeof currentRaw !== "string" || !currentRaw.trim()) {
-    throw new Error("Não foi possível ler o conteúdo atual de catalogo.json; publicação cancelada.");
-  }
-  // O arquivo-alvo precisa ser JSON válido antes de qualquer substituição.
-  JSON.parse(currentRaw.replace(/^\uFEFF/, ""));
+  // Arquivos grandes podem vir truncados pela API do Gist; nesse caso,
+  // recupera o conteúdo integral pelo raw_url oficial antes de validar.
+  await getCompleteGistFileContent(before.files[GIST_FILE]);
 
   await gistRequest(token, "PATCH", {
     files: { [GIST_FILE]: { content: "\uFEFF" + serialized } }
   });
 
   const after = await gistRequest(token);
-  const publishedRaw = after.files?.[GIST_FILE]?.content;
-  if (typeof publishedRaw !== "string") throw new Error("Não foi possível confirmar catalogo.json após publicação.");
+  const publishedRaw = await getCompleteGistFileContent(after.files?.[GIST_FILE]);
   const published = JSON.parse(publishedRaw.replace(/^\uFEFF/, ""));
   if (JSON.stringify(published) !== JSON.stringify(payload)) {
     throw new Error("A verificação posterior do Gist divergiu do conteúdo preparado.");
