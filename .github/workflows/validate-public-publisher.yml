@@ -23,3 +23,5 @@ jobs:
           node-version: '22'
       - name: Testar preparação isolada do catálogo público
         run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/publish-public-catalog.test.mjs
+      - name: Executar dry-run sem publicar no Gist
+        run: node scripts/publish-public-catalog.mjs
