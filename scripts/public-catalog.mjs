@@ -39,10 +39,17 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
           safeItem.fotos = safeItem.fotos.map(url => sanitizePublicImageUrl(url, imageOptions)).filter(Boolean);
         } else delete safeItem.fotos;
         if (safeItem.foto != null) {
-          const safePhoto = sanitizePublicImageUrl(safeItem.foto, imageOptions);
-          if (safePhoto) safeItem.foto = safePhoto;
-          else if (safeItem.fotos?.length) safeItem.foto = safeItem.fotos[0];
-          else delete safeItem.foto;
+          const rawPhoto = String(safeItem.foto).trim();
+          const isBareFilename = rawPhoto && !/^https:\/\//i.test(rawPhoto) &&
+            !rawPhoto.startsWith("/") && !rawPhoto.includes("://");
+          if (isBareFilename && safeItem.fotos?.length) {
+            safeItem.foto = safeItem.fotos[0];
+          } else {
+            const safePhoto = sanitizePublicImageUrl(rawPhoto, imageOptions);
+            if (safePhoto) safeItem.foto = safePhoto;
+            else if (safeItem.fotos?.length) safeItem.foto = safeItem.fotos[0];
+            else delete safeItem.foto;
+          }
         } else if (safeItem.fotos?.length) safeItem.foto = safeItem.fotos[0];
         if (Array.isArray(safeItem.variacoes)) {
           safeItem.variacoes = safeItem.variacoes.map((variation, index) => {
