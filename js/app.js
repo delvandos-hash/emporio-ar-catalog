@@ -1766,7 +1766,7 @@ function updateNavCrumb() {
   parts.push(`<button type="button" data-nav="home">Início</button>`);
   if (g && g !== 'Todos') {
     parts.push(`<span class="sep">›</span>`);
-    parts.push(`<button type="button" data-nav="session">${genderLabel(g)}</button>`);
+    parts.push(`<button type="button" data-nav="session">${escapeHtml(genderLabel(g))}</button>`);
   }
   if (c && c !== 'Todos') {
     parts.push(`<span class="sep">›</span>`);
