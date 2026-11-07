@@ -1,0 +1,25 @@
+name: Validar publicação pública isolada
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/publish-public-catalog.mjs'
+      - 'scripts/publish-public-catalog.test.mjs'
+      - 'scripts/public-catalog.mjs'
+      - 'scripts/public-image-url.mjs'
+      - 'js/data.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Testar preparação isolada do catálogo público
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/publish-public-catalog.test.mjs
