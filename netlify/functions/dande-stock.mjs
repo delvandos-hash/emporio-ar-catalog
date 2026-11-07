@@ -97,7 +97,7 @@ export default async (req) => {
   const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-    "Cache-Control": "public, max-age=20",
+    "Cache-Control": "no-store, no-cache, must-revalidate",
   };
 
   try {
