@@ -60,8 +60,8 @@ test("converte imagem da Imarat para rota same-origin e remove URL inválida", (
     }]
   });
   const item = result.perfumes[0].items[0];
-  assert.equal(item.foto, "/api/product-image?path=%2Fuploads%2Fproducts%2Fitem.webp");
-  assert.deepEqual(item.fotos, ["/api/product-image?path=%2Fuploads%2Fproducts%2Fitem-2.webp"]);
+  assert.equal(item.foto, "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fitem.webp");
+  assert.deepEqual(item.fotos, ["/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fitem-2.webp"]);
 });
 
 test("descarta imagem inválida sem remover o produto", () => {
