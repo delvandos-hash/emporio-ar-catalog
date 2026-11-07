@@ -697,21 +697,27 @@ function findCartCatalogPhoto(cartItem) {
   return '';
 }
 
-function findCartCatalogProductId(cartItem) {
+function findCartCatalogProduct(cartItem) {
   const wantedName = String(cartItem?.nome || '').trim().toLowerCase();
   const wantedBrand = String(cartItem?.brand || '').trim().toLowerCase();
   const wantedVolume = String(cartItem?.volume || '').trim().toLowerCase();
+  if (!wantedName || !wantedBrand) return null;
   for (const line of Object.keys(DATA || {})) {
     for (const group of DATA[line] || []) {
       for (const product of group.items || []) {
         if (String(product.nome || '').trim().toLowerCase() !== wantedName) continue;
         if (String(group.brand || '').trim().toLowerCase() !== wantedBrand) continue;
         if (String(product.volume || '').trim().toLowerCase() !== wantedVolume) continue;
-        return String(product.public_id || productId({ ...product, brand: group.brand, cat: group.cat, line }));
+        return { ...product, brand: group.brand, cat: group.cat, line };
       }
     }
   }
-  return '';
+  return null;
+}
+
+function findCartCatalogProductId(cartItem) {
+  const product = findCartCatalogProduct(cartItem);
+  return product ? String(product.public_id || productId(product)) : '';
 }
 
 function getCartProductUrl(cartItem) {
@@ -726,22 +732,32 @@ function loadCart() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
-    // localStorage pode ser editado pelo próprio navegador: aceitar apenas campos esperados.
+    // O armazenamento local guarda a seleção e a quantidade; os dados comerciais
+    // são sempre reconstruídos a partir da versão atual do catálogo.
     return raw.filter((item) => item && typeof item === 'object' && !Array.isArray(item))
-      .map((item) => ({
-        nome: String(item.nome || 'Produto').slice(0, 180),
-        brand: String(item.brand || '').slice(0, 120),
-        volume: String(item.volume || '').slice(0, 60),
-        foto: resolveCatalogImageUrl(item.foto) || findCartCatalogPhoto(item),
-        produtoId: String(item.produtoId || findCartCatalogProductId(item) || '').slice(0, 220),
-        variacaoEstoque: item.variacaoEstoque == null ? null : Math.max(0, Number(item.variacaoEstoque) || 0),
-        varejo: String(item.varejo ?? ''),
-        atacado: String(item.atacado ?? ''),
-        disponivel: item.disponivel === 'Não' ? 'Não' : 'Sim',
-        qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty) || 1))),
-        variacaoNome: String(item.variacaoNome || '').slice(0, 100),
-        cat: String(item.cat || '').slice(0, 100)
-      }));
+      .map((item) => {
+        const storedId = String(item.produtoId || '').slice(0, 220);
+        const catalogProduct = findProductById(storedId) || findCartCatalogProduct(item);
+        const variationName = String(item.variacaoNome || '').slice(0, 100);
+        const catalogVariation = variationName && Array.isArray(catalogProduct?.variacoes)
+          ? catalogProduct.variacoes.find(v => normStockKey(v.nome) === normStockKey(variationName))
+          : null;
+        const qty = Math.max(1, Math.min(999, Math.floor(Number(item.qty) || 1)));
+        return {
+          nome: String(catalogProduct?.nome || item.nome || 'Produto').slice(0, 180),
+          brand: String(catalogProduct?.brand || item.brand || '').slice(0, 120),
+          volume: String(catalogProduct?.volume || item.volume || '').slice(0, 60),
+          foto: resolveCatalogImageUrl(catalogProduct?.foto || (Array.isArray(catalogProduct?.fotos) ? catalogProduct.fotos[0] : '') || item.foto) || findCartCatalogPhoto(item),
+          produtoId: String(catalogProduct ? (catalogProduct.public_id || productId(catalogProduct)) : (storedId || findCartCatalogProductId(item))).slice(0, 220),
+          variacaoEstoque: catalogVariation ? Math.max(0, Number(catalogVariation.estoque) || 0) : (item.variacaoEstoque == null ? null : Math.max(0, Number(item.variacaoEstoque) || 0)),
+          varejo: String(catalogProduct?.varejo ?? item.varejo ?? ''),
+          atacado: String(catalogProduct?.atacado ?? item.atacado ?? ''),
+          disponivel: catalogProduct ? (catalogProduct.disponivel === 'Não' ? 'Não' : 'Sim') : (item.disponivel === 'Não' ? 'Não' : 'Sim'),
+          qty,
+          variacaoNome: variationName,
+          cat: String(catalogProduct?.cat || item.cat || '').slice(0, 100)
+        };
+      });
   } catch { return []; }
 }
 function persistCart() {
@@ -1345,6 +1361,7 @@ function openWhatsApp(p) {
 
 function addToCart(p, qty = 1) {
   if (!isAvailable(p)) { alert('Este produto está esgotado no momento.'); return false; }
+  const requestedQty = Math.max(1, Math.min(999, Math.floor(Number(qty) || 1)));
   let variacoes = [null];
   if (isVariacaoCatalogProduct(p)) {
     const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
@@ -1353,19 +1370,22 @@ function addToCart(p, qty = 1) {
       if (!variacoes.length) { alert('Selecione uma ou mais variações antes de adicionar ao carrinho.'); document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
       for (const v of variacoes) {
         const existing = cart.find(item => cartKey(item) === cartKey(p) && item.variacaoNome === v.nome);
-        if ((existing?.qty || 0) + qty > v.estoque) { alert(`Estoque insuficiente para ${v.nome}. Disponível: ${v.estoque}.`); return false; }
+        if ((existing?.qty || 0) + requestedQty > v.estoque) { alert(`Estoque insuficiente para ${v.nome}. Disponível: ${v.estoque}.`); return false; }
+        if ((existing?.qty || 0) + requestedQty > 999) { alert('O limite por item no carrinho é de 999 unidades.'); return false; }
       }
     }
   }
   for (const variacao of variacoes) {
     const key = cartKey(p) + (variacao ? '|' + variacao.nome : '');
     const existing = cart.find(item => (cartKey(item) + (item.variacaoNome ? '|' + item.variacaoNome : '')) === key);
-    if (existing) existing.qty += qty;
-    else cart.push({ nome:p.nome, brand:p.brand, volume:p.volume,
+    if (existing) {
+      if (existing.qty + requestedQty > 999) { alert('O limite por item no carrinho é de 999 unidades.'); return false; }
+      existing.qty += requestedQty;
+    } else cart.push({ nome:p.nome, brand:p.brand, volume:p.volume,
       foto:resolveCatalogImageUrl(p.foto || (Array.isArray(p.fotos) ? p.fotos[0] : '')),
-      produtoId:productId(p),
+      produtoId:String(p.public_id || productId(p)),
       varejo:p.varejo, atacado:p.atacado,
-      disponivel:p.disponivel || 'Sim', qty, variacaoNome:variacao ? variacao.nome : '',
+      disponivel:p.disponivel || 'Sim', qty:requestedQty, variacaoNome:variacao ? variacao.nome : '',
       variacaoEstoque:variacao ? variacao.estoque : null, cat:p.cat || '' });
   }
   const saved = updateCartUI();
@@ -1377,6 +1397,8 @@ function addToCart(p, qty = 1) {
 
 function setCartQty(index, qty) {
   const item = cart[index]; if (!item) return;
+  qty = Math.floor(Number(qty));
+  if (!Number.isFinite(qty) || qty > 999) { alert('O limite por item no carrinho é de 999 unidades.'); return; }
   if (qty < 1) cart.splice(index, 1);
   else {
     if (item.variacaoNome && Number.isFinite(Number(item.variacaoEstoque)) && qty > Number(item.variacaoEstoque)) { alert(`Estoque insuficiente para ${item.variacaoNome}. Disponível: ${item.variacaoEstoque}.`); return; }
