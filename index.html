@@ -2847,6 +2847,56 @@
     text-align: center;
     pointer-events: none;
   }
+  /* Resumo fixo do carrinho — somente em telas móveis */
+  .mobile-cart-bar {
+    display: none;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 450;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px));
+    background: #1f2937;
+    color: #fff;
+    box-shadow: 0 -3px 16px rgba(0,0,0,.18);
+  }
+  .mobile-cart-bar.show { display: flex; }
+  .mobile-cart-bar .bar-info {
+    min-width: 0;
+    font-size: .88rem;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .mobile-cart-bar .bar-total {
+    display: block;
+    margin-top: .08rem;
+    color: #f3dfb0;
+    font-size: .96rem;
+    font-weight: 800;
+  }
+  .mobile-cart-bar .bar-btn {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 9px;
+    padding: .7rem 1rem;
+    background: var(--wa);
+    color: #fff;
+    font: inherit;
+    font-size: .84rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  body.has-mobile-cart { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  body.has-mobile-cart .btn-top { bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+  @media (min-width: 768px) {
+    .mobile-cart-bar { display: none !important; }
+    body.has-mobile-cart { padding-bottom: 0 !important; }
+    body.has-mobile-cart .btn-top { bottom: 5.5rem; }
+  }
+
 </style>
 
 <link rel="manifest" href="manifest.webmanifest" />
@@ -3017,6 +3067,14 @@
 <button id="cartFab" class="cart-fab" title="Ver pedido" style="display:none">
   🛒 <span id="cartCount">0</span>
 </button>
+
+<div id="mobileCartBar" class="mobile-cart-bar" role="region" aria-label="Resumo do carrinho" aria-live="polite">
+  <div class="bar-info">
+    <span><span id="mobileCartCount">0</span> itens no carrinho</span>
+    <span class="bar-total">R$ <span id="mobileCartTotal">0,00</span></span>
+  </div>
+  <button type="button" class="bar-btn" id="mobileCartOpen">Ver carrinho</button>
+</div>
 
 <div class="modal-overlay" id="favoritesModal" role="dialog" aria-modal="true" aria-labelledby="favoritesTitle">
   <div class="modal favorites-modal">
