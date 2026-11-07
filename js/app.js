@@ -823,6 +823,46 @@ function withLiveStock(item, brand, cat, line) {
   return { ...item, brand, disponivel: live };
 }
 
+async function fetchFreshStockSnapshot() {
+  const response = await fetch('/api/stock-sync?fresh=' + Date.now(), { cache: 'no-store' });
+  if (!response.ok) throw new Error('Não foi possível consultar o estoque atualizado.');
+  const data = await response.json();
+  if (!data || !data.ok || !data.updatedAt || !data.map || !data.brandMap) throw new Error('A origem não confirmou o estoque dos produtos.');
+  stockLiveMap = data;
+  try { localStorage.setItem(STOCK_CACHE_KEY, JSON.stringify({ map: data.map || {}, byName: data.byName || {}, brandMap: data.brandMap || {}, brandByName: data.brandByName || {}, updatedAt: data.updatedAt })); } catch (e) {}
+  return data;
+}
+
+async function fetchFreshVariationStock(product) {
+  if (!product || !product.stock_ref || !isVariacaoCatalogProduct(product)) throw new Error('Não foi possível identificar a origem do estoque deste produto.');
+  const endpoint = isRoupasProduct(product) ? '/api/roupas-stock?ref=' + encodeURIComponent(product.stock_ref) + '&source=' + encodeURIComponent(product.stock_route || 'a') : '/api/dande-stock?ref=' + encodeURIComponent(product.stock_ref) + '&category=' + encodeURIComponent(product.cat || '');
+  const response = await fetch(endpoint + '&fresh=' + Date.now(), { cache: 'no-store' });
+  if (!response.ok) throw new Error('Não foi possível confirmar as variações de ' + (product.nome || 'um produto') + '.');
+  const data = await response.json();
+  if (!Array.isArray(data && data.variacoes)) throw new Error('A resposta de estoque das variações é inválida.');
+  return data.variacoes.map(v => ({ id: String(v.id || ''), nome: String(v.nome || '—'), estoque: Math.max(0, Math.floor(Number(v.estoque) || 0)) }));
+}
+
+async function validateOrderStock(items) {
+  const regular = items.filter(item => !isScoopProduct(item) && !isVariacaoCatalogProduct(item));
+  const variations = items.filter(item => !isScoopProduct(item) && isVariacaoCatalogProduct(item));
+  if (regular.length) await fetchFreshStockSnapshot();
+  for (const item of regular) {
+    const status = lookupLiveStock(item, item.brand, item.cat, item.line);
+    if (status !== 'Sim') throw new Error(status === 'Não' ? '“' + item.nome + '” está esgotado no momento. Remova o item ou tente novamente mais tarde.' : 'Não foi possível confirmar o estoque de “' + item.nome + '”. O pedido não foi enviado.');
+    item.disponivel = 'Sim';
+  }
+  for (const item of variations) {
+    const current = await fetchFreshVariationStock(item);
+    if (item.variacaoNome) {
+      const found = current.find(v => normStockKey(v.nome) === normStockKey(item.variacaoNome));
+      if (!found || found.estoque < Number(item.qty || 1)) throw new Error(found ? 'Estoque insuficiente para “' + item.nome + '” — variação ' + item.variacaoNome + '. Disponível agora: ' + found.estoque + '.' : 'A variação ' + item.variacaoNome + ' de “' + item.nome + '” não foi localizada na consulta atual. O pedido não foi enviado.');
+      item.variacaoEstoque = found.estoque;
+    } else if (!current.some(v => v.estoque > 0)) throw new Error('“' + item.nome + '” está sem variações disponíveis no momento.');
+  }
+  return { ok: true };
+}
+
 async function syncStockFromRoot() {
   try {
     try {
@@ -1191,17 +1231,25 @@ async function confirmBuyMeta() {
     }
     const { cep, cidade, uf } = cepResult;
     const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
-    if (Array.isArray(p.variacoesSelecionadas) && p.variacoesSelecionadas.some(v => qty > Number(v.estoque || 0))) {
-      waWindow.close();
-      alert('A quantidade solicitada ultrapassa o estoque de uma ou mais variações selecionadas.');
-      return;
+    const orderProduct = { ...p, qty };
+    if (Array.isArray(p.variacoesSelecionadas) && p.variacoesSelecionadas.length) {
+      const freshVariations = await fetchFreshVariationStock(p);
+      const refreshed = p.variacoesSelecionadas.map(selected => {
+        const found = freshVariations.find(v => normStockKey(v.nome) === normStockKey(selected.nome));
+        if (!found || found.estoque < qty) throw new Error(found ? 'Estoque insuficiente para a variação ' + selected.nome + '. Disponível agora: ' + found.estoque + '.' : 'A variação ' + selected.nome + ' não foi localizada na consulta atual.');
+        return found;
+      });
+      orderProduct.variacoesSelecionadas = refreshed;
+      orderProduct.variacaoSelecionada = refreshed[0] || null;
+    } else if (!isScoopProduct(p)) {
+      await validateOrderStock([orderProduct]);
     }
     saveCustomerMeta({ nome, cep, cidade, uf });
     const cn = document.getElementById('cartClientName');
     const cc = document.getElementById('cartObs');
     if (cn && nome) cn.value = nome;
     if (cc && cep) cc.value = cep;
-    waWindow.location.href = `https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, cidade, uf, qty })}`;
+    waWindow.location.href = `https://wa.me/${WHATSAPP}?text=${buildWaMessage(orderProduct, { nome, cep, cidade, uf, qty })}`;
     closeBuyMetaModal();
   } catch (error) {
     try { waWindow?.close(); } catch (closeError) {}
@@ -3005,6 +3053,17 @@ document.getElementById('cartCheckout').addEventListener('click', async () => {
       alert(cepResult.reason || 'Não foi possível validar o CEP.');
       return;
     }
+    const orderItems = cart.map(item => {
+      const catalogProduct = findProductById(item.produtoId);
+      if (!catalogProduct) throw new Error('Não foi possível localizar “' + item.nome + '” no catálogo para conferir o estoque. O pedido não foi enviado.');
+      return { ...catalogProduct, ...item, line: catalogProduct.line, fonte: catalogProduct.fonte, stock_ref: catalogProduct.stock_ref, stock_route: catalogProduct.stock_route };
+    });
+    await validateOrderStock(orderItems);
+    orderItems.forEach((updated, index) => {
+      if (updated.variacaoEstoque != null) cart[index].variacaoEstoque = updated.variacaoEstoque;
+      cart[index].disponivel = updated.disponivel || 'Sim';
+    });
+    updateCartUI();
     saveCustomerMeta({
       nome: document.getElementById('cartClientName')?.value?.trim() || '',
       cep: cepResult.cep,
@@ -3014,8 +3073,8 @@ document.getElementById('cartCheckout').addEventListener('click', async () => {
     waWindow.location.href = `https://wa.me/${WHATSAPP}?text=${buildCartWaMessage()}`;
   } catch (error) {
     waWindow.close();
-    console.warn('Não foi possível preparar o pedido no WhatsApp.', error);
-    alert('Não foi possível preparar seu pedido agora. Tente novamente.');
+    console.warn('Não foi possível validar/preparar o pedido no WhatsApp.', error);
+    alert(error?.message || 'Não foi possível confirmar o estoque. O pedido não foi enviado. Tente novamente.');
   } finally {
     button.disabled = false;
     button.textContent = previousLabel;
