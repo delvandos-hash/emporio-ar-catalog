@@ -74,3 +74,18 @@ test("filtro global não depende de filtros de origem e devolve lista vazia sem 
   ];
   assert.deepEqual(filterFavoriteGroups(groups, () => false), []);
 });
+
+
+test("lista plana de favoritos reúne origens e remove duplicatas sem perder metadados", async () => {
+  const { collectFavoriteProducts } = await import("../js/favorites.js");
+  const groups = [
+    { line: "feminino", cat: "Perfumes", brand: "Marca A", items: [{ nome: "Perfume A", volume: "100ml", public_id: "a" }, { nome: "Outro", volume: "50ml" }] },
+    { line: "masculino", cat: "Perfumes", brand: "Marca B", items: [{ nome: "Perfume B", volume: "100ml", public_id: "b" }] },
+    { line: "unissex", cat: "Novidades", brand: "Marca A", items: [{ nome: "Perfume A", volume: "100ml", public_id: "a" }] }
+  ];
+  const result = collectFavoriteProducts(groups, (item) => item.public_id === "a" || item.public_id === "b");
+  assert.deepEqual(result.map((p) => [p.nome, p.brand, p.line]), [
+    ["Perfume A", "Marca A", "feminino"],
+    ["Perfume B", "Marca B", "masculino"]
+  ]);
+});
