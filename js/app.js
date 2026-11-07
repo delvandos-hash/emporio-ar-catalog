@@ -839,9 +839,9 @@ function ensureBrandCategoryFilters() {
 
 
 
-function allGroups() {
+function allGroups(forceAll = false) {
   const genderOrder = ['feminino', 'masculino', 'unissex', 'roupas', 'acessorios'];
-  const gSel = state.favoritesOnly ? 'Todos' : String(state.gender || 'Todos');
+  const gSel = (forceAll || state.favoritesOnly) ? 'Todos' : String(state.gender || 'Todos');
   // Sessão Brand: coleta Brand de masculino/feminino/unissex e usa a coleção (brand) como categoria
   if (gSel.toLowerCase() === 'brand') {
     const result = [];
@@ -2026,7 +2026,7 @@ function toggleFav(p) {
 /** Resolve favoritos no catálogo completo, independentemente da sessão ativa. */
 function getFavoriteProducts() {
   const favoriteIds = new Set(loadFavs());
-  const groups = allGroups();
+  const groups = allGroups(true);
   return collectFavoriteProducts(groups, (item, group) =>
     isFav({ ...item, brand: group.brand, cat: group.cat }, favoriteIds)
   ).map((product) => validateProductPrices(product));
