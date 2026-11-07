@@ -30,7 +30,7 @@ function findProductUrl(html, id) {
   const namePos = html.indexOf(`data-store="product-item-name-${id}"`);
   if (namePos < 0) return "";
   const window = html.slice(Math.max(0, namePos - 3000), namePos + 400);
-  const match = window.match(/href="((?:https:\\/\\/dandejoias\\.com)?\\/produtos\\/[^"]+)"/i);
+  const match = window.match(/href="((?:https:\/\/dandejoias\.com)?\/produtos\/[^"]+)"/i);
   if (!match) return "";
   return match[1].startsWith("/") ? new URL(match[1], DANDE_BASE).toString() : match[1];
 }
@@ -116,9 +116,10 @@ export default async (req) => {
     let resolvedId = id || "";
     if (stockRef && !productUrl) {
       const wantedCategory = normCategory(category);
-      const categories = wantedCategory
+      const filteredCategories = wantedCategory
         ? DANDE_CATEGORIES.filter((item) => normCategory(item.nome) === wantedCategory)
         : DANDE_CATEGORIES;
+      const categories = filteredCategories.length ? filteredCategories : DANDE_CATEGORIES;
       for (const cat of categories) {
         for (let page = 1; page <= 15; page++) {
           const pageUrl = page === 1
