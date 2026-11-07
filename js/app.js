@@ -730,10 +730,10 @@ function normStockKey(s) {
     .replace(/\s+/g, ' ');
 }
 
-function lookupLiveStock(item, brand, cat) {
+function lookupLiveStock(item, brand, cat, line) {
   if (!stockLiveMap) return null;
   const n = normStockKey(item.nome);
-  const isBrand = cat === 'Brand' || String(cat || '').startsWith('Brand') || String(brand || '').toUpperCase().includes('BRAND') || String(brand || '').toUpperCase().includes('ARABIC') || String(brand || '').toUpperCase().includes('DREAM') || String(brand || '').toUpperCase().includes('FLACONETE') || String(brand || '').toUpperCase().includes('SAPATINHO') || String(brand || '').toUpperCase().includes('BODY') || String(brand || '').toUpperCase().includes('BEAUTY') || String(brand || '').toUpperCase().includes('COLE');
+  const isBrand = line === 'brand' || cat === 'Brand' || String(cat || '').startsWith('Brand') || String(brand || '').toUpperCase().includes('BRAND') || String(brand || '').toUpperCase().includes('ARABIC') || String(brand || '').toUpperCase().includes('DREAM') || String(brand || '').toUpperCase().includes('FLACONETE') || String(brand || '').toUpperCase().includes('SAPATINHO') || String(brand || '').toUpperCase().includes('BODY') || String(brand || '').toUpperCase().includes('BEAUTY') || String(brand || '').toUpperCase().includes('COLE');
   const map = isBrand ? (stockLiveMap.brandMap || {}) : (stockLiveMap.map || {});
   const byName = isBrand ? (stockLiveMap.brandByName || {}) : (stockLiveMap.byName || {});
   const b = normStockKey(brand);
@@ -752,8 +752,8 @@ function lookupLiveStock(item, brand, cat) {
   return null;
 }
 
-function withLiveStock(item, brand, cat) {
-  const live = lookupLiveStock(item, brand, cat);
+function withLiveStock(item, brand, cat, line) {
+  const live = lookupLiveStock(item, brand, cat, line);
   if (!live) return { ...item, brand };
   return { ...item, brand, disponivel: live };
 }
@@ -855,7 +855,7 @@ function allGroups(forceAll = false) {
           ...g,
           line: 'brand',
           cat: g.brand || 'Brand', // subcategoria = nome da coleção
-          items: g.items.map(it => applyOverride(it, g.brand, overrides))
+          items: g.items.map(it => withLiveStock(applyOverride(it, g.brand, overrides), g.brand, g.cat || '', line))
         });
       }
     }
@@ -868,7 +868,7 @@ function allGroups(forceAll = false) {
       result.push({
         ...g,
         line,
-        items: g.items.map(it => applyOverride(it, g.brand, overrides))
+        items: g.items.map(it => withLiveStock(applyOverride(it, g.brand, overrides), g.brand, g.cat || '', line))
       });
     }
   }
