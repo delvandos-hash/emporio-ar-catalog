@@ -881,35 +881,29 @@ function cartKey(p) {
 
 function buildWaMessage(p, meta = {}) {
   const qty = Math.max(1, Math.min(99, parseInt(meta.qty, 10) || 1));
-  const isScoop = isScoopProduct(p);
-  const useAtacado = !isScoop && qty >= 6 && p.atacado && p.atacado !== '—';
-  const unitStr = useAtacado ? p.atacado : p.varejo;
-  const unit = parsePrice(unitStr);
-  const sub = unit * qty;
+  const isScoop = isScoopProduct(p), selected = Array.isArray(p.variacoesSelecionadas) ? p.variacoesSelecionadas : [];
   let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
   if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
   if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   if (meta.nome || meta.cep) msg += '\n';
-  msg += `*${p.nome}*\n`;
-  msg += `Marca: ${p.brand || 'Empório A.R'}\n`;
-  if (p.volume && p.volume !== '—' && !isVariacaoCatalogProduct(p)) msg += `Volume: ${p.volume}\n`;
-  const variacao = p.variacaoSelecionada || getSelectedVariacao();
-  if (variacao && variacao.nome) {
-    msg += `Variação / Tamanho: *${variacao.nome}*\n`;
-  }
+  msg += `*${p.nome}*\nMarca: ${p.brand || 'Empório A.R'}\n`;
   if (p.cat && isVariacaoCatalogProduct(p)) msg += `Categoria: ${p.cat}\n`;
-  msg += `Qtd: *${qty}*\n`;
-  if (isScoop) {
-    msg += `Preço fixo unit.: *R$ ${p.varejo}*\n`;
-  } else if (useAtacado) {
-    msg += `Tabela: *ATACADO (6+)*\n`;
-    msg += `Preço unit.: *R$ ${p.atacado}*\n`;
-  } else {
-    msg += `Tabela: *VAREJO*\n`;
-    msg += `Preço unit.: *R$ ${p.varejo}*\n`;
+  if (selected.length) {
+    const totalQty = qty * selected.length, wholesale = !isScoop && totalQty >= 6 && p.atacado && p.atacado !== '—';
+    const unit = parsePrice(wholesale ? p.atacado : p.varejo); let total = 0;
+    msg += 'Variações / tamanhos:\n';
+    selected.forEach(v => { const sub = unit * qty; total += sub; msg += `• *${v.nome}* — Qtd: *${qty}* × R$ ${formatBRL(unit)} = *R$ ${formatBRL(sub)}*\n`; });
+    msg += `Tabela: *${wholesale ? 'ATACADO (6+)' : 'VAREJO'}*\nTotal de unidades: *${totalQty}*\nTotal: *R$ ${formatBRL(total)}*\n`;
+    if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
+    msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
+    return encodeURIComponent(msg);
   }
-  if (unit > 0) msg += `Subtotal: *R$ ${formatBRL(sub)}*\n`;
+  const wholesale = !isScoop && qty >= 6 && p.atacado && p.atacado !== '—', unit = parsePrice(wholesale ? p.atacado : p.varejo), sub = unit * qty;
+  if (p.volume && p.volume !== '—' && !isVariacaoCatalogProduct(p)) msg += `Volume: ${p.volume}\n`;
+  const v = p.variacaoSelecionada || getSelectedVariacao();
+  if (v?.nome) msg += `Variação / Tamanho: *${v.nome}*\n`;
+  msg += `Qtd: *${qty}*\nTabela: *${wholesale ? 'ATACADO (6+)' : 'VAREJO'}*\nPreço unit.: *R$ ${formatBRL(unit)}*\nSubtotal: *R$ ${formatBRL(sub)}*\n`;
   if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
@@ -1075,6 +1069,7 @@ async function confirmBuyMeta() {
   }
   const { cep, cidade, uf } = cepResult;
   const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
+  if (Array.isArray(p.variacoesSelecionadas) && p.variacoesSelecionadas.some(v => qty > Number(v.estoque || 0))) { alert('A quantidade solicitada ultrapassa o estoque de uma ou mais variações selecionadas.'); return; }
   try {
     localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep, cidade, uf }));
     const cn = document.getElementById('cartClientName');
@@ -1149,67 +1144,51 @@ function buildCartWaMessage() {
 }
 
 function openWhatsApp(p) {
-  if (!isAvailable(p)) {
-    alert('Este produto está esgotado no momento.');
-    return;
-  }
+  if (!isAvailable(p)) { alert('Este produto está esgotado no momento.'); return; }
   if (isVariacaoCatalogProduct(p)) {
     const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
-    const hasAvailable = vars.some(v => (Number(v.estoque) || 0) > 0);
-    if (vars.length && hasAvailable) {
-      const sel = p.variacaoSelecionada || getSelectedVariacao();
-      if (!sel || !sel.nome) {
-        alert('Selecione o tamanho / variação antes de comprar.');
-        document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
-      p.variacaoSelecionada = sel;
+    if (vars.some(v => (Number(v.estoque) || 0) > 0)) {
+      const selected = getSelectedVariacoes();
+      if (!selected.length) { alert('Selecione uma ou mais variações antes de comprar.'); document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      p.variacoesSelecionadas = selected; p.variacaoSelecionada = selected[0];
     }
   }
-  // pede nome + CEP antes de abrir o WhatsApp (igual espírito do carrinho)
   openBuyMetaModal(p);
 }
 
 function addToCart(p, qty = 1) {
-  if (!isAvailable(p)) {
-    alert('Este produto está esgotado no momento.');
-    return;
-  }
-  let variacao = null;
+  if (!isAvailable(p)) { alert('Este produto está esgotado no momento.'); return; }
+  let variacoes = [null];
   if (isVariacaoCatalogProduct(p)) {
     const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
-    const hasAvailable = vars.some(v => (Number(v.estoque) || 0) > 0);
-    if (vars.length && hasAvailable) {
-      variacao = p.variacaoSelecionada || getSelectedVariacao();
-      if (!variacao || !variacao.nome) {
-        alert('Selecione o tamanho / variação antes de adicionar ao carrinho.');
-        document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
+    if (vars.some(v => (Number(v.estoque) || 0) > 0)) {
+      variacoes = getSelectedVariacoes();
+      if (!variacoes.length) { alert('Selecione uma ou mais variações antes de adicionar ao carrinho.'); document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      for (const v of variacoes) {
+        const existing = cart.find(item => cartKey(item) === cartKey(p) && item.variacaoNome === v.nome);
+        if ((existing?.qty || 0) + qty > v.estoque) { alert(`Estoque insuficiente para ${v.nome}. Disponível: ${v.estoque}.`); return; }
       }
-      p.variacaoSelecionada = variacao;
     }
   }
-  const key = cartKey(p) + (variacao ? '|' + variacao.nome : '');
-  const existing = cart.find(c => (cartKey(c) + (c.variacaoNome ? '|' + c.variacaoNome : '')) === key);
-  if (existing) existing.qty += qty;
-  else cart.push({
-    nome: p.nome,
-    brand: p.brand,
-    volume: p.volume,
-    varejo: p.varejo,
-    atacado: p.atacado,
-    disponivel: p.disponivel || 'Sim',
-    qty,
-    variacaoNome: variacao ? variacao.nome : '',
-    cat: p.cat || ''
-  });
+  for (const variacao of variacoes) {
+    const key = cartKey(p) + (variacao ? '|' + variacao.nome : '');
+    const existing = cart.find(item => (cartKey(item) + (item.variacaoNome ? '|' + item.variacaoNome : '')) === key);
+    if (existing) existing.qty += qty;
+    else cart.push({ nome:p.nome, brand:p.brand, volume:p.volume, varejo:p.varejo, atacado:p.atacado,
+      disponivel:p.disponivel || 'Sim', qty, variacaoNome:variacao ? variacao.nome : '',
+      variacaoEstoque:variacao ? variacao.estoque : null, cat:p.cat || '' });
+  }
   updateCartUI();
-  showCartToast(qty > 1 ? `Adicionado (${qty}) ao carrinho` : 'Adicionado ao carrinho');
+  showCartToast(variacoes.length > 1 ? `${variacoes.length} variações adicionadas ao carrinho` : 'Adicionado ao carrinho');
 }
 
 function setCartQty(index, qty) {
+  const item = cart[index]; if (!item) return;
   if (qty < 1) cart.splice(index, 1);
-  else cart[index].qty = qty;
+  else {
+    if (item.variacaoNome && Number.isFinite(Number(item.variacaoEstoque)) && qty > Number(item.variacaoEstoque)) { alert(`Estoque insuficiente para ${item.variacaoNome}. Disponível: ${item.variacaoEstoque}.`); return; }
+    item.qty = qty;
+  }
   updateCartUI();
   if (document.getElementById('cartModal').classList.contains('open')) renderCart();
 }
@@ -1577,62 +1556,39 @@ function bindPhotoGallery(photoEl, fotos) {
   }, { passive: true });
 }
 
-function buildVariacoesHtml(p, selectedId) {
+function buildVariacoesHtml(p, selectedIds) {
   const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
   if (!vars.length) return '';
+  const selected = new Set(Array.isArray(selectedIds) ? selectedIds.map(String) : selectedIds != null ? [String(selectedIds)] : []);
   const chips = vars.map(v => {
-    const qty = Number(v.estoque) || 0;
-    const ok = qty > 0;
-    const id = String(v.id || v.nome || '');
-    const sel = selectedId != null && String(selectedId) === id ? ' selected' : '';
-    const disabled = ok ? '' : ' disabled';
-    const label = escapeHtml(v.nome || '—');
-    const stock = ok ? `${qty} un.` : 'Esgotado';
-    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}>
-      <span class="var-chip-name">${label}</span>
-      <span class="var-chip-stock">${stock}</span>
-    </button>`;
+    const qty = Number(v.estoque) || 0, ok = qty > 0, id = String(v.id || v.nome || '');
+    const sel = selected.has(id) ? ' selected' : '', disabled = ok ? '' : ' disabled';
+    const label = escapeHtml(v.nome || '—'), stock = ok ? `${qty} un.` : 'Esgotado';
+    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}><span class="var-chip-name">${label}</span><span class="var-chip-stock">${stock}</span></button>`;
   }).join('');
-  return `<div class="variacoes-box" id="variacoesBox">
-    <strong>Escolha o tamanho / variação</strong>
-    <div class="var-chips">${chips}</div>
-    <p class="var-hint" id="varHint">Selecione uma opção disponível para comprar</p>
-  </div>`;
+  return `<div class="variacoes-box" id="variacoesBox"><strong>Escolha uma ou mais variações</strong><div class="var-chips">${chips}</div><p class="var-hint" id="varHint">Selecione todas as opções que deseja comprar</p></div>`;
 }
 
-function getSelectedVariacao() {
+function getSelectedVariacoes() {
   const box = document.getElementById('variacoesBox');
-  if (!box) return null;
-  const sel = box.querySelector('.var-chip.selected');
-  if (!sel) return null;
-  return {
-    id: sel.getAttribute('data-var-id') || '',
-    nome: sel.getAttribute('data-var-nome') || '',
+  if (!box) return [];
+  return [...box.querySelectorAll('.var-chip.selected')].map(sel => ({
+    id: sel.getAttribute('data-var-id') || '', nome: sel.getAttribute('data-var-nome') || '',
     estoque: Number(sel.getAttribute('data-var-estoque') || 0)
-  };
+  }));
 }
+function getSelectedVariacao() { return getSelectedVariacoes()[0] || null; }
 
 function bindVariacaoSelector() {
   const box = document.getElementById('variacoesBox');
   if (!box) return;
-  box.querySelectorAll('.var-chip:not([disabled])').forEach(btn => {
-    btn.addEventListener('click', () => {
-      box.querySelectorAll('.var-chip').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      const hint = document.getElementById('varHint');
-      if (hint) {
-        hint.textContent = 'Selecionado: ' + (btn.getAttribute('data-var-nome') || '');
-        hint.classList.add('ok');
-      }
-      if (currentProduct) {
-        currentProduct.variacaoSelecionada = {
-          id: btn.getAttribute('data-var-id') || '',
-          nome: btn.getAttribute('data-var-nome') || '',
-          estoque: Number(btn.getAttribute('data-var-estoque') || 0)
-        };
-      }
-    });
-  });
+  box.querySelectorAll('.var-chip:not([disabled])').forEach(btn => btn.addEventListener('click', () => {
+    btn.classList.toggle('selected');
+    const selected = getSelectedVariacoes();
+    if (currentProduct) { currentProduct.variacoesSelecionadas = selected; currentProduct.variacaoSelecionada = selected[0] || null; }
+    const hint = document.getElementById('varHint');
+    if (hint) { hint.textContent = selected.length ? `${selected.length} variação(ões) selecionada(s)` : 'Selecione todas as opções que deseja comprar'; hint.classList.toggle('ok', selected.length > 0); }
+  }));
 }
 
 let detailsScrollY = 0;
@@ -1664,17 +1620,10 @@ async function refreshVariationStock(p) {
     const total = Number.isFinite(Number(data.total_estoque))
       ? Math.max(0, Math.floor(Number(data.total_estoque)))
       : variacoes.reduce((sum, v) => sum + v.estoque, 0);
-    const selected = currentProduct.variacaoSelecionada || getSelectedVariacao();
-    const selectedVariation = selected
-      ? variacoes.find((variation) => variation.nome === selected.nome && variation.estoque > 0)
-      : null;
-    const updated = {
-      ...currentProduct,
-      variacoes,
-      total_estoque: total,
-      disponivel: total > 0 ? 'Sim' : 'Não',
-      variacaoSelecionada: selectedVariation || null
-    };
+    const selected = currentProduct.variacoesSelecionadas || getSelectedVariacoes();
+    const selectedVariations = selected.map(s => variacoes.find(v => v.nome === s.nome && v.estoque > 0)).filter(Boolean);
+    const updated = { ...currentProduct, variacoes, total_estoque: total, disponivel: total > 0 ? 'Sim' : 'Não',
+      variacoesSelecionadas: selectedVariations, variacaoSelecionada: selectedVariations[0] || null };
     openDetails(updated, { fromNav: true, skipLiveStock: true, preserveVariation: true });
   } catch (error) {
     if (!currentProduct || (currentProduct.public_id || currentProduct.stock_ref) !== requestId) return;
@@ -1746,7 +1695,7 @@ function openDetails(p, opts = {}) {
     notasHtml += `<strong>${titulo}</strong><br>${escapeHtml(p.notas).replace(/\n/g, '<br>')}`;
   }
   if (varCatalog) {
-    notasHtml += buildVariacoesHtml(p, p.variacaoSelecionada?.id);
+    notasHtml += buildVariacoesHtml(p, (p.variacoesSelecionadas || []).map(v => v.id).filter(Boolean));
   }
   if (notasHtml) {
     notasEl.style.display = 'block';
@@ -1758,7 +1707,7 @@ function openDetails(p, opts = {}) {
 
   // seletor de variação (Roupas / Acessórios)
   if (varCatalog) {
-    if (!opts.preserveVariation) p.variacaoSelecionada = null;
+    if (!opts.preserveVariation) { p.variacoesSelecionadas = []; p.variacaoSelecionada = null; }
     bindVariacaoSelector();
   }
 
