@@ -1313,6 +1313,27 @@ function updateMobileCartBar() {
   document.body.classList.toggle('has-mobile-cart', totalItems > 0);
 }
 
+function openProductFromCart(index) {
+  const item = cart[index];
+  if (!item) return;
+  const product = findProductById(item.produtoId || productId(item)) || {
+    ...item,
+    foto: item.foto || '',
+    fotos: item.foto ? [item.foto] : [],
+    variacoes: []
+  };
+  if (item.variacaoNome && Array.isArray(product.variacoes)) {
+    product.variacoesSelecionadas = product.variacoes.filter(v => v.nome === item.variacaoNome);
+    product.variacaoSelecionada = product.variacoesSelecionadas[0] || null;
+  }
+  const cartDialog = document.getElementById('cartModal');
+  cartDialog.classList.remove('open');
+  cartDialog.setAttribute('aria-hidden', 'true');
+  const detailsDialog = document.getElementById('modal');
+  detailsDialog.__returnToCart = true;
+  openDetails(product, { preserveVariation: Boolean(item.variacaoNome) });
+}
+
 function updateCartUI() {
   const fab = document.getElementById('cartFab');
   const count = document.getElementById('cartCount');
@@ -1353,9 +1374,11 @@ function renderCart() {
     const label = isScoopProduct(p) ? 'Preço fixo' : (useAtacado ? 'Atacado' : 'Varejo');
     return `
     <div class="cart-item">
-      <img class="cart-item-photo" src="${escapeHtml(resolveCatalogImageUrl(p.foto) || '')}" alt="${escapeHtml(p.nome)}" width="64" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+      <button type="button" class="cart-product-open cart-product-photo-button" data-open-cart-product="${i}" aria-label="Ver detalhes de ${escapeHtml(p.nome)}">
+        <img class="cart-item-photo" src="${escapeHtml(resolveCatalogImageUrl(p.foto) || '')}" alt="" width="64" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+      </button>
       <div class="cart-item-info">
-        <strong>${escapeHtml(p.nome)}</strong><br>
+        <button type="button" class="cart-product-open cart-product-name" data-open-cart-product="${i}">${escapeHtml(p.nome)}</button><br>
         <span class="cart-item-meta">${escapeHtml(p.brand || '')} · ${escapeHtml(p.volume || '—')}${p.variacaoNome ? ' · Variação: ' + escapeHtml(p.variacaoNome) : ''} · ${label}: R$ ${formatBRL(unit)}</span>
         <div class="cart-qty">
           <button type="button" data-qty-minus="${i}" aria-label="Diminuir">−</button>
@@ -1387,6 +1410,9 @@ function renderCart() {
 
   list.querySelectorAll('.cart-item-photo').forEach(img => {
     img.addEventListener('error', () => { img.hidden = true; }, { once: true });
+  });
+  list.querySelectorAll('[data-open-cart-product]').forEach(button => {
+    button.addEventListener('click', () => openProductFromCart(Number(button.dataset.openCartProduct)));
   });
   list.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => removeFromCart(Number(btn.dataset.remove)));
@@ -1936,7 +1962,16 @@ function closeModal() {
   const done = () => {
     overlay.classList.remove('open', 'closing');
     overlay.setAttribute('aria-hidden', 'true');
-    overlay.__returnFocus?.focus?.();
+    const returnToCart = Boolean(overlay.__returnToCart);
+    overlay.__returnToCart = false;
+    if (returnToCart) {
+      const cartDialog = document.getElementById('cartModal');
+      cartDialog.classList.add('open');
+      cartDialog.setAttribute('aria-hidden', 'false');
+      requestAnimationFrame(() => focusDialog(cartDialog));
+    } else {
+      overlay.__returnFocus?.focus?.();
+    }
     overlay.__returnFocus = null;
     currentProduct = null;
     setProductUrl(null);
