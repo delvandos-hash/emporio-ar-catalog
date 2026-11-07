@@ -2,10 +2,36 @@
  * Proxy de imagens da Imarat: o navegador recebe somente uma rota do próprio catálogo.
  * Aceita exclusivamente arquivos em /uploads/products/ no host de origem configurado.
  */
-const ALLOWED_ORIGIN_HOST = "imaratperfumaria.com";
-const ALLOWED_PATH_PREFIX = "/uploads/products/";
+import { normalizeProductImagePath } from "../../scripts/public-image-url.mjs";
+
+const ALLOWED_ORIGIN = "https://imaratperfumaria.com";
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"]);
 const MAX_BYTES = 8 * 1024 * 1024;
+
+async function readBodyLimited(response, maxBytes) {
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  if (!size) return null;
+  const result = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
 
 export default async (req) => {
   const headers = {
@@ -18,18 +44,23 @@ export default async (req) => {
     const baseValue = process.env.IMARAT_ORIGIN_URL;
     if (!baseValue) return new Response("Imagem indisponível", { status: 503, headers });
     const base = new URL(baseValue);
-    if (base.protocol !== "https:" || base.hostname.toLowerCase() !== ALLOWED_ORIGIN_HOST) {
+    if (
+      base.origin !== ALLOWED_ORIGIN ||
+      base.pathname !== "/" ||
+      base.search ||
+      base.hash ||
+      base.username ||
+      base.password
+    ) {
       return new Response("Imagem indisponível", { status: 503, headers });
     }
 
     const requestUrl = new URL(req.url);
-    const path = requestUrl.searchParams.get("path") || "";
-    if (!path.startsWith(ALLOWED_PATH_PREFIX) || path.includes("\\") || path.includes("..")) {
-      return new Response("Requisição inválida", { status: 400, headers });
-    }
+    const path = normalizeProductImagePath(requestUrl.searchParams.get("path") || "");
+    if (!path) return new Response("Requisição inválida", { status: 400, headers });
 
-    const target = new URL(path, base.origin);
-    if (target.origin !== base.origin || target.search || target.hash) {
+    const target = new URL(path, ALLOWED_ORIGIN);
+    if (target.origin !== ALLOWED_ORIGIN || target.search || target.hash || !target.pathname.startsWith("/uploads/products/")) {
       return new Response("Requisição inválida", { status: 400, headers });
     }
 
@@ -46,10 +77,8 @@ export default async (req) => {
       return new Response("Imagem muito grande", { status: 413, headers });
     }
 
-    const bytes = await response.arrayBuffer();
-    if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) {
-      return new Response("Imagem inválida", { status: 413, headers });
-    }
+    const bytes = await readBodyLimited(response, MAX_BYTES);
+    if (!bytes) return new Response("Imagem inválida ou muito grande", { status: 413, headers });
 
     return new Response(bytes, {
       status: 200,
