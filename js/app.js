@@ -666,6 +666,23 @@ function applyOverride(item, brand, overrides = loadOverrides()) {
   return { ...item, ...o, brand: o.brand || brand };
 }
 
+function findCartCatalogPhoto(cartItem) {
+  const wantedName = String(cartItem?.nome || '').trim().toLowerCase();
+  const wantedBrand = String(cartItem?.brand || '').trim().toLowerCase();
+  const wantedVolume = String(cartItem?.volume || '').trim().toLowerCase();
+  for (const line of Object.keys(DATA || {})) {
+    for (const group of DATA[line] || []) {
+      for (const product of group.items || []) {
+        if (String(product.nome || '').trim().toLowerCase() !== wantedName) continue;
+        if (String(group.brand || '').trim().toLowerCase() !== wantedBrand) continue;
+        if (String(product.volume || '').trim().toLowerCase() !== wantedVolume) continue;
+        return resolveCatalogImageUrl(product.foto || (Array.isArray(product.fotos) ? product.fotos[0] : ''));
+      }
+    }
+  }
+  return '';
+}
+
 function loadCart() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
@@ -676,6 +693,7 @@ function loadCart() {
         nome: String(item.nome || 'Produto').slice(0, 180),
         brand: String(item.brand || '').slice(0, 120),
         volume: String(item.volume || '').slice(0, 60),
+        foto: resolveCatalogImageUrl(item.foto) || findCartCatalogPhoto(item),
         varejo: String(item.varejo ?? ''),
         atacado: String(item.atacado ?? ''),
         disponivel: item.disponivel === 'Não' ? 'Não' : 'Sim',
@@ -1173,7 +1191,9 @@ function addToCart(p, qty = 1) {
     const key = cartKey(p) + (variacao ? '|' + variacao.nome : '');
     const existing = cart.find(item => (cartKey(item) + (item.variacaoNome ? '|' + item.variacaoNome : '')) === key);
     if (existing) existing.qty += qty;
-    else cart.push({ nome:p.nome, brand:p.brand, volume:p.volume, varejo:p.varejo, atacado:p.atacado,
+    else cart.push({ nome:p.nome, brand:p.brand, volume:p.volume,
+      foto:resolveCatalogImageUrl(p.foto || (Array.isArray(p.fotos) ? p.fotos[0] : '')),
+      varejo:p.varejo, atacado:p.atacado,
       disponivel:p.disponivel || 'Sim', qty, variacaoNome:variacao ? variacao.nome : '',
       variacaoEstoque:variacao ? variacao.estoque : null, cat:p.cat || '' });
   }
@@ -1241,6 +1261,7 @@ function renderCart() {
     const label = isScoopProduct(p) ? 'Preço fixo' : (useAtacado ? 'Atacado' : 'Varejo');
     return `
     <div class="cart-item">
+      <img class="cart-item-photo" src="${escapeHtml(resolveCatalogImageUrl(p.foto) || '')}" alt="${escapeHtml(p.nome)}" width="64" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden';this.removeAttribute('src')">
       <div class="cart-item-info">
         <strong>${escapeHtml(p.nome)}</strong><br>
         <span class="cart-item-meta">${escapeHtml(p.brand || '')} · ${escapeHtml(p.volume || '—')}${p.variacaoNome ? ' · Variação: ' + escapeHtml(p.variacaoNome) : ''} · ${label}: R$ ${formatBRL(unit)}</span>
