@@ -65,7 +65,7 @@ function findProductById(id) {
     for (const g of DATA[line] || []) {
       for (const it of g.items || []) {
         const p = { ...it, brand: g.brand, cat: g.cat, line };
-        if (productId(p) === want) return p;
+        if (productId(p) === want || String(it.public_id || '').toLowerCase() === want) return p;
       }
     }
   }
@@ -84,7 +84,9 @@ function setProductUrl(p) {
 }
 function openProductFromUrl() {
   try {
-    const id = new URLSearchParams(window.location.search).get('produto');
+    const pathMatch = window.location.pathname.match(/^\/p\/([^/]+)\/?$/);
+    const pathId = pathMatch ? decodeURIComponent(pathMatch[1]) : '';
+    const id = pathId || new URLSearchParams(window.location.search).get('produto');
     if (!id) return false;
     const p = findProductById(id);
     if (p) {
@@ -97,6 +99,8 @@ function openProductFromUrl() {
 
 
 function getProductShareUrl(p) {
+  const shortId = String(p?.public_id || '').trim();
+  if (shortId) return window.location.origin + '/p/' + encodeURIComponent(shortId);
   try {
     const url = new URL(window.location.href);
     url.searchParams.set('produto', productId(p));
@@ -693,7 +697,7 @@ function findCartCatalogProductId(cartItem) {
         if (String(product.nome || '').trim().toLowerCase() !== wantedName) continue;
         if (String(group.brand || '').trim().toLowerCase() !== wantedBrand) continue;
         if (String(product.volume || '').trim().toLowerCase() !== wantedVolume) continue;
-        return productId({ ...product, brand: group.brand, cat: group.cat, line });
+        return String(product.public_id || productId({ ...product, brand: group.brand, cat: group.cat, line }));
       }
     }
   }
@@ -701,17 +705,11 @@ function findCartCatalogProductId(cartItem) {
 }
 
 function getCartProductUrl(cartItem) {
-  const id = String(cartItem?.produtoId || findCartCatalogProductId(cartItem) || '');
+  const storedId = String(cartItem?.produtoId || '');
+  const matched = storedId ? findProductById(storedId) : null;
+  const id = String(matched?.public_id || (storedId.startsWith('p_') ? storedId : '') || findCartCatalogProductId(cartItem) || '');
   if (!id) return '';
-  try {
-    const url = new URL(window.location.href);
-    url.search = '';
-    url.hash = '';
-    url.searchParams.set('produto', id);
-    return url.toString();
-  } catch {
-    return '';
-  }
+  return window.location.origin + '/p/' + encodeURIComponent(id);
 }
 
 function loadCart() {
@@ -970,33 +968,65 @@ function openBuyMetaModal(p) {
   if (title) title.textContent = (p.nome || 'Produto') + (p.variacoesSelecionadas?.length ? ` · ${p.variacoesSelecionadas.length} variações` : '');
   const qtyEl = document.getElementById('buyQty');
   if (qtyEl) qtyEl.value = '1';
-  // pré-preenche com carrinho ou último uso
-  try {
-    const cartNome = document.getElementById('cartClientName')?.value || '';
-    const cartCep = document.getElementById('cartObs')?.value || '';
-    const saved = JSON.parse(localStorage.getItem('emporio_buy_meta') || '{}');
-    const n = document.getElementById('buyClientName');
-    const c = document.getElementById('buyClientCep');
-    if (n && !n.value) n.value = cartNome || saved.nome || '';
-    if (c && !c.value) {
-      c.value = cartCep || saved.cep || '';
-      if (saved.cidade) document.getElementById('buyCepCity').value = saved.cidade;
-      if (saved.uf) document.getElementById('buyCepUf').value = saved.uf;
-      if (saved.cidade && saved.uf) {
-        c.dataset.cepCity = saved.cidade;
-        c.dataset.cepUf = saved.uf;
-        c.dataset.cepValid = 'true';
-        document.getElementById('buyCepStatus').textContent = 'Endereço salvo anteriormente.';
-        document.getElementById('buyCepStatus').dataset.state = 'success';
-      }
-    }
-  } catch (e) {}
+  prefillCustomerMeta('buy');
   ov?.classList.add('open');
 }
 
 function closeBuyMetaModal() {
   document.getElementById('buyMetaModal')?.classList.remove('open');
   pendingBuyProduct = null;
+}
+
+const CUSTOMER_META_KEY = 'emporio_buy_meta';
+
+function loadCustomerMeta() {
+  try {
+    const value = JSON.parse(localStorage.getItem(CUSTOMER_META_KEY) || '{}');
+    return value && typeof value === 'object' ? value : {};
+  } catch { return {}; }
+}
+
+function saveCustomerMeta(patch = {}) {
+  try {
+    const previous = loadCustomerMeta();
+    const next = { ...previous };
+    for (const key of ['nome', 'cep', 'cidade', 'uf']) {
+      if (patch[key] !== undefined && String(patch[key]).trim()) next[key] = String(patch[key]).trim();
+    }
+    localStorage.setItem(CUSTOMER_META_KEY, JSON.stringify(next));
+    return next;
+  } catch { return loadCustomerMeta(); }
+}
+
+function prefillCustomerMeta(prefix) {
+  const saved = loadCustomerMeta();
+  const nameEl = document.getElementById(prefix === 'cart' ? 'cartClientName' : 'buyClientName');
+  const cepEl = document.getElementById(prefix === 'cart' ? 'cartObs' : 'buyClientCep');
+  const cityEl = document.getElementById(prefix + 'CepCity');
+  const ufEl = document.getElementById(prefix + 'CepUf');
+  const statusEl = document.getElementById(prefix + 'CepStatus');
+  if (nameEl && !nameEl.value && saved.nome) nameEl.value = saved.nome;
+  if (cepEl && !cepEl.value && saved.cep) cepEl.value = saved.cep;
+  if (saved.cidade && saved.uf && cepEl && cepDigits(cepEl.value) === cepDigits(saved.cep)) {
+    if (cityEl) cityEl.value = saved.cidade;
+    if (ufEl) ufEl.value = saved.uf;
+    cepEl.dataset.cepCity = saved.cidade;
+    cepEl.dataset.cepUf = saved.uf;
+    cepEl.dataset.cepValid = 'true';
+    if (statusEl) {
+      statusEl.textContent = 'Dados salvos neste aparelho.';
+      statusEl.dataset.state = 'success';
+    }
+  }
+}
+
+function bindCustomerName(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('blur', () => {
+    const nome = input.value.trim();
+    if (nome) saveCustomerMeta({ nome });
+  });
 }
 
 function cepDigits(cep) {
@@ -1060,6 +1090,13 @@ async function lookupCep(inputId) {
     if (cityEl) cityEl.value = data.localidade;
     if (ufEl) ufEl.value = data.uf;
     setStatus('Endereço localizado.', 'success');
+    const nameId = prefix === 'cart' ? 'cartClientName' : 'buyClientName';
+    saveCustomerMeta({
+      nome: document.getElementById(nameId)?.value?.trim() || '',
+      cep: digits,
+      cidade: data.localidade,
+      uf: data.uf
+    });
     return { ok: true, cep: digits, cidade: data.localidade, uf: data.uf };
   } catch (error) {
     if (input.dataset.cepRequest !== requestId) return { ok: false, reason: 'Consulta substituída.' };
@@ -1123,7 +1160,7 @@ async function confirmBuyMeta() {
   const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
   if (Array.isArray(p.variacoesSelecionadas) && p.variacoesSelecionadas.some(v => qty > Number(v.estoque || 0))) { alert('A quantidade solicitada ultrapassa o estoque de uma ou mais variações selecionadas.'); return; }
   try {
-    localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep, cidade, uf }));
+    saveCustomerMeta({ nome, cep, cidade, uf });
     const cn = document.getElementById('cartClientName');
     const cc = document.getElementById('cartObs');
     if (cn && nome) cn.value = nome;
@@ -2716,6 +2753,7 @@ document.querySelectorAll('#stockFilters .fbtn').forEach(btn => {
 });
 
 document.getElementById('cartFab').addEventListener('click', () => {
+  prefillCustomerMeta('cart');
   renderCart();
   document.getElementById('cartModal').classList.add('open');
 });
@@ -2733,14 +2771,12 @@ document.getElementById('cartCheckout').addEventListener('click', async () => {
     return;
   }
   try {
-    const saved = JSON.parse(localStorage.getItem('emporio_buy_meta') || '{}');
-    localStorage.setItem('emporio_buy_meta', JSON.stringify({
-      ...saved,
-      nome: document.getElementById('cartClientName')?.value?.trim() || saved.nome || '',
+    saveCustomerMeta({
+      nome: document.getElementById('cartClientName')?.value?.trim() || '',
       cep: cepResult.cep,
       cidade: cepResult.cidade,
       uf: cepResult.uf
-    }));
+    });
   } catch (e) {}
   window.open(`https://wa.me/${WHATSAPP}?text=${buildCartWaMessage()}`, '_blank');
 });
@@ -3080,6 +3116,9 @@ document.getElementById('buyMetaConfirm')?.addEventListener('click', confirmBuyM
 
 bindCepField('buyClientCep');
 bindCepField('cartObs');
+bindCustomerName('buyClientName');
+bindCustomerName('cartClientName');
+prefillCustomerMeta('cart');
 
 
 document.getElementById('navCrumb')?.addEventListener('click', (e) => {
