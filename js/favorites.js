@@ -33,3 +33,21 @@ export function filterFavoriteGroups(groups, isFavorite) {
     }))
     .filter((group) => group.items.length > 0);
 }
+
+
+/** Junta os favoritos em uma lista plana, preservando a origem de cada produto. */
+export function collectFavoriteProducts(groups, isFavorite) {
+  if (!Array.isArray(groups) || typeof isFavorite !== 'function') return [];
+  const seen = new Set();
+  const result = [];
+  for (const group of groups) {
+    for (const item of Array.isArray(group.items) ? group.items : []) {
+      if (!isFavorite(item, group)) continue;
+      const key = [group.brand || item.brand || '', item.nome || '', item.volume || ''].join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({ ...item, brand: item.brand || group.brand || '', cat: item.cat || group.cat || '', line: item.line || group.line || '' });
+    }
+  }
+  return result;
+}
