@@ -15,8 +15,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Testar validação de URLs públicas de imagem
-        run: node --test scripts/public-image-url.test.mjs
+      - name: Testar sanitização do catálogo público
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs
         env:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
       - name: Sincronizar estoque e novos produtos
