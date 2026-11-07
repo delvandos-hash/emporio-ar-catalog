@@ -20,3 +20,16 @@ export function toggleFavoriteIds(favorites, publicId, legacyId) {
     ? [publicId, ...current]
     : current.slice();
 }
+
+
+/** Mantém todos os grupos de origem e retorna somente os itens favoritados. */
+export function filterFavoriteGroups(groups, isFavorite) {
+  if (!Array.isArray(groups) || typeof isFavorite !== 'function') return [];
+  return groups
+    .map((group) => ({
+      ...group,
+      items: (Array.isArray(group.items) ? group.items : [])
+        .filter((item) => isFavorite(item, group)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
