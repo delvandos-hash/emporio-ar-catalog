@@ -35,7 +35,12 @@ export default async (req, context) => {
       const clean = {};
       for (const [key, child] of Object.entries(value)) {
         if (privateKeys.has(key.toLowerCase())) continue;
-        clean[key] = sanitize(child);
+        if (key.toLowerCase() === 'url_origem' && typeof child === 'string') {
+          try { const sourceUrl = new URL(child); clean[key] = sourceUrl.pathname + sourceUrl.search; }
+          catch { clean[key] = child; }
+        } else {
+          clean[key] = sanitize(child);
+        }
       }
       return clean;
     };
