@@ -74,12 +74,11 @@ function parseVariantsFromHtml(html, id) {
 }
 
 function toVariacoes(variants) {
-  return (variants || []).map((v) => {
+  return (variants || []).map((v, index) => {
     const opts = [v.option0, v.option1, v.option2].filter(Boolean);
     return {
-      id: String(v.id || ""),
-      nome: opts.length ? opts.join(" / ") : v.sku || "Único",
-      sku: v.sku || "",
+      id: `v${index + 1}`,
+      nome: opts.length ? opts.join(" / ") : "Único",
       estoque: Number(v.stock) || 0,
     };
   });
