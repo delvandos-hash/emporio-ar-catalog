@@ -24,7 +24,7 @@ export function sanitizePayload(payload) {
 function jsonResponse(payload, status) {
   return new Response(JSON.stringify(payload), { status, headers: {
     "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": status === 200 ? "public, max-age=60" : "no-store",
+    "Cache-Control": status === 200 ? "public, max-age=60, s-maxage=300, stale-while-revalidate=600" : "no-store",
     "X-Content-Type-Options": "nosniff"
   }});
 }
