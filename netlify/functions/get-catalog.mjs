@@ -73,7 +73,7 @@ function sanitizeData(data) {
   return clean;
 }
 
-function sanitizePayload(payload) {
+export function sanitizePayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Formato de resposta inválido");
   }
