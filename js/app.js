@@ -1646,10 +1646,10 @@ async function refreshVariationStock(p) {
   const requestId = p.public_id || p.stock_ref;
   const btnAdd = document.getElementById('modalAddCart');
   const btnBuy = document.getElementById('modalBuy');
-  if (btnAdd) { btnAdd.disabled = true; btnAdd.classList.add('btn-disabled'); btnAdd.textContent = 'Consultando estoque...'; }
-  if (btnBuy) { btnBuy.disabled = true; btnBuy.classList.add('btn-disabled'); btnBuy.textContent = 'Consultando estoque...'; }
+  if (btnAdd) { btnAdd.disabled = true; btnAdd.classList.add('btn-disabled'); btnAdd.textContent = 'Atualizando Estoque'; }
+  if (btnBuy) { btnBuy.disabled = true; btnBuy.classList.add('btn-disabled'); btnBuy.textContent = 'Atualizando Estoque'; }
   const hint = document.getElementById('varHint');
-  if (hint) { hint.textContent = 'Consultando disponibilidade atual das variações...'; hint.classList.remove('ok'); }
+  if (hint) { hint.textContent = 'Atualizando Estoque'; hint.classList.remove('ok'); }
   try {
     const response = await fetch(endpoint, { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
