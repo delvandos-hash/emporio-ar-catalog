@@ -2,7 +2,7 @@
    Camada exclusivamente visual: não altera dados, filtros, preços, estoque,
    calendário sazonal, carrinho, integrações ou regras de publicação. */
 
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   --premium-ivory: #fbf8f2;
@@ -14,8 +14,8 @@
   --premium-muted: #81796d;
   --premium-line: #e9e1d5;
   --premium-shadow: 0 12px 34px rgba(56, 43, 24, .075);
-  --premium-font-display: "Playfair Display", Georgia, "Times New Roman", serif;
-  --premium-font-ui: "Manrope", "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --premium-font-display: "Inter", "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --premium-font-ui: "Inter", "Avenir Next", Avenir, "Segoe UI", sans-serif;
 }
 
 html { scroll-behavior: smooth; }
@@ -63,9 +63,9 @@ body:not([class*="theme-"]) header {
 .tabs { gap: .55rem; }
 .tab {
   border-radius: 999px;
-  padding: .58rem .95rem;
+  padding: .42rem .72rem;
   font-family: var(--premium-font-ui);
-  font-size: .86rem;
+  font-size: .78rem;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -103,7 +103,7 @@ body:not([class*="theme-"]) .search input:focus {
   box-shadow: 0 0 0 4px rgba(184,154,90,.13);
 }
 .filter-select {
-  min-height: 44px;
+  min-height: 38px;
   border-radius: 999px;
   border-color: var(--premium-line);
   color: var(--premium-ink);
@@ -134,9 +134,9 @@ body:not([class*="theme-"]) .filters-bar {
 .filters { gap: .48rem; }
 .fbtn {
   border-radius: 999px;
-  padding: .52rem .95rem;
+  padding: .38rem .72rem;
   font-family: var(--premium-font-ui);
-  font-size: .86rem;
+  font-size: .78rem;
   font-weight: 600;
   transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
 }
@@ -211,7 +211,7 @@ body:not([class*="theme-"]) .featured-strip {
 }
 .feat-card {
   flex-basis: 158px;
-  padding: .65rem;
+  padding: .58rem;
   border-radius: 17px;
   transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
   font-family: var(--premium-font-ui);
