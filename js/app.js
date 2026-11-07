@@ -895,15 +895,14 @@ function buildWaMessage(p, meta = {}) {
     msg += 'Variações / tamanhos:\n';
     selected.forEach(v => { const sub = unit * qty; total += sub; msg += `• *${v.nome}* — Qtd: *${qty}* × R$ ${formatBRL(unit)} = *R$ ${formatBRL(sub)}*\n`; });
     msg += `Tabela: *${wholesale ? 'ATACADO (6+)' : 'VAREJO'}*\nTotal de unidades: *${totalQty}*\nTotal: *R$ ${formatBRL(total)}*\n`;
-    if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
-    msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
-    return encodeURIComponent(msg);
+  } else {
+    const wholesale = !isScoop && qty >= 6 && p.atacado && p.atacado !== '—';
+    const unit = parsePrice(wholesale ? p.atacado : p.varejo), sub = unit * qty;
+    if (p.volume && p.volume !== '—' && !isVariacaoCatalogProduct(p)) msg += `Volume: ${p.volume}\n`;
+    const v = p.variacaoSelecionada || getSelectedVariacao();
+    if (v?.nome) msg += `Variação / Tamanho: *${v.nome}*\n`;
+    msg += `Qtd: *${qty}*\nTabela: *${wholesale ? 'ATACADO (6+)' : 'VAREJO'}*\nPreço unit.: *R$ ${formatBRL(unit)}*\nSubtotal: *R$ ${formatBRL(sub)}*\n`;
   }
-  const wholesale = !isScoop && qty >= 6 && p.atacado && p.atacado !== '—', unit = parsePrice(wholesale ? p.atacado : p.varejo), sub = unit * qty;
-  if (p.volume && p.volume !== '—' && !isVariacaoCatalogProduct(p)) msg += `Volume: ${p.volume}\n`;
-  const v = p.variacaoSelecionada || getSelectedVariacao();
-  if (v?.nome) msg += `Variação / Tamanho: *${v.nome}*\n`;
-  msg += `Qtd: *${qty}*\nTabela: *${wholesale ? 'ATACADO (6+)' : 'VAREJO'}*\nPreço unit.: *R$ ${formatBRL(unit)}*\nSubtotal: *R$ ${formatBRL(sub)}*\n`;
   if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
