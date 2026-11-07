@@ -1595,6 +1595,27 @@ function buildPhotoGallery(p) {
   return { html, isEmpty: false, fotos };
 }
 
+function openProductImageLightbox(src, alt = '') {
+  const overlay = document.getElementById('productImageLightbox');
+  const image = document.getElementById('productImageLightboxImg');
+  if (!overlay || !image || !src) return;
+  image.src = src;
+  image.alt = alt || 'Imagem ampliada do produto';
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('image-lightbox-open');
+}
+
+function closeProductImageLightbox() {
+  const overlay = document.getElementById('productImageLightbox');
+  const image = document.getElementById('productImageLightboxImg');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('image-lightbox-open');
+  if (image) image.removeAttribute('src');
+}
+
 function bindPhotoGallery(photoEl, fotos) {
   if (!photoEl || !fotos || fotos.length < 2) return;
   let idx = 0;
@@ -1627,11 +1648,7 @@ function bindPhotoGallery(photoEl, fotos) {
     e.preventDefault(); e.stopPropagation();
     show(idx + 1);
   });
-  // toque/clique na foto principal também avança
-  mainImg?.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    show(idx + 1);
-  });
+  // A foto principal abre a visualização ampliada; a navegação continua pelas setas e miniaturas.
   thumbs().forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -2582,6 +2599,22 @@ window.addEventListener('popstate', () => {
 });
 document.getElementById('modal').addEventListener('click', e => {
   if (e.target.id === 'modal') closeModal();
+});
+
+document.getElementById('modalPhoto')?.addEventListener('click', e => {
+  const image = e.target.closest('.gallery-main > img');
+  if (!image) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openProductImageLightbox(image.currentSrc || image.src, image.alt);
+});
+document.getElementById('productImageLightboxClose')?.addEventListener('click', closeProductImageLightbox);
+document.getElementById('productImageLightbox')?.addEventListener('click', e => {
+  if (e.target.id === 'productImageLightbox') closeProductImageLightbox();
+});
+document.addEventListener('keydown', e => {
+  const lightbox = document.getElementById('productImageLightbox');
+  if (e.key === 'Escape' && lightbox?.classList.contains('open')) closeProductImageLightbox();
 });
 document.getElementById('modalBuy').addEventListener('click', () => {
   if (currentProduct) openWhatsApp(currentProduct);
