@@ -17,20 +17,16 @@ function decodeEntities(s) {
 }
 
 function parseVariantsFromHtml(html, id) {
-  // 1) data-variants near product id
   if (id) {
     const idx = html.indexOf(`data-product-id="${id}"`);
     if (idx >= 0) {
       const chunk = html.slice(Math.max(0, idx - 800), idx + 12000);
       const vm = chunk.match(/data-variants="([^"]*)"/);
       if (vm) {
-        try {
-          return JSON.parse(decodeEntities(vm[1]));
-        } catch {}
+        try { return JSON.parse(decodeEntities(vm[1])); } catch {}
       }
     }
   }
-  // 2) any data-variants on product page (detail page usually one product)
   const all = [...html.matchAll(/data-variants="([^"]*)"/g)];
   for (const m of all) {
     try {
@@ -42,9 +38,7 @@ function parseVariantsFromHtml(html, id) {
     } catch {}
   }
   if (all.length) {
-    try {
-      return JSON.parse(decodeEntities(all[0][1]));
-    } catch {}
+    try { return JSON.parse(decodeEntities(all[0][1])); } catch {}
   }
   return null;
 }
@@ -75,16 +69,11 @@ export default async (req) => {
 
     if (!DANDE_BASE) throw new Error("Origem de acessórios não configurada no ambiente privado.");
     if (!id && !productUrl) {
-      return new Response(JSON.stringify({ erro: "id ou url obrigatório" }), {
-        status: 400,
-        headers,
-      });
+      return new Response(JSON.stringify({ erro: "id ou url obrigatório" }), { status: 400, headers });
     }
 
     if (productUrl) {
-      try {
-        productUrl = decodeURIComponent(productUrl);
-      } catch {}
+      try { productUrl = decodeURIComponent(productUrl); } catch {}
       if (productUrl.startsWith("//")) productUrl = "https:" + productUrl;
       if (!productUrl.startsWith("http")) {
         productUrl = new URL(productUrl.replace(/^\//, ""), DANDE_BASE + "/").toString();
@@ -97,50 +86,38 @@ export default async (req) => {
       if (parsedProductUrl.origin !== new URL(DANDE_BASE).origin) throw new Error("URL de produto inválida.");
       const res = await fetch(productUrl, {
         headers: { "User-Agent": UA, Accept: "text/html", "Accept-Language": "pt-BR,pt;q=0.9" },
+        redirect: "error",
       });
       if (res.ok) html = await res.text();
     }
 
-    // Fallback search by id
     if (!html && id) {
-      const searchUrl = `${DANDE_BASE}/search/?q=${encodeURIComponent(id)}`;
+      const searchUrl = new URL("/search/", DANDE_BASE);
+      searchUrl.searchParams.set("q", id);
       const res = await fetch(searchUrl, {
         headers: { "User-Agent": UA, Accept: "text/html" },
+        redirect: "error",
       });
       if (res.ok) html = await res.text();
     }
 
     if (!html) {
-      return new Response(JSON.stringify({ erro: "página não carregou", id }), {
-        status: 502,
-        headers,
-      });
+      return new Response(JSON.stringify({ erro: "página não carregou", id }), { status: 502, headers });
     }
 
     const variants = parseVariantsFromHtml(html, id);
     if (!variants) {
-      return new Response(
-        JSON.stringify({ erro: "produto não encontrado", id }),
-        { status: 404, headers }
-      );
+      return new Response(JSON.stringify({ erro: "produto não encontrado", id }), { status: 404, headers });
     }
 
     const variacoes = toVariacoes(variants);
     const total = variacoes.reduce((s, v) => s + v.estoque, 0);
 
     return new Response(
-      JSON.stringify({
-        id,
-        total_estoque: total,
-        variacoes,
-        atualizado_em: new Date().toISOString(),
-      }),
+      JSON.stringify({ id, total_estoque: total, variacoes, atualizado_em: new Date().toISOString() }),
       { status: 200, headers }
     );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ erro: "falha inesperada" }),
-      { status: 500, headers }
-    );
+  } catch {
+    return new Response(JSON.stringify({ erro: "falha inesperada" }), { status: 500, headers });
   }
 };
