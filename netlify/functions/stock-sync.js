@@ -2,8 +2,8 @@
  * Netlify Function — sincroniza estoque Imarat + Brand Collection
  * GET /.netlify/functions/stock-sync
  */
-const IMARAT_API = 'https://imaratperfumaria.com/api/products';
-const BRAND_BASE = 'https://brandcollectionpy.com.br';
+const IMARAT_API = process.env.IMARAT_API_URL;
+const BRAND_BASE = process.env.BRAND_BASE_URL;
 const BRAND_SELLER = 'darlanaugusto';
 
 function norm(s) {
@@ -118,12 +118,13 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers, body: '' };
   }
   try {
+    if (!IMARAT_API || !BRAND_BASE) throw new Error('Origem de estoque não configurada no ambiente privado.');
     const [imarat, brand] = await Promise.all([
       fetchImaratStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, total: 0, source: 'imarat', error: String(e.message || e),
+        map: {}, byName: {}, fetched: 0, total: 0, source: 'imarat', error: 'Origem indisponível.',
       })),
       fetchBrandStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, source: 'brand', error: String(e.message || e),
+        map: {}, byName: {}, fetched: 0, source: 'brand', error: 'Origem indisponível.',
       })),
     ]);
     const body = {
@@ -145,7 +146,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         ok: false,
-        error: String(err && err.message ? err.message : err),
+        error: 'Falha na sincronização.',
         updatedAt: new Date().toISOString(),
       }),
     };

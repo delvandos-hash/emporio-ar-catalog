@@ -7,15 +7,15 @@ const SOURCES = {
   sophia: {
     // tenta domínio próprio e, se cair, FacilZap
     bases: [
-      "https://sophiamoda.com.br",
-      "https://facilzap.app.br/sophiamodafemi",
+      process.env.SOPHIA_PRIMARY_URL,
+      process.env.SOPHIA_FALLBACK_URL,
     ],
-    base: "https://sophiamoda.com.br",
+    base: process.env.SOPHIA_PRIMARY_URL,
     loja: "lojavendedoras",
     categories: ["108042", "108328", "108333", "108339", "108338", "379539"],
   },
   franny: {
-    base: "https://frannyloja.com.br",
+    base: process.env.FRANNY_BASE_URL,
     loja: "62999336607",
     categories: [
       "265229", // Vestido
@@ -69,7 +69,7 @@ async function fetchCategoryPage(src, catId, page, cookie) {
     headers: {
       "User-Agent": UA,
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      Origin: src.base.includes("facilzap") ? "https://facilzap.app.br" : src.base,
+      Origin: src.base === process.env.SOPHIA_FALLBACK_URL ? process.env.SOPHIA_FALLBACK_ORIGIN : src.base,
       Referer: `${src.base}/c/atacado/${src.loja}`,
       "X-Requested-With": "XMLHttpRequest",
       Accept: "application/json, text/javascript, */*; q=0.01",
@@ -120,6 +120,7 @@ export default async (req) => {
     }
 
     const { source, id } = parseId(rawId);
+    if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
     if (!src || !id) {
       return new Response(JSON.stringify({ erro: "fonte/id inválidos", rawId }), {
@@ -159,7 +160,6 @@ export default async (req) => {
                 id: String(found.id),
                 id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
                 fonte: source,
-                base,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -192,7 +192,6 @@ export default async (req) => {
                 id: String(found.id),
                 id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
                 fonte: source,
-                base,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -215,7 +214,7 @@ export default async (req) => {
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ erro: "falha", mensagem: error.message }),
+      JSON.stringify({ erro: "falha inesperada" }),
       { status: 500, headers }
     );
   }

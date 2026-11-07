@@ -2,10 +2,27 @@
   publish = "."
   functions = "netlify/functions"
 
+# Cabeçalhos de segurança aplicados a todas as respostas do site.
 [[headers]]
-  for = "/netlify/functions/*"
+  for = "/*"
   [headers.values]
-    Access-Control-Allow-Origin = "*"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000"
+
+# Impede acesso direto ao arquivo-fonte do catálogo, que contém dados internos.
+[[redirects]]
+  from = "/js/data.js"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/api/product-image"
+  to = "/.netlify/functions/product-image"
+  status = 200
 
 [[redirects]]
   from = "/api/catalogo"
@@ -26,7 +43,7 @@
   from = "/api/dande-stock"
   to = "/.netlify/functions/dande-stock"
   status = 200
-  
+
 [[redirects]]
   from = "/feed.xml"
   to = "/.netlify/functions/get-feed"
@@ -43,4 +60,3 @@
   [headers.values]
     Content-Type = "application/javascript; charset=utf-8"
     Cache-Control = "no-cache"
-

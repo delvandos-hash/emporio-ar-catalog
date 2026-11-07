@@ -1,0 +1,24 @@
+name: Testes de segurança do catálogo público
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-catalog-tests:
+    name: Testes isolados do catálogo público
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Executar testes de sanitização
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs

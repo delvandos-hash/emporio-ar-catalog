@@ -1,42 +1,29 @@
 /**
  * Empório A.R - Catálogo Digital
- * Dados: Gist (principal) + fallback local data.js + estoque ao vivo
+ * Dados: API pública sanitizada + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 
-// Novo Gist (20/10/2026)
-const GIST_CATALOG_URL =
-  'https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json';
-
 async function loadCatalogData() {
-  // 1) Gist primeiro (leve — não baixa data.js de 1.5MB)
-  // 2) API local
-  // 3) Fallback: data.js só se Gist falhar (import dinâmico)
-  const urls = [GIST_CATALOG_URL, '/api/catalogo'];
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) continue;
-      const text = await res.text();
-      const j = JSON.parse(text.replace(/^\uFEFF/, ''));
-      if (j && j.DATA) return j;
-    } catch (e) {
-      // tenta o próximo
-    }
-  }
-
+  // O catálogo só é carregado pela API pública sanitizada.
+  // Não importar data.js diretamente: ele é um artefato público e não deve
+  // funcionar como caminho alternativo que contorne a sanitização.
   try {
-    const mod = await import('./data.js');
-    return {
-      DATA: mod.DATA,
-      WHATSAPP: mod.WHATSAPP,
-      BRAND: mod.BRAND,
-    };
+    const res = await fetch('/api/catalogo', { cache: 'no-store' });
+    if (res.ok) {
+      const text = await res.text();
+      const payload = JSON.parse(text.replace(/^\uFEFF/, ''));
+      if (payload && payload.DATA && typeof payload.DATA === 'object') return payload;
+    }
   } catch (e) {
-    console.error('Fallback data.js falhou', e);
-    return { DATA: {}, WHATSAPP: '5562991134488', BRAND: { name: 'Empório A.R', phone: '(62) 99113-4488' } };
+    console.warn('API do catálogo indisponível');
   }
+
+  return {
+    DATA: {},
+    WHATSAPP: '5562991134488',
+    BRAND: { name: 'Empório A.R', phone: '(62) 99113-4488' },
+  };
 }
 
 // Loading visível enquanto busca o Gist
@@ -51,7 +38,10 @@ const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
 
 try {
   const el = document.getElementById('bootStatus');
-  if (el) el.remove();
+  if (el) {
+    if (DATA && Object.keys(DATA).length) el.remove();
+    else el.textContent = 'Catálogo temporariamente indisponível. Tente novamente em instantes.';
+  }
 } catch (e) {}
 
 /** ID estável do produto (deep link ?produto= e feed Google) */
@@ -121,8 +111,12 @@ function getProductShareText(p) {
   let t = `*${p.nome}* — Empório A.R\n`;
   if (p.brand) t += `Marca: ${p.brand}\n`;
   if (p.volume && p.volume !== '—') t += `Volume: ${p.volume}\n`;
-  if (p.varejo) t += `Varejo: R$ ${p.varejo}\n`;
-  if (p.atacado && p.atacado !== '—') t += `Atacado (6+): R$ ${p.atacado}\n`;
+  if (isScoopProduct(p)) {
+    if (p.varejo) t += `Preço fixo: R$ ${p.varejo}\n`;
+  } else {
+    if (p.varejo) t += `Varejo: R$ ${p.varejo}\n`;
+    if (p.atacado && p.atacado !== '—') t += `Atacado (6+): R$ ${p.atacado}\n`;
+  }
   t += `\n👉 Abra o produto no catálogo (link):\n${link}\n`;
   t += `\nCatálogo completo: https://catalogoemporio.netlify.app`;
   return t;
@@ -279,9 +273,9 @@ async function renderStoryCardCanvas(p) {
 
   ctx.fillStyle = '#4ade80';
   ctx.font = 'bold 52px system-ui, sans-serif';
-  if (p.varejo) ctx.fillText('R$ ' + p.varejo, W / 2, ty);
+  if (p.varejo) ctx.fillText((isScoopProduct(p) ? 'Preço fixo R$ ' : 'R$ ') + p.varejo, W / 2, ty);
   ty += 50;
-  if (p.atacado && p.atacado !== '—') {
+  if (!isScoopProduct(p) && p.atacado && p.atacado !== '—') {
     ctx.fillStyle = '#86efac';
     ctx.font = '36px system-ui, sans-serif';
     ctx.fillText('Atacado (6+) R$ ' + p.atacado, W / 2, ty);
@@ -704,6 +698,14 @@ function parsePrice(str) {
   return parsePriceStrict(str);
 }
 
+function isScoopProduct(p) {
+  return Boolean(p && (
+    p.cat === 'Scoop Premiado' ||
+    p.badge === 'Scoop' ||
+    String(p.nome || '').toLowerCase().includes('scoop')
+  ));
+}
+
 // Valores vindos do catálogo, URL e armazenamento local são tratados como texto não confiável.
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -879,7 +881,8 @@ function cartKey(p) {
 
 function buildWaMessage(p, meta = {}) {
   const qty = Math.max(1, Math.min(99, parseInt(meta.qty, 10) || 1));
-  const useAtacado = qty >= 6 && p.atacado && p.atacado !== '—';
+  const isScoop = isScoopProduct(p);
+  const useAtacado = !isScoop && qty >= 6 && p.atacado && p.atacado !== '—';
   const unitStr = useAtacado ? p.atacado : p.varejo;
   const unit = parsePrice(unitStr);
   const sub = unit * qty;
@@ -897,7 +900,9 @@ function buildWaMessage(p, meta = {}) {
   }
   if (p.cat && isVariacaoCatalogProduct(p)) msg += `Categoria: ${p.cat}\n`;
   msg += `Qtd: *${qty}*\n`;
-  if (useAtacado) {
+  if (isScoop) {
+    msg += `Preço fixo unit.: *R$ ${p.varejo}*\n`;
+  } else if (useAtacado) {
     msg += `Tabela: *ATACADO (6+)*\n`;
     msg += `Preço unit.: *R$ ${p.atacado}*\n`;
   } else {
@@ -1082,7 +1087,7 @@ async function confirmBuyMeta() {
 }
 
 function unitPrice(p, useAtacado) {
-  if (useAtacado && p.atacado && p.atacado !== '—') return parsePrice(p.atacado);
+  if (!isScoopProduct(p) && useAtacado && p.atacado && p.atacado !== '—') return parsePrice(p.atacado);
   return parsePrice(p.varejo);
 }
 
@@ -1105,15 +1110,23 @@ function getCartMeta() {
 function buildCartWaMessage() {
   const totalItens = cartTotalQty();
   const meta = getCartMeta();
-  // Atacado somente com 6+ itens — cliente não escolhe
+  // Scoops Premiados mantêm preço fixo; atacado vale apenas para os demais produtos.
   const useAtacado = totalItens >= 6;
-  const modo = useAtacado ? 'ATACADO (6+ itens)' : 'VAREJO';
+  const hasScoop = cart.some(isScoopProduct);
+  const hasRegular = cart.some(p => !isScoopProduct(p));
   const agora = new Date();
   const dataHora = agora.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
   let msg = 'Olá! Gostaria de *confirmar o pedido* no *Empório A.R*.\n\n';
   msg += `📅 ${dataHora}\n`;
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
-  msg += `📋 Tabela: *${modo}*\n`;
+  if (hasScoop && hasRegular) {
+    msg += `📋 Produtos convencionais: *${useAtacado ? 'ATACADO (6+ itens)' : 'VAREJO'}*\n`;
+    msg += '📋 Scoops Premiados: *PREÇO FIXO*\n';
+  } else if (hasScoop) {
+    msg += '📋 Scoops Premiados: *PREÇO FIXO*\n';
+  } else {
+    msg += `📋 Tabela: *${useAtacado ? 'ATACADO (6+ itens)' : 'VAREJO'}*\n`;
+  }
   msg += '────────────────\n';
   let total = 0;
   cart.forEach((p, i) => {
@@ -1247,7 +1260,7 @@ function renderCart() {
     const unit = unitPrice(p, useAtacado);
     const sub = unit * p.qty;
     total += sub;
-    const label = useAtacado ? 'Atacado' : 'Varejo';
+    const label = isScoopProduct(p) ? 'Preço fixo' : (useAtacado ? 'Atacado' : 'Varejo');
     return `
     <div class="cart-item">
       <div class="cart-item-info">
@@ -1264,9 +1277,14 @@ function renderCart() {
     </div>`;
   }).join('');
 
-  const modeHtml = useAtacado
-    ? '<div class="cart-mode is-atacado">✓ Preço de ATACADO aplicado (6+ itens)</div>'
-    : `<div class="cart-mode is-varejo">Varejo — faltam <strong>${6 - totalItens}</strong> item(ns) para preço de atacado</div>`;
+  const hasScoop = cart.some(isScoopProduct);
+  const hasRegular = cart.some(p => !isScoopProduct(p));
+  const modeHtml = !hasRegular
+    ? '<div class="cart-mode">Scoops Premiados com preço fixo por unidade</div>'
+    : (useAtacado
+      ? '<div class="cart-mode is-atacado">✓ Preço de ATACADO aplicado aos produtos elegíveis (6+ itens)</div>'
+      : `<div class="cart-mode is-varejo">Varejo — faltam <strong>${6 - totalItens}</strong> item(ns) para preço de atacado nos produtos elegíveis</div>`) +
+      (hasScoop ? '<div class="cart-mode">Scoops Premiados mantêm o preço fixo</div>' : '');
 
   const sticky = `<div class="cart-sticky-summary"><span>Resumo do pedido</span>Itens: ${totalItens} · Total: R$ ${formatBRL(total)}</div>`;
   list.innerHTML = sticky + modeHtml + itemsHtml + `
@@ -1462,10 +1480,11 @@ function absSophiaImg(u) {
   const s = String(u).trim();
   if (!s) return '';
   try {
-    const url = new URL(s, 'https://arquivos-cdn.facilzap.app.br/');
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
-    if (url.username || url.password) return '';
-    url.protocol = 'https:';
+    const url = new URL(s, window.location.origin);
+    if (url.protocol !== 'https:' || url.username || url.password) return '';
+    const sameOrigin = url.origin === window.location.origin;
+    const approvedCdn = ['arquivos-cdn.facilzap.app.br', 'acdn-us.mitiendanube.com'].includes(url.hostname.toLowerCase());
+    if (!sameOrigin && !approvedCdn) return '';
     return url.toString();
   } catch (e) {
     return '';
@@ -1635,7 +1654,7 @@ function openDetails(p, opts = {}) {
   const overlay = document.getElementById('modal');
   overlay.classList.remove('closing');
   const avail = isAvailable(p);
-  const isScoop = (p.badge === 'Scoop') || (p.nome || '').toLowerCase().includes('scoop');
+  const isScoop = isScoopProduct(p);
   const roupas = isRoupasProduct(p);
   const acessorios = isAcessoriosProduct(p);
   const varCatalog = isVariacaoCatalogProduct(p);
@@ -1643,8 +1662,12 @@ function openDetails(p, opts = {}) {
   document.getElementById('modalName').textContent = p.nome;
   document.getElementById('modalMeta').textContent =
     `${p.brand || 'Empório A.R'}${p.volume && p.volume !== '—' && !isScoop && !varCatalog ? ' · ' + p.volume : ''}${varCatalog && p.cat ? ' · ' + p.cat : ''} · ${avail ? 'Disponível' : 'ESGOTADO'}`;
-  document.getElementById('modalVarejo').textContent = p.varejo ? `R$ ${p.varejo}` : '—';
-  document.getElementById('modalAtacado').textContent = p.atacado && p.atacado !== '—' ? `R$ ${p.atacado}` : '—';
+  const modalVarejo = document.getElementById('modalVarejo');
+  const modalAtacado = document.getElementById('modalAtacado');
+  modalVarejo.textContent = p.varejo ? `R$ ${p.varejo}` : '—';
+  modalAtacado.textContent = p.atacado && p.atacado !== '—' ? `R$ ${p.atacado}` : '—';
+  modalVarejo.previousElementSibling.textContent = isScoop ? 'Preço fixo' : 'Varejo';
+  modalAtacado.parentElement.style.display = isScoop ? 'none' : '';
 
   const photo = document.getElementById('modalPhoto');
   if (isScoop) {
@@ -2133,7 +2156,7 @@ function render() {
       for (const rawItem of sortedItems) {
         const item = validateProductPrices(rawItem);
         const avail = isAvailable(item);
-        const isScoop = (item.badge === 'Scoop') || (item.nome || '').toLowerCase().includes('scoop');
+        const isScoop = isScoopProduct({ ...item, cat });
         const varejoShow = item.varejo ? `R$ ${escapeHtml(item.varejo)}` : '—';
         const atacadoShow = item.atacado && item.atacado !== '—' ? `R$ ${escapeHtml(item.atacado)}` : '—';
         const pdata = encodeURIComponent(JSON.stringify({
@@ -2164,9 +2187,13 @@ function render() {
         const isNovo = isNovoRecente(item) || isLancamentoItem(item, cat);
         const badgeEsg = avail ? '' : '<span class="badge-esgotado">ESGOTADO</span>';
         const badgeNovo = (avail && isNovo) ? '<span class="badge-novo">NOVO</span>' : '';
-        const atacHint = (avail && item.atacado && item.atacado !== '—')
+        const atacHint = (!isScoop && avail && item.atacado && item.atacado !== '—')
           ? '<span class="price-atacado-hint">Atacado a partir de 6 itens</span>'
           : '';
+        const pricesHtml = isScoop
+          ? `<div><span class="price-label">Preço fixo</span><span class="price-v">${varejoShow}</span></div>`
+          : `<div><span class="price-label">Varejo</span><span class="price-v">${varejoShow}</span></div>
+             <div><span class="price-label">Atacado</span><span class="price-a">${atacadoShow}</span></div>`;
         const cardClass = avail ? 'card' : 'card esgotado';
         const stockHtml = avail
           ? '<span class="stock-label stock-ok">Disponível</span>'
@@ -2189,8 +2216,7 @@ function render() {
               <div class="name">${escapeHtml(item.nome)}</div>
               <div class="meta">${escapeHtml(item.volume || '—')} · ${stockHtml}</div>
               <div class="prices">
-                <div><span class="price-label">Varejo</span><span class="price-v">${varejoShow}</span></div>
-                <div><span class="price-label">Atacado</span><span class="price-a">${atacadoShow}</span></div>
+                ${pricesHtml}
                 ${atacHint || ''}
               </div>
               <div class="card-actions">
@@ -2273,13 +2299,14 @@ function downloadCatalogPDF() {
   for (const line of ['feminino', 'masculino', 'unissex', 'roupas', 'acessorios']) {
     for (const g of (DATA[line] || [])) {
       for (const item of g.items) {
+        const isScoop = isScoopProduct(item);
         rows.push({
           genero: line.charAt(0).toUpperCase() + line.slice(1),
           marca: g.brand,
           nome: item.nome,
           volume: item.volume || '—',
-          varejo: item.varejo || '—',
-          atacado: item.atacado || '—',
+          preco: item.varejo || '—',
+          modalidade: isScoop ? 'Preço fixo' : `Varejo: R$ ${item.varejo || '—'} · Atacado: R$ ${item.atacado || '—'}`,
           status: (item.disponivel || 'Sim') === 'Sim' ? 'Disponível' : 'Esgotado'
         });
       }
@@ -2293,8 +2320,8 @@ function downloadCatalogPDF() {
       <td>${escapeHtml(r.nome)}</td>
       <td>${escapeHtml(r.volume)}</td>
       <td>${escapeHtml(r.genero)}</td>
-      <td>R$ ${escapeHtml(r.varejo)}</td>
-      <td>R$ ${escapeHtml(r.atacado)}</td>
+      <td>R$ ${escapeHtml(r.preco)}</td>
+      <td>${escapeHtml(r.modalidade)}</td>
       <td>${escapeHtml(r.status)}</td>
     </tr>`
   ).join('');
@@ -2314,7 +2341,7 @@ function downloadCatalogPDF() {
 <h1>Empório A.R — Catálogo de Perfumes</h1>
 <p>WhatsApp (62) 99113-4488 · ${rows.length} produtos · Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
 <table>
-<thead><tr><th>Marca</th><th>Produto</th><th>Volume</th><th>Gênero</th><th>Varejo</th><th>Atacado</th><th>Status</th></tr></thead>
+<thead><tr><th>Marca</th><th>Produto</th><th>Volume</th><th>Gênero</th><th>Preço</th><th>Modalidade</th><th>Status</th></tr></thead>
 <tbody>${table}</tbody>
 </table>
 <script>window.onload=function(){window.print();}</script>
