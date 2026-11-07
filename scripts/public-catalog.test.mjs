@@ -7,7 +7,7 @@ process.env.IMARAT_ORIGIN_URL = "https://products.example/";
 
 test("publica somente os campos usados pela vitrine", () => {
   const result = toPublicCatalog({
-    perfumes: [{
+    feminino: [{
       brand: "Marca",
       cat: "Perfumes",
       cat_id: "interno-cat",
@@ -31,7 +31,7 @@ test("publica somente os campos usados pela vitrine", () => {
     }]
   });
 
-  const group = result.perfumes[0];
+  const group = result.feminino[0];
   const item = group.items[0];
   assert.deepEqual(Object.keys(group).sort(), ["brand", "cat", "items"]);
   assert.deepEqual(Object.keys(item).sort(), [
@@ -46,7 +46,7 @@ test("publica somente os campos usados pela vitrine", () => {
 
 test("converte imagens de catálogo para rota same-origin e remove URL inválida", () => {
   const result = toPublicCatalog({
-    perfumes: [{
+    feminino: [{
       brand: "Marca",
       cat: "Perfumes",
       items: [{
@@ -59,20 +59,20 @@ test("converte imagens de catálogo para rota same-origin e remove URL inválida
       }]
     }]
   });
-  const item = result.perfumes[0].items[0];
+  const item = result.feminino[0].items[0];
   assert.equal(item.foto, "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fitem.webp");
   assert.deepEqual(item.fotos, ["/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fitem-2.webp"]);
 });
 
 test("descarta imagem inválida sem remover o produto", () => {
   const result = toPublicCatalog({
-    perfumes: [{
+    feminino: [{
       brand: "Marca",
       cat: "Perfumes",
       items: [{ nome: "Produto sem imagem", foto: "https://host-nao-autorizado.example/a.webp" }]
     }]
   });
-  assert.deepEqual(result.perfumes[0].items.map(x => x.nome), ["Produto sem imagem"]);
+  assert.deepEqual(result.feminino[0].items.map(x => x.nome), ["Produto sem imagem"]);
 });
 
 test("normaliza estoque de variações e limita identificadores/textos", () => {
@@ -106,7 +106,7 @@ import { sanitizePayload } from "../netlify/functions/get-catalog.mjs";
 
 test("API e publicação no Gist mantêm a mesma projeção pública", () => {
   const source = {
-    perfumes: [{
+    feminino: [{
       brand: "Marca",
       cat: "Perfumes",
       cat_id: "interno",
@@ -152,11 +152,11 @@ test("remove identificadores internos e padroniza a fonte", () => {
 });
 
 test("usa a primeira foto pública quando foto contém somente nome relativo inválido", () => {
-  const result = toPublicCatalog({ perfumes: [{ brand: "Marca", cat: "Perfumes", items: [{
+  const result = toPublicCatalog({ feminino: [{ brand: "Marca", cat: "Perfumes", items: [{
     nome: "Produto", foto: "arquivo-sem-base.webp",
     fotos: ["https://images-secondary.example/stores/a/produto.webp"]
   }]}]});
-  const item = result.perfumes[0].items[0];
+  const item = result.feminino[0].items[0];
   assert.equal(item.foto, "/api/product-image?source=b&path=%2Fstores%2Fa%2Fproduto.webp");
   assert.deepEqual(item.fotos, [item.foto]);
 });
