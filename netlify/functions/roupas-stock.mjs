@@ -93,7 +93,7 @@ async function fetchCategoryPage(src, catId, page, cookie) {
   }
 }
 
-function buildVariacoes(found) {
+export function buildVariacoes(found) {
   const estoqueMap = found.estoque || {};
   const varDict = found.variacoes || {};
   const variacoes = Object.entries(varDict).map(([vid, vinfo], index) => ({
