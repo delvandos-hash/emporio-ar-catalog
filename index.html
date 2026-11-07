@@ -2497,7 +2497,13 @@
     color: #fafaf9;
     border-color: #57534e;
   }
-  .cep-hint-warn {
+  .cep-address-row { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:.5rem; margin-top:.45rem; }
+.cep-address-row .cart-input { min-width:0; background:rgba(127,127,127,.08); }
+.cep-lookup-status { min-height:1.1em; margin:.25rem 0 0; font-size:.78rem; opacity:.8; }
+.cep-lookup-status[data-state="success"] { color:#16834a; }
+.cep-lookup-status[data-state="error"] { color:#c0392b; }
+.cep-lookup-status[data-state="loading"] { opacity:.65; }
+.cep-hint-warn {
     color: #fbbf24;
     font-size: .75rem;
     margin: .25rem 0 0;
@@ -2851,7 +2857,12 @@
         <input type="text" id="cartClientName" class="cart-input" placeholder="Como podemos te chamar?" maxlength="80" autocomplete="name" />
         <label class="cart-label">Coloque seu CEP</label>
         <input type="text" id="cartObs" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
-        <p class="cep-hint-warn" id="cartCepWarn">CEP incompleto — pode enviar assim mesmo.</p>
+        <p class="cep-hint-warn" id="cartCepWarn">Informe um CEP com 8 dígitos para validar.</p>
+        <div class="cep-address-row">
+          <input type="text" id="cartCepCity" class="cart-input" placeholder="Cidade (preenchida pelo CEP)" readonly />
+          <input type="text" id="cartCepUf" class="cart-input" placeholder="UF" readonly />
+        </div>
+        <p class="cep-lookup-status" id="cartCepStatus" aria-live="polite"></p>
         <p class="cart-hint" id="cartPriceHint">Preço de atacado aplica-se automaticamente a partir de 6 itens.</p>
       </div>
       <button class="btn-buy" id="cartCheckout" style="width:100%;margin-top:1rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
@@ -2901,7 +2912,12 @@
       </div>
       <label class="cart-label">Coloque seu CEP</label>
       <input type="text" id="buyClientCep" class="cart-input" placeholder="Ex.: 74000-000" maxlength="12" inputmode="numeric" autocomplete="postal-code" />
-      <p class="cep-hint-warn" id="buyCepWarn">CEP incompleto — pode enviar assim mesmo.</p>
+      <p class="cep-hint-warn" id="buyCepWarn">Informe um CEP com 8 dígitos para validar.</p>
+      <div class="cep-address-row">
+        <input type="text" id="buyCepCity" class="cart-input" placeholder="Cidade (preenchida pelo CEP)" readonly />
+        <input type="text" id="buyCepUf" class="cart-input" placeholder="UF" readonly />
+      </div>
+      <p class="cep-lookup-status" id="buyCepStatus" aria-live="polite"></p>
       <p class="cart-hint">Esses dados vão na mensagem do WhatsApp para agilizar seu atendimento.</p>
       <button class="btn-buy" id="buyMetaConfirm" type="button" style="width:100%;margin-top:.85rem;padding:.85rem;border:none;border-radius:12px;background:#25D366;color:#fff;font-weight:600;font-size:.95rem;cursor:pointer">
         📲 Continuar no WhatsApp
