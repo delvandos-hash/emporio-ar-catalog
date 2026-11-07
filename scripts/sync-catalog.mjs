@@ -809,6 +809,12 @@ function mergeRoupasGroups(listOfGroupArrays, prevRoupas = []) {
 
 // ========== DANDE (ACESSÓRIOS) ==========
 const DANDE_BASE = process.env.DANDE_BASE_URL;
+function dandePathOnly(value) {
+  if (!value) return '';
+  try { const parsed = new URL(String(value), DANDE_BASE); return parsed.pathname + parsed.search; }
+  catch { return ''; }
+}
+
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -1058,7 +1064,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
             badge: prev?.badge || '',
             fonte: 'acessorios',
             id_origem: String(p.id),
-            url_origem: p.url || (prev && prev.url_origem) || '',
+            url_origem: dandePathOnly(p.url || (prev && prev.url_origem) || ''),
             total_estoque: totalEstoque,
             variacoes,
             cat: cat.nome,
