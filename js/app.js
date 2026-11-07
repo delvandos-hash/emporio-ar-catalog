@@ -1,6 +1,6 @@
 /**
  * Empório A.R - Catálogo Digital
- * Dados: API pública sanitizada + fallback local data.js + estoque ao vivo
+ * Dados: API pública sanitizada + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 
