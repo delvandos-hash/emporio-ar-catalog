@@ -89,3 +89,16 @@ test("lista plana de favoritos reúne origens e remove duplicatas sem perder met
     ["Perfume B", "Marca B", "masculino"]
   ]);
 });
+
+test("não funde produtos de linhas diferentes que compartilham marca, nome e volume", async () => {
+  const { collectFavoriteProducts } = await import("../js/favorites.js");
+  const groups = [
+    { line: "feminino", cat: "Perfumes", brand: "Marca A", items: [{ nome: "Perfume A", volume: "100ml", public_id: "p_feminino" }] },
+    { line: "unissex", cat: "Perfumes", brand: "Marca A", items: [{ nome: "Perfume A", volume: "100ml", public_id: "p_unissex" }] }
+  ];
+  const result = collectFavoriteProducts(groups, () => true);
+  assert.deepEqual(result.map((p) => [p.public_id, p.line]), [
+    ["p_feminino", "feminino"],
+    ["p_unissex", "unissex"]
+  ]);
+});
