@@ -11,6 +11,8 @@ on:
       - 'netlify/functions/product-image.mjs'
       - 'netlify/functions/get-feed.js'
       - 'scripts/get-feed.test.mjs'
+      - 'scripts/favorites-compat.test.mjs'
+      - 'js/favorites.js'
       - 'js/app.js'
       - 'js/data.js'
   workflow_dispatch:
@@ -40,7 +42,7 @@ jobs:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
-        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/publish-public-catalog.test.mjs
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs scripts/publish-public-catalog.test.mjs
       - name: Executar dry-run sem publicar no Gist
         if: github.event_name == 'pull_request' || inputs.publish != 'publish'
         env:
