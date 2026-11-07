@@ -139,7 +139,7 @@ export default async (req) => {
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ erro: "falha", mensagem: error.message }),
+      JSON.stringify({ erro: "falha inesperada" }),
       { status: 500, headers }
     );
   }
