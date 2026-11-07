@@ -4,7 +4,8 @@ on:
   pull_request:
     paths:
       - 'scripts/publish-public-catalog.mjs'
-      - 'scripts/publish-public-catalog.test.mjs scripts/variation-stock.test.mjs'
+      - 'scripts/publish-public-catalog.test.mjs'
+      - 'scripts/variation-stock.test.mjs'
       - 'scripts/public-catalog.mjs'
       - 'scripts/public-image-url.mjs'
       - 'netlify/functions/get-catalog.mjs'
@@ -12,7 +13,6 @@ on:
       - 'netlify/functions/get-feed.js'
       - 'netlify/functions/roupas-stock.mjs'
       - 'netlify/functions/dande-stock.mjs'
-      - 'scripts/variation-stock.test.mjs'
       - 'scripts/get-feed.test.mjs'
       - 'scripts/favorites-compat.test.mjs'
       - 'js/favorites.js'
