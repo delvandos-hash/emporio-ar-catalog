@@ -3092,6 +3092,62 @@ footer img{opacity:.85}
     .btn-sm { font-size: .64rem !important; }
   }
 
+
+  /* Estados de interação — seleção, foco e indisponibilidade */
+  .var-chip {
+    border-color: #d8cbbb !important;
+    background: #fffdfa !important;
+    color: #332725 !important;
+  }
+  .var-chip .var-chip-name { color: #332725 !important; }
+  .var-chip .var-chip-stock { color: #55745e !important; }
+  .var-chip.selected,
+  .var-chip.selected:hover {
+    background: #382a2a !important;
+    border-color: #b49a70 !important;
+    box-shadow: 0 0 0 2px rgba(180,154,112,.28) !important;
+  }
+  .var-chip.selected .var-chip-name { color: #fff8ef !important; }
+  .var-chip.selected .var-chip-stock { color: #ead6ad !important; }
+  .var-chip.var-chip-out,
+  .var-chip:disabled {
+    opacity: 1 !important;
+    background: #eeeae4 !important;
+    border-color: #d6cec3 !important;
+    color: #71645a !important;
+    cursor: not-allowed !important;
+  }
+  .var-chip.var-chip-out .var-chip-name,
+  .var-chip:disabled .var-chip-name { color: #71645a !important; }
+  .var-chip.var-chip-out .var-chip-stock,
+  .var-chip:disabled .var-chip-stock { color: #8b3e38 !important; }
+  .var-chip:focus-visible,
+  .btn-sm:focus-visible,
+  .fav-btn:focus-visible,
+  .fbtn:focus-visible,
+  .filter-select:focus-visible,
+  .view-toggle button:focus-visible,
+  .favorites-trigger:focus-visible,
+  .modal button:focus-visible,
+  .cart-input:focus-visible {
+    outline: 3px solid #92764e !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 0 2px #fffdfa !important;
+  }
+  .btn-sm:disabled,
+  .btn-sm.btn-disabled {
+    opacity: .72 !important;
+    cursor: not-allowed !important;
+    filter: saturate(.65);
+  }
+  .stock-ok { background: #e8f1e9 !important; color: #365b40 !important; }
+  .stock-out { background: #f7e8e5 !important; color: #8b302b !important; }
+  .cart-input:focus,
+  .cart-input:focus-visible {
+    outline: 3px solid rgba(146,118,78,.42) !important;
+    border-color: #92764e !important;
+  }
+
 </style>
 
 <link rel="manifest" href="manifest.webmanifest" />
