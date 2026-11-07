@@ -41,7 +41,17 @@ try {
   const el = document.getElementById('bootStatus');
   if (el) {
     if (DATA && Object.keys(DATA).length) el.remove();
-    else el.textContent = 'Catálogo temporariamente indisponível. Tente novamente em instantes.';
+    else {
+      el.textContent = 'Catálogo temporariamente indisponível.';
+      el.style.flexDirection = 'column';
+      el.style.gap = '1rem';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = 'Tentar novamente';
+      retry.style.cssText = 'padding:.8rem 1.2rem;border:1px solid #b49a70;border-radius:8px;background:#211c1a;color:#f2ede3;font:600 1rem system-ui;cursor:pointer';
+      retry.addEventListener('click', () => window.location.reload());
+      el.appendChild(retry);
+    }
   }
 } catch (e) {}
 
@@ -2179,6 +2189,25 @@ function goNavSession() {
 
 
 
+function updateStockSyncStatus(ok) {
+  const container = document.querySelector('.notice');
+  let status = document.getElementById('stockSyncStatus');
+  if (ok) {
+    status?.remove();
+    return;
+  }
+  if (!container) return;
+  if (!status) {
+    status = document.createElement('p');
+    status.id = 'stockSyncStatus';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.style.cssText = 'margin:.65rem 0 0;padding:.55rem .7rem;border-top:1px solid rgba(139,48,43,.22);color:#8b302b;font-size:.82rem;font-weight:600';
+    container.querySelector('.notice-inner')?.appendChild(status);
+  }
+  status.textContent = 'Não foi possível atualizar o estoque agora. A disponibilidade pode estar desatualizada; confirme antes de concluir o pedido.';
+}
+
 function showCartToast(msg) {
   const el = document.getElementById('toastCart');
   if (!el) return;
@@ -3267,7 +3296,8 @@ document.getElementById('shareDownloadStory')?.addEventListener('click', async (
   if (!currentProduct) return;
   closeShareSheet();
   alert('Gerando imagem para Stories/Status…');
-  await downloadStoryCard(currentProduct);
+  const generated = await downloadStoryCard(currentProduct);
+  if (generated) alert('Imagem gerada. O download foi iniciado; abra a galeria para conferir o arquivo.');
 });
 document.getElementById('shareNative')?.addEventListener('click', async () => {
   if (!currentProduct) return;
@@ -3278,7 +3308,11 @@ document.getElementById('shareNative')?.addEventListener('click', async () => {
   if (navigator.share) {
     try {
       await navigator.share({ title: `${p.nome} · Empório A.R`, text, url });
-    } catch (e) {}
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        alert('Não foi possível abrir o compartilhamento do aparelho. Você pode copiar o link ou tentar novamente.');
+      }
+    }
   } else {
     alert('Compartilhamento do sistema não disponível neste aparelho. Use copiar link ou baixar imagem.');
   }
@@ -3286,8 +3320,9 @@ document.getElementById('shareNative')?.addEventListener('click', async () => {
 document.getElementById('shareWhatsApp')?.addEventListener('click', () => {
   const ov = document.getElementById('shareSheet');
   const text = ov?.dataset.text || '';
-  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  const opened = window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
   closeShareSheet();
+  if (!opened) alert('O navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este catálogo e tente novamente.');
 });
 
 
@@ -3436,7 +3471,11 @@ updateCartUI();
 render();
 updateFavoritesBadge();
 syncStockFromRoot().then((ok) => {
+  updateStockSyncStatus(ok);
   if (ok) render();
+  openProductFromUrl();
+}).catch(() => {
+  updateStockSyncStatus(false);
   openProductFromUrl();
 });
 // Deep link mesmo sem esperar estoque (fallback)
