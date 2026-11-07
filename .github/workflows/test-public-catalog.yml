@@ -21,4 +21,4 @@ jobs:
         with:
           node-version: "22"
       - name: Executar testes de sanitização
-        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs netlify/functions/product-image.test.mjs
