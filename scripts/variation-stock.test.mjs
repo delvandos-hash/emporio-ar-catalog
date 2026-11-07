@@ -31,3 +31,31 @@ test("acessórios devolvem IDs públicos e não expõem SKU", () => {
   assert.equal(JSON.stringify(result).includes("variant-private"), false);
   assert.equal(JSON.stringify(result).includes("SKU-PRIVADO"), false);
 });
+
+import { parseVariantsFromHtml } from "../netlify/functions/dande-stock.mjs";
+
+test("Dande só associa variações ao produto solicitado", () => {
+  const html = '<div data-product-id="111" data-variants="[{&quot;product_id&quot;:111,&quot;option0&quot;:&quot;P&quot;,&quot;stock&quot;:2}]"></div>' +
+    '<div data-product-id="222" data-variants="[{&quot;product_id&quot;:222,&quot;option0&quot;:&quot;G&quot;,&quot;stock&quot;:9}]"></div>';
+  assert.deepEqual(parseVariantsFromHtml(html, "111"), [
+    { product_id: 111, option0: "P", stock: 2 }
+  ]);
+});
+
+test("Dande não reutiliza variações do próximo produto quando o atual não tem estoque embutido", () => {
+  const html = '<div data-product-id="111"></div>' +
+    '<div data-product-id="222" data-variants="[{&quot;product_id&quot;:222,&quot;option0&quot;:&quot;G&quot;,&quot;stock&quot;:9}]"></div>';
+  assert.equal(parseVariantsFromHtml(html, "111"), null);
+});
+
+test("Dande não usa a primeira variação da página se o ID do produto não corresponder", () => {
+  const html = '<div data-variants="[{&quot;product_id&quot;:222,&quot;option0&quot;:&quot;G&quot;,&quot;stock&quot;:9}]"></div>';
+  assert.equal(parseVariantsFromHtml(html, "111"), null);
+});
+
+test("Dande mantém compatibilidade com página de produto sem ID solicitado", () => {
+  const html = '<div data-variants="[{&quot;option0&quot;:&quot;Único&quot;,&quot;stock&quot;:4}]"></div>';
+  assert.deepEqual(parseVariantsFromHtml(html), [
+    { option0: "Único", stock: 4 }
+  ]);
+});
