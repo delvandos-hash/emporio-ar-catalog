@@ -49,7 +49,7 @@ jobs:
           node --check js/app.js
           node --check netlify/functions/roupas-stock.mjs
           node --check netlify/functions/dande-stock.mjs
-          node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs scripts/publish-public-catalog.test.mjs
+          node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs scripts/variation-stock.test.mjs scripts/publish-public-catalog.test.mjs
       - name: Executar dry-run sem publicar no Gist
         if: github.event_name == 'pull_request' || inputs.publish != 'publish'
         env:
