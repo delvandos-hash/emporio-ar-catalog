@@ -3057,11 +3057,15 @@ document.getElementById('favoritesList')?.addEventListener('click', (event) => {
   if (!product) return;
   if (action === 'remove') {
     toggleFav(product);
-    renderFavoritesModal();
+    if (getFavoriteProducts().length === 0) {
+      closeFavoritesModal();
+    } else {
+      renderFavoritesModal();
+    }
     render();
   } else if (action === 'add') {
-    closeFavoritesModal();
     if (isVariacaoCatalogProduct(product)) {
+      closeFavoritesModal();
       openDetails(product);
     } else {
       addToCart(product, 1);
