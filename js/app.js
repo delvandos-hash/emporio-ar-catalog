@@ -3,7 +3,7 @@
  * Dados: API pública sanitizada + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
-import { isFavoriteId, toggleFavoriteIds, filterFavoriteGroups } from './favorites.js';
+import { isFavoriteId, toggleFavoriteIds, filterFavoriteGroups, collectFavoriteProducts } from './favorites.js';
 
 async function loadCatalogData() {
   // O catálogo só é carregado pela API pública sanitizada.
@@ -2027,24 +2027,10 @@ function toggleFav(p) {
 function getFavoriteProducts() {
   const favoriteIds = new Set(loadFavs());
   const groups = allGroups();
-  const products = [];
-  const seen = new Set();
-  for (const group of groups) {
-    for (const raw of group.items || []) {
-      const product = validateProductPrices({
-        ...raw,
-        brand: group.brand,
-        cat: group.cat,
-        line: group.line
-      });
-      if (!isFav(product, favoriteIds)) continue;
-      const key = productId(product);
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      products.push(product);
-    }
-  }
-  return products;
+  return collectFavoriteProducts(groups, (item, group) =>
+    isFav({ ...item, brand: group.brand, cat: group.cat }, favoriteIds)
+  ).map((product) => validateProductPrices(product));
+
 }
 
 function openFavoritesModal() {
@@ -2352,6 +2338,7 @@ function render() {
         btn.textContent = on ? '♥' : '♡';
         btn.setAttribute('aria-label', on ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
         if (state.favoritesOnly) render();
+        if (document.getElementById('favoritesModal')?.classList.contains('open')) renderFavoritesModal();
       } catch (err) {}
     });
   });
