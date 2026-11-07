@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildPublicPayload, parseCatalogData, getCompleteGistFileContent } from "./publish-public-catalog.mjs";
 
+process.env.CDN_IMAGE_BASE_URL = "https://images-primary.example/";
+process.env.CDN_IMAGE_FALLBACK_BASE_URL = "https://images-secondary.example/";
+process.env.IMARAT_ORIGIN_URL = "https://products.example/";
+
 const catalog = {
   perfumes: [{
     brand: "Marca",
@@ -12,7 +16,7 @@ const catalog = {
       varejo: "199,90",
       atacado: "149,90",
       disponivel: "Sim",
-      foto: "https://imaratperfumaria.com/uploads/products/a.webp",
+      foto: "https://products.example/uploads/products/a.webp",
       custo: 80,
       precoManual: true,
       url_origem: "https://fornecedor.example/item"
@@ -30,7 +34,7 @@ test("prepara projeção pública sem alterar valores comerciais do snapshot", (
   assert.equal(groupCount, 1);
   assert.equal(item.varejo, "199,90");
   assert.equal(item.atacado, "149,90");
-  assert.equal(item.foto, "/api/product-image?path=%2Fuploads%2Fproducts%2Fa.webp");
+  assert.equal(item.foto, "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fa.webp");
   assert.equal("custo" in item, false);
   assert.equal("precoManual" in item, false);
   assert.equal("url_origem" in item, false);
