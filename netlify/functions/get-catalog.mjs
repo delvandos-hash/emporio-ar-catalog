@@ -28,8 +28,20 @@ export default async (req, context) => {
     }
 
     const data = await response.json();
+    const privateKeys = new Set(['original','custo','precocusto','preco_custo','cost','costprice','precobase','preco_base']);
+    const sanitize = (value) => {
+      if (Array.isArray(value)) return value.map(sanitize);
+      if (!value || typeof value !== 'object') return value;
+      const clean = {};
+      for (const [key, child] of Object.entries(value)) {
+        if (privateKeys.has(key.toLowerCase())) continue;
+        clean[key] = sanitize(child);
+      }
+      return clean;
+    };
+    const publicData = sanitize(data);
 
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(publicData), {
       status: 200,
       headers: {
         "Content-Type": "application/json; charset=utf-8",
