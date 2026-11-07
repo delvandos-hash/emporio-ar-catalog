@@ -2,7 +2,7 @@
    Camada exclusivamente visual: não altera dados, filtros, preços, estoque,
    calendário sazonal, carrinho, integrações ou regras de publicação. */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
 
 :root {
   --premium-ivory: #fbf8f2;
@@ -14,8 +14,8 @@
   --premium-muted: #81796d;
   --premium-line: #e9e1d5;
   --premium-shadow: 0 12px 34px rgba(56, 43, 24, .075);
-  --premium-font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --premium-font-ui: "DM Sans", "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --premium-font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --premium-font-ui: "Manrope", "Avenir Next", Avenir, "Segoe UI", sans-serif;
 }
 
 html { scroll-behavior: smooth; }
@@ -231,13 +231,37 @@ body:not([class*="theme-"]) .feat-card:hover {
   border-radius: 12px;
   background: #f8f4ed;
 }
+.feat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  height: auto;
+  min-height: 0;
+}
 .feat-card .feat-name {
+  display: block;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: .45rem 0 .25rem;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  text-overflow: clip;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: initial;
   font-family: var(--premium-font-ui);
-  font-size: .78rem;
-  line-height: 1.4;
+  font-size: .77rem;
+  line-height: 1.48;
   font-weight: 600;
 }
 .feat-card .feat-price {
+  display: block;
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: .2rem;
   font-family: var(--premium-font-ui);
   font-size: .86rem;
   font-weight: 700;
