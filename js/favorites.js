@@ -35,7 +35,7 @@ export function filterFavoriteGroups(groups, isFavorite) {
 }
 
 
-/** Junta os favoritos em uma lista plana, preservando a origem de cada produto. */
+/** Junta favoritos sem fundir produtos distintos que compartilham nome e volume. */
 export function collectFavoriteProducts(groups, isFavorite) {
   if (!Array.isArray(groups) || typeof isFavorite !== 'function') return [];
   const seen = new Set();
@@ -43,10 +43,22 @@ export function collectFavoriteProducts(groups, isFavorite) {
   for (const group of groups) {
     for (const item of Array.isArray(group.items) ? group.items : []) {
       if (!isFavorite(item, group)) continue;
-      const key = [group.brand || item.brand || '', item.nome || '', item.volume || ''].join('|');
+      const brand = item.brand || group.brand || '';
+      const key = item.public_id || [
+        group.line || item.line || '',
+        group.cat || item.cat || '',
+        brand,
+        item.nome || '',
+        item.volume || ''
+      ].join('|');
       if (seen.has(key)) continue;
       seen.add(key);
-      result.push({ ...item, brand: item.brand || group.brand || '', cat: item.cat || group.cat || '', line: item.line || group.line || '' });
+      result.push({
+        ...item,
+        brand,
+        cat: item.cat || group.cat || '',
+        line: item.line || group.line || ''
+      });
     }
   }
   return result;
