@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { toPublicCatalog } from "./public-catalog.mjs";
+process.env.CDN_IMAGE_BASE_URL = "https://images-primary.example/";
+process.env.CDN_IMAGE_FALLBACK_BASE_URL = "https://images-secondary.example/";
+process.env.IMARAT_ORIGIN_URL = "https://products.example/";
 
 test("publica somente os campos usados pela vitrine", () => {
   const result = toPublicCatalog({
@@ -9,19 +12,16 @@ test("publica somente os campos usados pela vitrine", () => {
       cat: "Perfumes",
       cat_id: "interno-cat",
       items: [{
-        id: "interno-id",
-        id_origem: "123",
-        nome: "Perfume",
+                        nome: "Perfume",
         volume: "100ml",
         varejo: "199,90",
         atacado: "149,90",
-        foto: "https://arquivos-cdn.facilzap.app.br/produtos/a.webp",
-        fotos: ["https://acdn-us.mitiendanube.com/a.webp"],
+        foto: "https://images-primary.example/produtos/a.webp",
+        fotos: ["https://images-secondary.example/a.webp"],
         notas: "Baunilha",
         disponivel: "Sim",
         badge: "Novo",
-        fonte: "imarat",
-        novoDesde: "2026-11-07",
+                novoDesde: "2026-11-07",
         variacoes: [{ id: "v1", nome: "Único", estoque: 3, sku: "privado", custo: 99 }],
         custo: 50,
         precoManual: true,
@@ -36,11 +36,12 @@ test("publica somente os campos usados pela vitrine", () => {
   assert.deepEqual(Object.keys(group).sort(), ["brand", "cat", "items"]);
   assert.deepEqual(Object.keys(item).sort(), [
     "atacado", "badge", "disponivel", "fonte", "foto", "fotos",
-    "id_origem", "nome", "notas", "novoDesde", "varejo", "variacoes", "volume"
+    "nome", "notas", "novoDesde", "public_id", "varejo", "variacoes", "volume"
   ].sort());
   assert.equal(item.nome, "Perfume");
-  assert.equal(item.id_origem, "123");
   assert.deepEqual(item.variacoes, [{ id: "v1", nome: "Único", estoque: 3 }]);
+  assert.equal(item.fonte, "perfumaria");
+  assert.match(item.public_id, /^p_[a-f0-9]{20}$/);
 });
 
 test("converte imagem da Imarat para rota same-origin e remove URL inválida", () => {
@@ -50,9 +51,9 @@ test("converte imagem da Imarat para rota same-origin e remove URL inválida", (
       cat: "Perfumes",
       items: [{
         nome: "Produto",
-        foto: "https://imaratperfumaria.com/uploads/products/item.webp",
+        foto: "https://products.example/uploads/products/item.webp",
         fotos: [
-          "https://imaratperfumaria.com/uploads/products/item-2.webp",
+          "https://products.example/uploads/products/item-2.webp",
           "https://host-nao-autorizado.example/track"
         ]
       }]
@@ -71,7 +72,7 @@ test("descarta imagem inválida sem remover o produto", () => {
       items: [{ nome: "Produto sem imagem", foto: "https://host-nao-autorizado.example/a.webp" }]
     }]
   });
-  assert.deepEqual(result.perfumes[0].items, [{ nome: "Produto sem imagem" }]);
+  assert.deepEqual(result.perfumes[0].items.map(x => x.nome), ["Produto sem imagem"]);
 });
 
 test("normaliza estoque de variações e limita identificadores/textos", () => {
@@ -81,8 +82,7 @@ test("normaliza estoque de variações e limita identificadores/textos", () => {
       cat: "Roupas",
       items: [{
         nome: "Vestido",
-        id_origem: "x".repeat(150),
-        variacoes: [
+                variacoes: [
           { id: "v".repeat(150), nome: "Tamanho M".repeat(20), estoque: "4.8", sku: "interno" },
           { id: "v2", nome: "Tamanho G", estoque: -3, custo: 12 },
           { id: "v3", nome: "Tamanho P", estoque: "inválido" }
@@ -91,9 +91,8 @@ test("normaliza estoque de variações e limita identificadores/textos", () => {
     }]
   });
   const item = result.roupas[0].items[0];
-  assert.equal(item.id_origem.length, 120);
   assert.deepEqual(item.variacoes.map(v => v.estoque), [4, 0, 0]);
-  assert.equal(item.variacoes[0].id.length, 120);
+  assert.equal(item.variacoes[0].id, "v1");
   assert.equal(item.variacoes[0].nome.length, 120);
   assert.equal("sku" in item.variacoes[0], false);
 });
@@ -113,13 +112,12 @@ test("API e publicação no Gist mantêm a mesma projeção pública", () => {
       cat_id: "interno",
       items: [{
         id: "privado",
-        id_origem: 123,
-        nome: "Perfume",
+                nome: "Perfume",
         volume: "100ml",
         varejo: "199,90",
         atacado: "149,90",
-        foto: "https://imaratperfumaria.com/uploads/products/a.webp",
-        fotos: ["https://arquivos-cdn.facilzap.app.br/produtos/b.webp"],
+        foto: "https://products.example/uploads/products/a.webp",
+        fotos: ["https://images-primary.example/produtos/b.webp"],
         notas: "Baunilha",
         disponivel: "Sim",
         variacoes: [{ id: 1, nome: "Único", estoque: "2", sku: "privado" }],
@@ -138,4 +136,17 @@ test("API e publicação no Gist mantêm a mesma projeção pública", () => {
   }).DATA;
 
   assert.deepEqual(fromApi, fromGist);
+});
+
+test("remove identificadores internos e padroniza a fonte", () => {
+  const result = toPublicCatalog({ roupas: [{ brand: "Marca", cat: "Roupas", items: [{
+    nome: "Vestido", fonte: "fornecedor-interno", id_origem: "segredo-123",
+    variacoes: [{ id: "id-privado", nome: "M", estoque: 2 }]
+  }]}]});
+  const item = result.roupas[0].items[0];
+  assert.equal(item.fonte, "roupas");
+  assert.equal("id_origem" in item, false);
+  assert.equal(item.variacoes[0].id, "v1");
+  assert.equal(JSON.stringify(result).includes("segredo-123"), false);
+  assert.equal(JSON.stringify(result).includes("id-privado"), false);
 });
