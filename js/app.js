@@ -1261,7 +1261,7 @@ function renderCart() {
     const label = isScoopProduct(p) ? 'Preço fixo' : (useAtacado ? 'Atacado' : 'Varejo');
     return `
     <div class="cart-item">
-      <img class="cart-item-photo" src="${escapeHtml(resolveCatalogImageUrl(p.foto) || '')}" alt="${escapeHtml(p.nome)}" width="64" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden';this.removeAttribute('src')">
+      <img class="cart-item-photo" src="${escapeHtml(resolveCatalogImageUrl(p.foto) || '')}" alt="${escapeHtml(p.nome)}" width="64" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer">
       <div class="cart-item-info">
         <strong>${escapeHtml(p.nome)}</strong><br>
         <span class="cart-item-meta">${escapeHtml(p.brand || '')} · ${escapeHtml(p.volume || '—')}${p.variacaoNome ? ' · Variação: ' + escapeHtml(p.variacaoNome) : ''} · ${label}: R$ ${formatBRL(unit)}</span>
@@ -1293,6 +1293,9 @@ function renderCart() {
     </div>
     <button type="button" class="cart-clear" id="cartClearBtn">Limpar pedido</button>`;
 
+  list.querySelectorAll('.cart-item-photo').forEach(img => {
+    img.addEventListener('error', () => { img.hidden = true; }, { once: true });
+  });
   list.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => removeFromCart(Number(btn.dataset.remove)));
   });
