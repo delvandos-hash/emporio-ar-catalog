@@ -3,6 +3,7 @@
  * Dados: API pública sanitizada + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
+import { isFavoriteId } from './favorites.js';
 
 async function loadCatalogData() {
   // O catálogo só é carregado pela API pública sanitizada.
@@ -2005,7 +2006,10 @@ function favId(p) {
 }
 function isFav(p) {
   const id = favId(p);
-  return loadFavs().includes(id);
+  // Compatibilidade: versões anteriores também salvavam productId (marca-nome-volume).
+  // IDs internos antigos permanecem no armazenamento, mas não são publicados nem recriados.
+  const legacyId = productId(p);
+  return isFavoriteId(loadFavs(), id, legacyId);
 }
 function toggleFav(p) {
   const id = favId(p);
