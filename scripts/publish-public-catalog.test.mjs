@@ -7,7 +7,7 @@ process.env.CDN_IMAGE_FALLBACK_BASE_URL = "https://images-secondary.example/";
 process.env.IMARAT_ORIGIN_URL = "https://products.example/";
 
 const catalog = {
-  perfumes: [{
+  feminino: [{
     brand: "Marca",
     cat: "Perfumes",
     items: [{
@@ -29,7 +29,7 @@ export const WHATSAPP = "5562991134488";
 
 test("prepara projeção pública sem alterar valores comerciais do snapshot", () => {
   const { payload, productCount, groupCount } = buildPublicPayload(source, "2026-11-07T12:00:00.000Z");
-  const item = payload.DATA.perfumes[0].items[0];
+  const item = payload.DATA.feminino[0].items[0];
   assert.equal(productCount, 1);
   assert.equal(groupCount, 1);
   assert.equal(item.varejo, "199,90");
