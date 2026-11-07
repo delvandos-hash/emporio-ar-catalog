@@ -27,13 +27,13 @@ function setMeta(html: string, attribute: string, key: string, value: string): s
   const pattern = new RegExp(`<meta\\s+[^>]*${attribute}=["']${key}["'][^>]*>`, "i");
   const replacement = `<meta ${attribute}="${key}" content="${escaped}" />`;
   if (pattern.test(html)) return html.replace(pattern, replacement);
-  return html.replace("</head>", `  ${replacement}\\n</head>`);
+  return html.replace("</head>", `  ${replacement}\n</head>`);
 }
 
 function setCanonical(html: string, url: string): string {
   const replacement = `<link rel="canonical" href="${escapeHtml(url)}" />`;
   const pattern = new RegExp('<link[^>]*canonical[^>]*>', 'i');
-  return pattern.test(html) ? html.replace(pattern, replacement) : html.replace("</head>", `  ${replacement}\\n</head>`);
+  return pattern.test(html) ? html.replace(pattern, replacement) : html.replace("</head>", `  ${replacement}\n</head>`);
 }
 
 export default async (request: Request, context: any) => {
