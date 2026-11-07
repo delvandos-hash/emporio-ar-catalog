@@ -1000,6 +1000,38 @@ function cartKey(p) {
   return `${p.brand}|${p.nome}|${p.volume || ''}`;
 }
 
+function isProductInCart(product, selectedVariations = null) {
+  if (!product) return false;
+  const entries = cart.filter(item => cartKey(item) === cartKey(product));
+  if (!entries.length) return false;
+  if (Array.isArray(selectedVariations) && selectedVariations.length) {
+    const names = selectedVariations.map(v => String(v.nome || ''));
+    return names.every(name => entries.some(item => item.variacaoNome === name));
+  }
+  return true;
+}
+
+function syncCartButtonStates() {
+  document.querySelectorAll('#main .btn-add[data-p]').forEach(btn => {
+    try {
+      const product = JSON.parse(decodeURIComponent(btn.dataset.p));
+      const added = isProductInCart(product);
+      if (!btn.disabled) {
+        btn.textContent = added ? '✓ Adicionado ao carrinho' : 'Adicionar ao carrinho';
+        btn.classList.toggle('is-added', added);
+        btn.setAttribute('aria-label', btn.textContent);
+      }
+    } catch (error) {}
+  });
+  const modalButton = document.getElementById('modalAddCart');
+  if (modalButton && currentProduct && !modalButton.disabled) {
+    const selected = Array.isArray(currentProduct.variacoesSelecionadas) ? currentProduct.variacoesSelecionadas : null;
+    const added = isProductInCart(currentProduct, selected);
+    modalButton.textContent = added ? '✓ Adicionado ao carrinho' : '🛒 Adicionar ao carrinho';
+    modalButton.classList.toggle('is-added', added);
+  }
+}
+
 function buildWaMessage(p, meta = {}) {
   const qty = Math.max(1, Math.min(99, parseInt(meta.qty, 10) || 1));
   const isScoop = isScoopProduct(p), selected = Array.isArray(p.variacoesSelecionadas) ? p.variacoesSelecionadas : [];
@@ -1411,6 +1443,7 @@ function setCartQty(index, qty) {
 function removeFromCart(index) {
   cart.splice(index, 1);
   updateCartUI();
+  syncCartButtonStates();
   if (document.getElementById('cartModal').classList.contains('open')) renderCart();
 }
 
@@ -1551,6 +1584,7 @@ function renderCart() {
       try { localStorage.removeItem('emporio_cart_v1'); } catch (e) {}
       try { persistCart(); } catch (e) {}
       updateCartUI();
+      syncCartButtonStates();
       renderCart();
     }
   });
@@ -2040,7 +2074,9 @@ function openDetails(p, opts = {}) {
   if (avail) {
     btnAdd.disabled = false;
     btnAdd.classList.remove('btn-disabled');
-    btnAdd.textContent = '🛒 Adicionar ao carrinho';
+    const alreadyAdded = isProductInCart(p, Array.isArray(p.variacoesSelecionadas) && p.variacoesSelecionadas.length ? p.variacoesSelecionadas : null);
+    btnAdd.textContent = alreadyAdded ? '✓ Adicionado ao carrinho' : '🛒 Adicionar ao carrinho';
+    btnAdd.classList.toggle('is-added', alreadyAdded);
     btnBuy.disabled = false;
     btnBuy.classList.remove('btn-disabled');
     btnBuy.textContent = '📲 Comprar no WhatsApp';
@@ -2048,6 +2084,7 @@ function openDetails(p, opts = {}) {
     btnAdd.disabled = true;
     btnAdd.classList.add('btn-disabled');
     btnAdd.textContent = 'Esgotado — indisponível';
+    btnAdd.classList.remove('is-added');
     btnBuy.disabled = true;
     btnBuy.classList.add('btn-disabled');
     btnBuy.textContent = 'Esgotado — indisponível';
@@ -2652,8 +2689,9 @@ function render() {
         const stockHtml = avail
           ? '<span class="stock-label stock-ok">Disponível</span>'
           : '<span class="stock-label stock-out">Esgotado</span>';
+        const alreadyAdded = isProductInCart(item);
         const addBtn = avail
-          ? `<button class="btn-sm btn-add" data-p="${pdata}">Adicionar ao carrinho</button>`
+          ? `<button class="btn-sm btn-add${alreadyAdded ? ' is-added' : ''}" data-p="${pdata}" aria-label="${alreadyAdded ? 'Adicionado ao carrinho' : 'Adicionar ao carrinho'}">${alreadyAdded ? '✓ Adicionado ao carrinho' : 'Adicionar ao carrinho'}</button>`
           : `<button class="btn-sm btn-add btn-disabled" disabled>Esgotado</button>`;
         const buyBtn = avail
           ? `<button class="btn-sm btn-buy" data-p="${pdata}">Comprar</button>`
@@ -2686,6 +2724,7 @@ function render() {
     html += `</div>`;
   }
   main.innerHTML = buildFeaturedHtml() + html;
+  syncCartButtonStates();
 
   applyViewMode();
   main.querySelectorAll('.photo-click img, .feat-card img').forEach((img) => {
@@ -2761,9 +2800,7 @@ main.querySelectorAll('.btn-details, .photo-click').forEach(el => {
     btn.addEventListener('click', () => {
       const added = addToCart(JSON.parse(decodeURIComponent(btn.dataset.p)));
       if (!added) return;
-      const prev = btn.textContent;
-      btn.textContent = '✓ Adicionado';
-      setTimeout(() => { btn.textContent = prev; }, 900);
+      syncCartButtonStates();
     });
   });
 }
@@ -2863,10 +2900,7 @@ document.getElementById('modalAddCart').addEventListener('click', () => {
   if (currentProduct) {
     const added = addToCart(currentProduct);
     if (!added) return;
-    const btn = document.getElementById('modalAddCart');
-    const prev = btn.textContent;
-    btn.textContent = '✓ Adicionado ao carrinho';
-    setTimeout(() => { btn.textContent = prev; }, 1000);
+    syncCartButtonStates();
   }
 });
 
