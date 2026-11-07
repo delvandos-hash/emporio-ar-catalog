@@ -683,6 +683,37 @@ function findCartCatalogPhoto(cartItem) {
   return '';
 }
 
+function findCartCatalogProductId(cartItem) {
+  const wantedName = String(cartItem?.nome || '').trim().toLowerCase();
+  const wantedBrand = String(cartItem?.brand || '').trim().toLowerCase();
+  const wantedVolume = String(cartItem?.volume || '').trim().toLowerCase();
+  for (const line of Object.keys(DATA || {})) {
+    for (const group of DATA[line] || []) {
+      for (const product of group.items || []) {
+        if (String(product.nome || '').trim().toLowerCase() !== wantedName) continue;
+        if (String(group.brand || '').trim().toLowerCase() !== wantedBrand) continue;
+        if (String(product.volume || '').trim().toLowerCase() !== wantedVolume) continue;
+        return productId({ ...product, brand: group.brand, cat: group.cat, line });
+      }
+    }
+  }
+  return '';
+}
+
+function getCartProductUrl(cartItem) {
+  const id = String(cartItem?.produtoId || findCartCatalogProductId(cartItem) || '');
+  if (!id) return '';
+  try {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('produto', id);
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
 function loadCart() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
@@ -694,6 +725,8 @@ function loadCart() {
         brand: String(item.brand || '').slice(0, 120),
         volume: String(item.volume || '').slice(0, 60),
         foto: resolveCatalogImageUrl(item.foto) || findCartCatalogPhoto(item),
+        produtoId: String(item.produtoId || findCartCatalogProductId(item) || '').slice(0, 220),
+        variacaoEstoque: item.variacaoEstoque == null ? null : Math.max(0, Number(item.variacaoEstoque) || 0),
         varejo: String(item.varejo ?? ''),
         atacado: String(item.atacado ?? ''),
         disponivel: item.disponivel === 'Não' ? 'Não' : 'Sim',
@@ -906,6 +939,8 @@ function buildWaMessage(p, meta = {}) {
   if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   if (meta.nome || meta.cep) msg += '\n';
   msg += `*${p.nome}*\nMarca: ${p.brand || 'Empório A.R'}\n`;
+  const productUrl = getProductShareUrl(p);
+  if (productUrl) msg += `🔎 Produto no catálogo: ${productUrl}\n`;
   if (p.cat && isVariacaoCatalogProduct(p)) msg += `Categoria: ${p.cat}\n`;
   if (selected.length) {
     const totalQty = qty * selected.length, wholesale = !isScoop && totalQty >= 6 && p.atacado && p.atacado !== '—';
@@ -1150,6 +1185,8 @@ function buildCartWaMessage() {
     if (p.variacaoNome) msg += `   Variação: *${p.variacaoNome}*\n`;
     else if (p.volume && p.volume !== '—') msg += `   Volume: ${p.volume}\n`;
     if (p.cat) msg += `   Categoria: ${p.cat}\n`;
+    const productUrl = getCartProductUrl(p);
+    if (productUrl) msg += `   Foto e detalhes: ${productUrl}\n`;
     msg += `   Qtd: *${p.qty}* × R$ ${formatBRL(unit)} = *R$ ${formatBRL(sub)}*\n`;
   });
   msg += '────────────────\n';
@@ -1193,6 +1230,7 @@ function addToCart(p, qty = 1) {
     if (existing) existing.qty += qty;
     else cart.push({ nome:p.nome, brand:p.brand, volume:p.volume,
       foto:resolveCatalogImageUrl(p.foto || (Array.isArray(p.fotos) ? p.fotos[0] : '')),
+      produtoId:productId(p),
       varejo:p.varejo, atacado:p.atacado,
       disponivel:p.disponivel || 'Sim', qty, variacaoNome:variacao ? variacao.nome : '',
       variacaoEstoque:variacao ? variacao.estoque : null, cat:p.cat || '' });
