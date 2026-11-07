@@ -1,8 +1,12 @@
 /** Compatibilidade de favoritos sem expor identificadores internos. */
 export function isFavoriteId(favorites, publicId, legacyId) {
-  if (!Array.isArray(favorites)) return false;
+  const has = favorites instanceof Set
+    ? (id) => favorites.has(id)
+    : Array.isArray(favorites)
+      ? (id) => favorites.includes(id)
+      : () => false;
   return [publicId, legacyId].some((id) =>
-    typeof id === 'string' && id.length > 0 && favorites.includes(id)
+    typeof id === 'string' && id.length > 0 && has(id)
   );
 }
 
