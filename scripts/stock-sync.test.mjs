@@ -41,6 +41,31 @@ test("snapshot público usa somente chaves neutras e mantém os dois mapas de es
     for (const key of ["sources", "imarat", "brand", "brandMap", "brandByName", "total"]) {
       assert.equal(Object.hasOwn(payload, key), false, "campo interno não deve ser público: " + key);
     }
+
+    globalThis.fetch = async input => {
+      const url = String(input);
+      if (url.startsWith(process.env.IMARAT_API_URL)) throw new Error("falha simulada");
+      if (url === process.env.BRAND_BASE_URL + "/c/atacado/darlanaugusto") return new Response("", { status: 200 });
+      if (url.startsWith(process.env.BRAND_BASE_URL + "/c/atacado/carregar_produtos/1/")) return new Response("[]", { status: 200 });
+      throw new Error("URL inesperada no teste: " + url);
+    };
+    const partial = JSON.parse((await handler({ httpMethod: "GET" })).body);
+    assert.equal(partial.ok, false, "uma origem indisponível deve invalidar o snapshot completo");
+    assert.deepEqual(partial.mapA, {});
+    assert.equal(Object.hasOwn(partial, "imarat"), false);
+    assert.equal(Object.hasOwn(partial, "brand"), false);
+
+    globalThis.fetch = async input => {
+      const url = String(input);
+      if (url.startsWith(process.env.IMARAT_API_URL)) return new Response(JSON.stringify({ total: 0, products: [] }), { status: 200 });
+      if (url === process.env.BRAND_BASE_URL + "/c/atacado/darlanaugusto") throw new Error("falha simulada");
+      throw new Error("URL inesperada no teste: " + url);
+    };
+    const partialBrand = JSON.parse((await handler({ httpMethod: "GET" })).body);
+    assert.equal(partialBrand.ok, false, "falha da segunda origem também deve invalidar o snapshot");
+    assert.deepEqual(partialBrand.mapB, {});
+    assert.equal(Object.hasOwn(partialBrand, "imarat"), false);
+    assert.equal(Object.hasOwn(partialBrand, "brand"), false);
   } finally {
     globalThis.fetch = previousFetch;
     for (const key of envKeys) {
