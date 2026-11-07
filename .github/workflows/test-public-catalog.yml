@@ -22,4 +22,4 @@ jobs:
         with:
           node-version: "22"
       - name: Executar testes de sanitização
-        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs scripts/product-share.test.mjs
