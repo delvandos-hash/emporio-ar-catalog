@@ -200,7 +200,7 @@ export default async (req) => {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: stockRef || String(found.id),
+                id: stockRef || null,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
