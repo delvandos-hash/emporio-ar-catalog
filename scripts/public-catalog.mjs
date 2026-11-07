@@ -21,13 +21,14 @@ function publicSource(line, cat) {
   return "outros";
 }
 function publicLine(line, groups) {
-  const normalized = String(line || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
+  const normalized = String(line || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (normalized.includes("masculino")) return "masculino";
   if (normalized.includes("feminino")) return "feminino";
   if (normalized.includes("unissex")) return "unissex";
   if (normalized.includes("roup")) return "roupas";
   if (normalized.includes("acessor")) return "acessorios";
   if (normalized.includes("brand")) return "brand";
+  if (normalized.includes("perf")) return "perfumaria";
   if (normalized.includes("scoop")) return "scoop premiado";
   const categories = (Array.isArray(groups) ? groups : []).map(group => String(group?.cat || "").toLowerCase());
   if (categories.some(cat => cat.includes("roup"))) return "roupas";
