@@ -42,7 +42,10 @@ export default async (req) => {
 
   try {
     const baseValue = process.env.IMARAT_ORIGIN_URL;
-    if (!baseValue) return new Response("Imagem indisponível", { status: 503, headers });
+    if (!baseValue) {
+      console.warn("[product-image] config_missing", { variable: "IMARAT_ORIGIN_URL" });
+      return new Response("Imagem indisponível", { status: 503, headers });
+    }
     const base = new URL(baseValue);
     if (
       base.origin !== ALLOWED_ORIGIN ||
@@ -52,6 +55,14 @@ export default async (req) => {
       base.username ||
       base.password
     ) {
+      console.warn("[product-image] config_invalid", {
+        variable: "IMARAT_ORIGIN_URL",
+        originMatches: base.origin === ALLOWED_ORIGIN,
+        pathIsRoot: base.pathname === "/",
+        hasSearch: Boolean(base.search),
+        hasHash: Boolean(base.hash),
+        hasCredentials: Boolean(base.username || base.password),
+      });
       return new Response("Imagem indisponível", { status: 503, headers });
     }
 
@@ -68,23 +79,44 @@ export default async (req) => {
       headers: { "User-Agent": "EmporioAR-Catalog/1.0", Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif" },
       redirect: "error",
     });
-    if (!response.ok) return new Response("Imagem indisponível", { status: 502, headers });
+    if (!response.ok) {
+      console.warn("[product-image] upstream_http_error", {
+        status: response.status,
+        contentType: response.headers.get("content-type") || null,
+        redirected: response.redirected,
+      });
+      return new Response("Imagem indisponível", { status: 502, headers });
+    }
 
     const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    if (!ALLOWED_TYPES.has(contentType)) return new Response("Tipo de arquivo não permitido", { status: 415, headers });
+    if (!ALLOWED_TYPES.has(contentType)) {
+      console.warn("[product-image] upstream_type_rejected", { contentType: contentType || null });
+      return new Response("Tipo de arquivo não permitido", { status: 415, headers });
+    }
     const declaredSize = Number(response.headers.get("content-length"));
     if (Number.isFinite(declaredSize) && declaredSize > MAX_BYTES) {
+      console.warn("[product-image] upstream_size_rejected", { declaredSize, maxBytes: MAX_BYTES });
       return new Response("Imagem muito grande", { status: 413, headers });
     }
 
     const bytes = await readBodyLimited(response, MAX_BYTES);
-    if (!bytes) return new Response("Imagem inválida ou muito grande", { status: 413, headers });
+    if (!bytes) {
+      console.warn("[product-image] upstream_body_rejected", { maxBytes: MAX_BYTES });
+      return new Response("Imagem inválida ou muito grande", { status: 413, headers });
+    }
+
+    console.info("[product-image] success", { contentType, bytes: bytes.byteLength });
 
     return new Response(bytes, {
       status: 200,
       headers: { ...headers, "Cache-Control": "public, max-age=86400", "Content-Type": contentType, "Content-Length": String(bytes.byteLength) },
     });
-  } catch {
+  } catch (error) {
+    console.error("[product-image] upstream_fetch_failed", {
+      errorName: error?.name || "UnknownError",
+      causeCode: error?.cause?.code || null,
+      causeName: error?.cause?.name || null,
+    });
     return new Response("Imagem temporariamente indisponível", { status: 502, headers });
   }
 };
