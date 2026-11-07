@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeProductImagePath, sanitizePublicImageUrl } from "./public-image-url.mjs";
+import { normalizeProductImagePath, normalizePublicImagePath, sanitizePublicImageUrl } from "./public-image-url.mjs";
 const options = { cdnBase: "https://images-primary.example/", cdnFallbackBase: "https://images-secondary.example/", productBase: "https://products.example/" };
 test("converte origens de imagem para aliases same-origin", () => {
   assert.equal(sanitizePublicImageUrl("https://images-primary.example/products/a.webp", options), "/api/product-image?source=a&path=%2Fproducts%2Fa.webp");
