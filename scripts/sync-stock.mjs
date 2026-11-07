@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { toPublicCatalog } from './public-catalog.mjs';
+import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -195,7 +196,35 @@ async function main() {
     }
   }
 
-  for (const groups of Object.values(DATA)) for (const group of groups || []) for (const item of group.items || []) { delete item.original; delete item.custo; delete item.precoCusto; delete item.preco_custo; delete item.cost; delete item.costPrice; if (item.url_origem) { try { const sourceUrl = new URL(String(item.url_origem)); item.url_origem = sourceUrl.pathname + sourceUrl.search; } catch {} } }
+  for (const groups of Object.values(DATA)) {
+    for (const group of groups || []) {
+      for (const item of group.items || []) {
+        delete item.original;
+        delete item.custo;
+        delete item.precoCusto;
+        delete item.preco_custo;
+        delete item.cost;
+        delete item.costPrice;
+        if (item.url_origem) {
+          try {
+            const sourceUrl = new URL(String(item.url_origem), 'https://dandejoias.com');
+            item.url_origem = sourceUrl.pathname;
+          } catch {
+            delete item.url_origem;
+          }
+        }
+        if (item.foto) {
+          const safePhoto = sanitizePublicImageUrl(item.foto);
+          if (safePhoto) item.foto = safePhoto;
+          else delete item.foto;
+        }
+        if (Array.isArray(item.fotos)) {
+          item.fotos = item.fotos.map(sanitizePublicImageUrl).filter(Boolean);
+          if (!item.fotos.length) delete item.fotos;
+        }
+      }
+    }
+  }
 
   const out = '/** Empório A.R — estoque sincronizado ' + new Date().toISOString() + ' (Imarat+Brand) */\n' + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
 
