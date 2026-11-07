@@ -19,6 +19,11 @@
   status = 404
   force = true
 
+# Prévia social dinâmica: injeta título, descrição e foto do produto para crawlers.
+[[edge_functions]]
+  function = "product-share"
+  path = "/p/*"
+
 # Links curtos de produtos: a aplicação resolve /p/<public_id> sem expor IDs longos.
 [[redirects]]
   from = "/p/*"
