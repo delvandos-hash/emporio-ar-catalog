@@ -1882,6 +1882,7 @@ function openDetails(p, opts = {}) {
       }
     } catch (e) {}
   }
+  ov.setAttribute('aria-hidden', 'false');
   requestAnimationFrame(() => updateMobileCartBar());
 }
 
@@ -1896,6 +1897,7 @@ function closeModal() {
   const y = detailsScrollY || 0;
   const done = () => {
     overlay.classList.remove('open', 'closing');
+    overlay.setAttribute('aria-hidden', 'true');
     currentProduct = null;
     setProductUrl(null);
     updateMobileCartBar();
@@ -2808,6 +2810,7 @@ document.getElementById('cartFab').addEventListener('click', () => {
   prefillCustomerMeta('cart');
   renderCart();
   document.getElementById('cartModal').classList.add('open');
+  document.getElementById('cartModal').setAttribute('aria-hidden', 'false');
   updateMobileCartBar();
 });
 document.getElementById('mobileCartOpen')?.addEventListener('click', () => {
@@ -2815,11 +2818,13 @@ document.getElementById('mobileCartOpen')?.addEventListener('click', () => {
 });
 document.getElementById('cartClose').addEventListener('click', () => {
   document.getElementById('cartModal').classList.remove('open');
+  document.getElementById('cartModal').setAttribute('aria-hidden', 'true');
   updateMobileCartBar();
 });
 document.getElementById('cartModal').addEventListener('click', e => {
   if (e.target.id === 'cartModal') {
     document.getElementById('cartModal').classList.remove('open');
+    document.getElementById('cartModal').setAttribute('aria-hidden', 'true');
     updateMobileCartBar();
   }
 });
