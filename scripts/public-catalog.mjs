@@ -60,9 +60,12 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
         if (liveRef) {
           safeItem.stock_ref = liveRef;
-          if (safeItem.fonte === "roupas" || publicSource(line, group?.cat) === "roupas") {
+          if (publicSource(line, group?.cat) === "roupas") {
             safeItem.stock_route = String(item?.id_origem || "").toLowerCase().startsWith("franny-") ? "b" : "a";
           }
+        } else if (/^s_[a-f0-9]{24}$/.test(String(item?.stock_ref || ""))) {
+          safeItem.stock_ref = String(item.stock_ref);
+          if (["a", "b"].includes(item?.stock_route)) safeItem.stock_route = item.stock_route;
         }
         safeItem.fonte = publicSource(line, group?.cat);
         if (Array.isArray(safeItem.fotos)) {
