@@ -39,3 +39,9 @@ test("ignora armazenamento inválido e identificadores vazios", () => {
   assert.deepEqual(toggleFavoriteIds(null, "p_novo", "marca-produto-100ml"), ["p_novo"]);
   assert.deepEqual(toggleFavoriteIds([""], "", ""), [""]);
 });
+
+test("consulta favoritos por Set sem reler ou reconstruir o armazenamento", () => {
+  const snapshot = new Set(["p_publico", "outro-favorito"]);
+  assert.equal(isFavoriteId(snapshot, "p_publico", "marca-produto-100ml"), true);
+  assert.equal(isFavoriteId(snapshot, "ausente", "marca-produto-100ml"), false);
+});
