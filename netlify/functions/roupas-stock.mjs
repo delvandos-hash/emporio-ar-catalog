@@ -201,7 +201,6 @@ export default async (req) => {
             return new Response(
               JSON.stringify({
                 id: stockRef || String(found.id),
-                fonte: source,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
