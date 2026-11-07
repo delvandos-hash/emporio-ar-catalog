@@ -1664,14 +1664,18 @@ async function refreshVariationStock(p) {
     const total = Number.isFinite(Number(data.total_estoque))
       ? Math.max(0, Math.floor(Number(data.total_estoque)))
       : variacoes.reduce((sum, v) => sum + v.estoque, 0);
+    const selected = currentProduct.variacaoSelecionada || getSelectedVariacao();
+    const selectedVariation = selected
+      ? variacoes.find((variation) => variation.nome === selected.nome && variation.estoque > 0)
+      : null;
     const updated = {
       ...currentProduct,
       variacoes,
       total_estoque: total,
       disponivel: total > 0 ? 'Sim' : 'Não',
-      variacaoSelecionada: null
+      variacaoSelecionada: selectedVariation || null
     };
-    openDetails(updated, { fromNav: true, skipLiveStock: true });
+    openDetails(updated, { fromNav: true, skipLiveStock: true, preserveVariation: true });
     const updatedHint = document.getElementById('varHint');
     if (updatedHint) {
       updatedHint.textContent = variacoes.some(v => v.estoque > 0)
@@ -1749,7 +1753,7 @@ function openDetails(p, opts = {}) {
     notasHtml += `<strong>${titulo}</strong><br>${escapeHtml(p.notas).replace(/\n/g, '<br>')}`;
   }
   if (varCatalog) {
-    notasHtml += buildVariacoesHtml(p);
+    notasHtml += buildVariacoesHtml(p, p.variacaoSelecionada?.id);
   }
   if (notasHtml) {
     notasEl.style.display = 'block';
@@ -1761,7 +1765,7 @@ function openDetails(p, opts = {}) {
 
   // seletor de variação (Roupas / Acessórios)
   if (varCatalog) {
-    p.variacaoSelecionada = null;
+    if (!opts.preserveVariation) p.variacaoSelecionada = null;
     bindVariacaoSelector();
   }
 
