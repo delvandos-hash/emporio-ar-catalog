@@ -15,9 +15,25 @@ function publicSource(line, cat) {
   const ln = String(line || "").toLowerCase();
   const c = String(cat || "").toLowerCase();
   if (c === "brand" || c.startsWith("brand")) return "brand";
-  if (ln.includes("roup")) return "roupas";
-  if (ln.includes("acessor")) return "acessorios";
+  if (ln.includes("roup") || c.includes("roup")) return "roupas";
+  if (ln.includes("acessor") || c.includes("acessor")) return "acessorios";
   if (["masculino", "feminino", "unissex"].includes(ln) || ln.includes("perf") || c.includes("perf")) return "perfumaria";
+  return "outros";
+}
+function publicLine(line, groups) {
+  const normalized = String(line || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
+  if (normalized.includes("masculino")) return "masculino";
+  if (normalized.includes("feminino")) return "feminino";
+  if (normalized.includes("unissex")) return "unissex";
+  if (normalized.includes("roup")) return "roupas";
+  if (normalized.includes("acessor")) return "acessorios";
+  if (normalized.includes("brand")) return "brand";
+  if (normalized.includes("scoop")) return "scoop premiado";
+  const categories = (Array.isArray(groups) ? groups : []).map(group => String(group?.cat || "").toLowerCase());
+  if (categories.some(cat => cat.includes("roup"))) return "roupas";
+  if (categories.some(cat => cat.includes("acessor"))) return "acessorios";
+  if (categories.some(cat => cat === "brand" || cat.startsWith("brand"))) return "brand";
+  if (categories.some(cat => cat.includes("perf"))) return "perfumaria";
   return "outros";
 }
 function publicId(line, group, item) {
@@ -29,7 +45,9 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
   const publicData = {};
   for (const [line, groups] of Object.entries(DATA)) {
     if (!Array.isArray(groups)) continue;
-    publicData[line] = groups.map(group => {
+    const safeLine = publicLine(line, groups);
+    if (!publicData[safeLine]) publicData[safeLine] = [];
+    publicData[safeLine].push(...groups.map(group => {
       const safeGroup = pick(group, GROUP_FIELDS);
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
@@ -64,7 +82,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         return safeItem;
       }) : [];
       return safeGroup;
-    });
+    }));
   }
   return publicData;
 }
