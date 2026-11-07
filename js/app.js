@@ -3,7 +3,7 @@
  * Dados: API pública sanitizada + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
-import { isFavoriteId, toggleFavoriteIds } from './favorites.js';
+import { isFavoriteId, toggleFavoriteIds, filterFavoriteGroups } from './favorites.js';
 
 async function loadCatalogData() {
   // O catálogo só é carregado pela API pública sanitizada.
@@ -841,7 +841,7 @@ function ensureBrandCategoryFilters() {
 
 function allGroups() {
   const genderOrder = ['feminino', 'masculino', 'unissex', 'roupas', 'acessorios'];
-  const gSel = String(state.gender || 'Todos');
+  const gSel = state.favoritesOnly ? 'Todos' : String(state.gender || 'Todos');
   // Sessão Brand: coleta Brand de masculino/feminino/unissex e usa a coleção (brand) como categoria
   if (gSel.toLowerCase() === 'brand') {
     const result = [];
@@ -1835,6 +1835,7 @@ function buildFeaturedHtml() {
     /* show only via filter */ 
   }
   const items = collectFeatured(12);
+  const favoriteIds = new Set(loadFavs());
   if (!items.length) return '';
   const cards = items.map((item) => {
     const pdata = encodeURIComponent(JSON.stringify({
@@ -1856,11 +1857,13 @@ function buildFeaturedHtml() {
       total_estoque: item.total_estoque
     }));
     const foto = resolveCatalogImageUrl(item.foto);
-    return `<button type="button" class="feat-card" data-p="${pdata}">
+    const favOn = isFav(item, favoriteIds);
+    return `<div class="feat-card" role="button" tabindex="0" data-p="${pdata}">
+      <button type="button" class="feat-fav-btn${favOn ? ' on' : ''}" data-fav="${pdata}" aria-label="${favOn ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}">${favOn ? '♥' : '♡'}</button>
       ${foto ? `<img src="${escapeHtml(foto)}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : '<div class="feat-ph">SEM FOTO</div>'}
       <span class="feat-name">${escapeHtml(item.nome)}</span>
       <span class="feat-price">R$ ${escapeHtml(item.varejo)}</span>
-    </button>`;
+    </div>`;
   }).join('');
   return `<section class="featured-strip" aria-label="Novidades">
     <div class="featured-head">
@@ -2072,21 +2075,24 @@ function render() {
     state.category = 'Todos';
   }
   const q = state.search.trim().toLowerCase();
-  const groups = allGroups();
+  const sourceGroups = allGroups();
+  const groups = state.favoritesOnly
+    ? filterFavoriteGroups(sourceGroups, (item, group) =>
+        isFav({ ...item, brand: group.brand, cat: group.cat }, favoriteIds))
+    : sourceGroups;
   let count = 0;
   const byCat = {};
 
   for (const g of groups) {
-    if (!sectionActive(g.cat)) continue;
-    if (state.category !== 'Todos' && g.cat !== state.category) continue;
-    const items = g.items.filter(item => {
+    if (!state.favoritesOnly && !sectionActive(g.cat)) continue;
+    if (!state.favoritesOnly && state.category !== 'Todos' && g.cat !== state.category) continue;
+    const items = state.favoritesOnly ? g.items : g.items.filter(item => {
       if (!inPriceRange(item.varejo)) return false;
       if (state.stock === 'Disponivel' && !isAvailable(item)) return false;
       if (state.stock === 'Esgotado' && isAvailable(item)) return false;
       if (!matchesSearch(item, g.brand, g.cat, state.search)) return false;
       if (!matchesVolumeFilter(item, g.cat, state.volume, g.brand)) return false;
       if (state.vitrine === 'Lancamentos' && !isLancamentoItem(item, g.cat)) return false;
-      if (state.favoritesOnly && !isFav({ ...item, brand: g.brand, cat: g.cat }, favoriteIds)) return false;
       return true;
     });
     if (!items.length) continue;
@@ -2226,7 +2232,7 @@ function render() {
       img.parentElement?.classList.add('placeholder');
     }, { once: true });
   });
-  main.querySelectorAll('.fav-btn').forEach((btn) => {
+  main.querySelectorAll('.fav-btn, .feat-fav-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -2236,14 +2242,25 @@ function render() {
         const on = isFav(p);
         btn.classList.toggle('on', on);
         btn.textContent = on ? '♥' : '♡';
+        btn.setAttribute('aria-label', on ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
         if (state.favoritesOnly) render();
       } catch (err) {}
     });
   });
 
   main.querySelectorAll('.feat-card').forEach(btn => {
-    btn.addEventListener('click', () => {
+    const open = () => {
       try { openDetails(JSON.parse(decodeURIComponent(btn.getAttribute('data-p')))); } catch (e) {}
+    };
+    btn.addEventListener('click', (e) => {
+      if (e.target.closest('.feat-fav-btn')) return;
+      open();
+    });
+    btn.addEventListener('keydown', (e) => {
+      if (e.target === btn && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        open();
+      }
     });
   });
   const btnLanc = document.getElementById('btnVerLancamentos');
