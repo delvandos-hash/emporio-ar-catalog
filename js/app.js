@@ -449,15 +449,15 @@ function normalizeSearch(s) {
     .trim();
 }
 
-function matchesSearch(item, brand, cat, q) {
+function matchesSearch(item, brand, cat, q, tokens = null) {
   if (!q || !String(q).trim()) return true;
   const hay = normalizeSearch(
     [item.nome, brand, item.volume, item.notas, cat, item.badge, item.line]
       .filter(Boolean)
       .join(' ')
   );
-  const tokens = normalizeSearch(q).split(' ').filter(Boolean);
-  return tokens.every((t) => {
+  const searchTokens = tokens || normalizeSearch(q).split(' ').filter(Boolean);
+  return searchTokens.every((t) => {
     const alts = SEARCH_SYNONYMS[t] || [t];
     return alts.some((a) => hay.includes(a));
   });
@@ -2179,7 +2179,8 @@ function render() {
   if (state.category !== 'Todos' && !sectionActive(state.category)) {
     state.category = 'Todos';
   }
-  const q = state.search.trim().toLowerCase();
+  // Normaliza os termos uma vez; não repete o mesmo trabalho para cada produto.
+  const searchTokens = normalizeSearch(state.search).split(' ').filter(Boolean);
   const sourceGroups = allGroups();
   const groups = state.favoritesOnly
     ? filterFavoriteGroups(sourceGroups, (item, group) =>
@@ -2195,7 +2196,7 @@ function render() {
       if (!inPriceRange(item.varejo)) return false;
       if (state.stock === 'Disponivel' && !isAvailable(item)) return false;
       if (state.stock === 'Esgotado' && isAvailable(item)) return false;
-      if (!matchesSearch(item, g.brand, g.cat, state.search)) return false;
+      if (!matchesSearch(item, g.brand, g.cat, state.search, searchTokens)) return false;
       if (!matchesVolumeFilter(item, g.cat, state.volume, g.brand)) return false;
       if (state.vitrine === 'Lancamentos' && !isLancamentoItem(item, g.cat)) return false;
       return true;
