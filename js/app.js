@@ -1452,8 +1452,11 @@ function absSophiaImg(u) {
   const s = String(u).trim();
   if (!s) return '';
   try {
-    const url = new URL(s);
+    const url = new URL(s, window.location.origin);
     if (url.protocol !== 'https:' || url.username || url.password) return '';
+    const sameOrigin = url.origin === window.location.origin;
+    const approvedCdn = ['arquivos-cdn.facilzap.app.br', 'acdn-us.mitiendanube.com'].includes(url.hostname.toLowerCase());
+    if (!sameOrigin && !approvedCdn) return '';
     return url.toString();
   } catch (e) {
     return '';
