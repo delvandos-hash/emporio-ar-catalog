@@ -121,7 +121,7 @@ exports.handler = async (event) => {
     if (!IMARAT_API || !BRAND_BASE) throw new Error('Origem de estoque não configurada no ambiente privado.');
     const [imarat, brand] = await Promise.all([
       fetchImaratStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, total: 0, source: 'imarat', error: String(e.message || e),
+        map: {}, byName: {}, fetched: 0, total: 0, source: 'imarat', error: 'Origem indisponível.',
       })),
       fetchBrandStock().catch((e) => ({
         map: {}, byName: {}, fetched: 0, source: 'brand', error: String(e.message || e),
@@ -146,7 +146,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         ok: false,
-        error: String(err && err.message ? err.message : err),
+        error: 'Falha na sincronização.'
         updatedAt: new Date().toISOString(),
       }),
     };
