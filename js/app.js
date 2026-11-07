@@ -3,7 +3,7 @@
  * Dados: API pública sanitizada + estoque ao vivo
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
-import { isFavoriteId } from './favorites.js';
+import { isFavoriteId, toggleFavoriteIds } from './favorites.js';
 
 async function loadCatalogData() {
   // O catálogo só é carregado pela API pública sanitizada.
@@ -2014,10 +2014,8 @@ function isFav(p) {
 function toggleFav(p) {
   const id = favId(p);
   if (!id) return;
-  let arr = loadFavs();
-  if (arr.includes(id)) arr = arr.filter((x) => x !== id);
-  else arr.unshift(id);
-  saveFavs(arr);
+  const legacyId = productId(p);
+  saveFavs(toggleFavoriteIds(loadFavs(), id, legacyId));
 }
 
 function loadRecentSearches() {
