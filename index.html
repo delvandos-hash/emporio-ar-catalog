@@ -3160,7 +3160,7 @@ footer img{opacity:.85}
   <p style="margin-top:.5rem;opacity:.7">Catálogo digital · WhatsApp (62) 99113-4488</p>
 </footer>
 
-<div class="modal-overlay" id="modal">
+<div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalName" aria-hidden="true">
   <div class="modal">
     <div class="modal-header">
       <button type="button" class="modal-back" id="modalBack" aria-label="Voltar">← Voltar</button>
@@ -3226,10 +3226,10 @@ footer img{opacity:.85}
   </div>
 </div>
 
-<div class="modal-overlay" id="cartModal">
+<div class="modal-overlay" id="cartModal" role="dialog" aria-modal="true" aria-labelledby="cartModalTitle" aria-hidden="true">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
-      <h3>Seu pedido</h3>
+      <h3 id="cartModalTitle">Seu pedido</h3>
       <button class="modal-close" id="cartClose">×</button>
     </div>
     <div class="modal-body">
