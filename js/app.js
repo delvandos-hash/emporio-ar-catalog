@@ -886,6 +886,7 @@ function buildWaMessage(p, meta = {}) {
   let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
   if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
+  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   if (meta.nome || meta.cep) msg += '\n';
   msg += `*${p.nome}*\n`;
   msg += `Marca: ${p.brand || 'Empório A.R'}\n`;
@@ -904,6 +905,7 @@ function buildWaMessage(p, meta = {}) {
     msg += `Preço unit.: *R$ ${p.varejo}*\n`;
   }
   if (unit > 0) msg += `Subtotal: *R$ ${formatBRL(sub)}*\n`;
+  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
