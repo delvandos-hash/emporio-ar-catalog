@@ -127,7 +127,7 @@ export default async (req) => {
     }
 
     const sourceParam = url.searchParams.get("source") || "";
-    const parsed = rawId ? parseId(rawId) : { source: sourceParam === "franny" ? "franny" : "sophia", id: "" };
+    const parsed = rawId ? parseId(rawId) : { source: sourceParam === "b" ? "franny" : "sophia", id: "" };
     const { source, id } = parsed;
     if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
@@ -169,7 +169,6 @@ export default async (req) => {
             return new Response(
               JSON.stringify({
                 id: stockRef || String(found.id),
-                fonte: source,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -220,7 +219,7 @@ export default async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ erro: "produto não encontrado", id, fonte: source }),
+      JSON.stringify({ erro: "produto não encontrado", id }),
       { status: 404, headers }
     );
   } catch (error) {
