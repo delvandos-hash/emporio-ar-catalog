@@ -102,3 +102,40 @@ test("rejeita DATA inválido", () => {
   assert.throws(() => toPublicCatalog(null), /DATA inválido/);
   assert.throws(() => toPublicCatalog([]), /DATA inválido/);
 });
+
+import { sanitizePayload } from "../netlify/functions/get-catalog.mjs";
+
+test("API e publicação no Gist mantêm a mesma projeção pública", () => {
+  const source = {
+    perfumes: [{
+      brand: "Marca",
+      cat: "Perfumes",
+      cat_id: "interno",
+      items: [{
+        id: "privado",
+        id_origem: 123,
+        nome: "Perfume",
+        volume: "100ml",
+        varejo: "199,90",
+        atacado: "149,90",
+        foto: "https://imaratperfumaria.com/uploads/products/a.webp",
+        fotos: ["https://arquivos-cdn.facilzap.app.br/produtos/b.webp"],
+        notas: "Baunilha",
+        disponivel: "Sim",
+        variacoes: [{ id: 1, nome: "Único", estoque: "2", sku: "privado" }],
+        custo: 70,
+        precoManual: true,
+        url_origem: "https://fornecedor.example/produto"
+      }]
+    }]
+  };
+  const fromGist = toPublicCatalog(source);
+  const fromApi = sanitizePayload({
+    DATA: source,
+    WHATSAPP: "5562991134488",
+    BRAND: { name: "Empório A.R.", phone: "privado", secret: "não publicar" },
+    internal: "não publicar"
+  }).DATA;
+
+  assert.deepEqual(fromApi, fromGist);
+});
