@@ -16,7 +16,12 @@ export function sanitizePublicImageUrl(value, options = {}) {
   const cdnBase = options.cdnBase ?? process.env.CDN_IMAGE_BASE_URL ?? "";
   const configuredHosts = options.allowedHosts
     ?? (process.env.PUBLIC_IMAGE_HOSTS || "").split(",").map((host) => host.trim()).filter(Boolean);
-  const allowedHosts = new Set(configuredHosts.map(normalizeHost).filter(Boolean));
+  // CDN já presente nas 1.959 entradas do catálogo auditado.
+  // Outros hosts só entram por configuração explícita.
+  const allowedHosts = new Set([
+    "arquivos-cdn.facilzap.app.br",
+    ...configuredHosts.map(normalizeHost).filter(Boolean),
+  ]);
   const cdnHost = cdnBase ? normalizeHost(cdnBase) : "";
   if (cdnHost) allowedHosts.add(cdnHost);
 
