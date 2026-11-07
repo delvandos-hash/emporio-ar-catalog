@@ -1,65 +1,59 @@
-/**
- * Validação das imagens públicas do catálogo.
- * CDNs autorizados carregam diretamente; imagens da Imarat usam proxy same-origin.
- */
-const CDN_HOSTS = new Set([
-  "arquivos-cdn.facilzap.app.br",
-  "acdn-us.mitiendanube.com",
-]);
 const PROXY_ORIGIN = "https://catalogo-interno.invalid";
-const PRODUCT_PATH_PREFIX = "/uploads/products/";
+const IMAGE_SOURCES = new Set(["a", "b", "p"]);
+
+function safeBase(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash ? url : null;
+  } catch { return null; }
+}
+
+export function normalizePublicImagePath(value) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "";
+  let decoded;
+  try { decoded = decodeURIComponent(value); } catch { return ""; }
+  if (decoded.includes("%") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded) ||
+      decoded.includes("?") || decoded.includes("#") ||
+      decoded.split("/").some((part) => part === "." || part === "..") || decoded.length > 2048) return "";
+  return decoded;
+}
 
 export function normalizeProductImagePath(value) {
-  if (typeof value !== "string" || !value.startsWith(PRODUCT_PATH_PREFIX)) return "";
-  let decoded;
-  try {
-    decoded = decodeURIComponent(value);
-  } catch {
-    return "";
-  }
-  if (
-    decoded.includes("%") ||
-    decoded.includes("\\") ||
-    /[\u0000-\u001f\u007f]/.test(decoded) ||
-    decoded.split("/").some((part) => part === "." || part === "..")
-  ) return "";
-
-  try {
-    const url = new URL(decoded, PROXY_ORIGIN);
-    if (url.origin !== PROXY_ORIGIN || url.search || url.hash || !url.pathname.startsWith(PRODUCT_PATH_PREFIX)) return "";
-    return url.pathname;
-  } catch {
-    return "";
-  }
+  const path = normalizePublicImagePath(value);
+  return path.startsWith("/uploads/products/") ? path : "";
 }
 
 export function sanitizePublicImageUrl(value, options = {}) {
   if (typeof value !== "string" || !value.trim()) return "";
-  const cdnBase = options.cdnBase ?? process.env.CDN_IMAGE_BASE_URL ?? "";
-
+  const primary = safeBase(options.cdnBase ?? process.env.CDN_IMAGE_BASE_URL ?? "");
+  const secondary = safeBase(options.cdnFallbackBase ?? process.env.CDN_IMAGE_FALLBACK_BASE_URL ?? "");
+  const product = safeBase(options.productBase ?? process.env.IMARAT_ORIGIN_URL ?? "");
   try {
     const raw = value.trim();
-    const proxyUrl = new URL(raw, PROXY_ORIGIN);
-    if (proxyUrl.origin === PROXY_ORIGIN && proxyUrl.pathname === "/api/product-image") {
-      const path = normalizeProductImagePath(proxyUrl.searchParams.get("path") || "");
-      if (!path) return "";
-      return proxyUrl.pathname + "?path=" + encodeURIComponent(path);
+    const existing = new URL(raw, PROXY_ORIGIN);
+    if (existing.origin === PROXY_ORIGIN && existing.pathname === "/api/product-image") {
+      const path = normalizePublicImagePath(existing.searchParams.get("path") || "");
+      // Compatibilidade com o formato anterior do Preview #5/#4:
+      // naquela versão, somente imagens da Imarat passavam pelo proxy
+      // e a rota não carregava o parâmetro "source".
+      const requestedSource = existing.searchParams.get("source") || "";
+      const source = requestedSource || (path.startsWith("/uploads/products/") ? "p" : "");
+      if (!IMAGE_SOURCES.has(source) || !path || (source === "p" && !path.startsWith("/uploads/products/"))) return "";
+      return "/api/product-image?source=" + source + "&path=" + encodeURIComponent(path);
     }
-
-    const base = cdnBase ? (cdnBase.endsWith("/") ? cdnBase : cdnBase + "/") : undefined;
-    const url = base ? new URL(raw, base) : new URL(raw);
+    let url;
+    if (/^https:\/\//i.test(raw)) url = new URL(raw);
+    else if (raw.startsWith("/uploads/products/") && product) url = new URL(raw, product.origin);
+    else if (primary) url = new URL(raw, primary);
+    else return "";
     if (url.protocol !== "https:" || url.username || url.password || url.hash) return "";
-
-    if (url.hostname.toLowerCase() === "imaratperfumaria.com") {
-      if (!url.pathname.startsWith(PRODUCT_PATH_PREFIX) || url.search) return "";
-      const path = normalizeProductImagePath(url.pathname);
-      if (!path) return "";
-      return "/api/product-image?path=" + encodeURIComponent(path);
+    for (const [source, base] of [["p", product], ["a", primary], ["b", secondary]]) {
+      if (!base || url.origin !== base.origin) continue;
+      const path = normalizePublicImagePath(url.pathname);
+      if (!path || (source === "p" && !path.startsWith("/uploads/products/"))) return "";
+      return "/api/product-image?source=" + source + "&path=" + encodeURIComponent(path);
     }
-
-    if (!CDN_HOSTS.has(url.hostname.toLowerCase())) return "";
-    return url.toString();
-  } catch {
     return "";
-  }
+  } catch { return ""; }
 }
