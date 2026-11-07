@@ -659,9 +659,9 @@ function refreshCategoryFilterVisibility() {
 }
 
 
-function applyOverride(item, brand) {
+function applyOverride(item, brand, overrides = loadOverrides()) {
   const key = `${brand}|${item.nome}|${item.volume || ''}`;
-  const o = loadOverrides()[key];
+  const o = overrides[key];
   if (!o) return { ...item, brand };
   return { ...item, ...o, brand: o.brand || brand };
 }
@@ -841,6 +841,8 @@ function ensureBrandCategoryFilters() {
 
 function allGroups(forceAll = false) {
   const genderOrder = ['feminino', 'masculino', 'unissex', 'roupas', 'acessorios'];
+  // Lê e interpreta as personalizações uma única vez por montagem do catálogo.
+  const overrides = loadOverrides();
   const gSel = (forceAll || state.favoritesOnly) ? 'Todos' : String(state.gender || 'Todos');
   // Sessão Brand: coleta Brand de masculino/feminino/unissex e usa a coleção (brand) como categoria
   if (gSel.toLowerCase() === 'brand') {
@@ -853,7 +855,7 @@ function allGroups(forceAll = false) {
           ...g,
           line: 'brand',
           cat: g.brand || 'Brand', // subcategoria = nome da coleção
-          items: g.items.map(it => applyOverride(it, g.brand))
+          items: g.items.map(it => applyOverride(it, g.brand, overrides))
         });
       }
     }
@@ -866,7 +868,7 @@ function allGroups(forceAll = false) {
       result.push({
         ...g,
         line,
-        items: g.items.map(it => applyOverride(it, g.brand))
+        items: g.items.map(it => applyOverride(it, g.brand, overrides))
       });
     }
   }
