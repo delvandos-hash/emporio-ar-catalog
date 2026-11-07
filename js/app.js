@@ -1308,7 +1308,8 @@ function updateMobileCartBar() {
   if (countEl) countEl.textContent = String(totalItems);
   if (totalEl) totalEl.textContent = formatBRL(subtotal);
   const cartModalOpen = document.getElementById('cartModal')?.classList.contains('open') || false;
-  bar.classList.toggle('show', totalItems > 0 && !cartModalOpen);
+  const productDetailsOpen = document.getElementById('modal')?.classList.contains('open') || false;
+  bar.classList.toggle('show', totalItems > 0 && !cartModalOpen && !productDetailsOpen);
   document.body.classList.toggle('has-mobile-cart', totalItems > 0);
 }
 
@@ -1881,6 +1882,7 @@ function openDetails(p, opts = {}) {
       }
     } catch (e) {}
   }
+  requestAnimationFrame(() => updateMobileCartBar());
 }
 
 /* O estoque é atualizado pelo snapshot sincronizado do catálogo. */
@@ -1896,6 +1898,7 @@ function closeModal() {
     overlay.classList.remove('open', 'closing');
     currentProduct = null;
     setProductUrl(null);
+    updateMobileCartBar();
     // restaura posição da lista
     requestAnimationFrame(() => {
       window.scrollTo(0, y);
