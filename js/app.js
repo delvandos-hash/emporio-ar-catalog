@@ -196,7 +196,7 @@ function drawImageContain(ctx, img, x, y, w, h) {
 }
 
 async function loadProductImage(p) {
-  const src = p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '';
+  const src = absSophiaImg(p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '');
   if (!src) return null;
   const tryLoad = (url, cross) => new Promise((resolve) => {
     const img = new Image();
@@ -677,7 +677,20 @@ function applyOverride(item, brand) {
 function loadCart() {
   try {
     const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-    return Array.isArray(raw) ? raw : [];
+    if (!Array.isArray(raw)) return [];
+    // localStorage pode ser editado pelo próprio navegador: aceitar apenas campos esperados.
+    return raw.filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => ({
+        nome: String(item.nome || 'Produto').slice(0, 180),
+        brand: String(item.brand || '').slice(0, 120),
+        volume: String(item.volume || '').slice(0, 60),
+        varejo: String(item.varejo ?? ''),
+        atacado: String(item.atacado ?? ''),
+        disponivel: item.disponivel === 'Não' ? 'Não' : 'Sim',
+        qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty) || 1))),
+        variacaoNome: String(item.variacaoNome || '').slice(0, 100),
+        cat: String(item.cat || '').slice(0, 100)
+      }));
   } catch { return []; }
 }
 function persistCart() {
@@ -688,10 +701,14 @@ let currentProduct = null;
 let searchTimer = null;
 
 function parsePrice(str) {
-  if (!str || str === '—' || str === '-') return 0;
-  const n = String(str).replace(/[R$\s]/g, '').replace(',', '.');
-  const v = parseFloat(n);
-  return isNaN(v) ? 0 : v;
+  return parsePriceStrict(str);
+}
+
+// Valores vindos do catálogo, URL e armazenamento local são tratados como texto não confiável.
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
 }
 
 function isAvailable(item) {
@@ -869,6 +886,7 @@ function buildWaMessage(p, meta = {}) {
   let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
   if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
+  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   if (meta.nome || meta.cep) msg += '\n';
   msg += `*${p.nome}*\n`;
   msg += `Marca: ${p.brand || 'Empório A.R'}\n`;
@@ -887,6 +905,7 @@ function buildWaMessage(p, meta = {}) {
     msg += `Preço unit.: *R$ ${p.varejo}*\n`;
   }
   if (unit > 0) msg += `Subtotal: *R$ ${formatBRL(sub)}*\n`;
+  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
@@ -908,7 +927,18 @@ function openBuyMetaModal(p) {
     const n = document.getElementById('buyClientName');
     const c = document.getElementById('buyClientCep');
     if (n && !n.value) n.value = cartNome || saved.nome || '';
-    if (c && !c.value) c.value = cartCep || saved.cep || '';
+    if (c && !c.value) {
+      c.value = cartCep || saved.cep || '';
+      if (saved.cidade) document.getElementById('buyCepCity').value = saved.cidade;
+      if (saved.uf) document.getElementById('buyCepUf').value = saved.uf;
+      if (saved.cidade && saved.uf) {
+        c.dataset.cepCity = saved.cidade;
+        c.dataset.cepUf = saved.uf;
+        c.dataset.cepValid = 'true';
+        document.getElementById('buyCepStatus').textContent = 'Endereço salvo anteriormente.';
+        document.getElementById('buyCepStatus').dataset.state = 'success';
+      }
+    }
   } catch (e) {}
   ov?.classList.add('open');
 }
@@ -930,22 +960,125 @@ function updateCepWarn(inputId, warnId) {
   warn.classList.toggle('show', incomplete);
 }
 
-function confirmBuyMeta() {
+async function lookupCep(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return { ok: false, reason: 'Campo de CEP não encontrado.' };
+  const digits = cepDigits(input.value);
+  const prefix = inputId === 'cartObs' ? 'cart' : 'buy';
+  const cityEl = document.getElementById(prefix + 'CepCity');
+  const ufEl = document.getElementById(prefix + 'CepUf');
+  const statusEl = document.getElementById(prefix + 'CepStatus');
+  const setStatus = (message, state = '') => {
+    if (statusEl) {
+      statusEl.textContent = message;
+      statusEl.dataset.state = state;
+    }
+  };
+  if (digits.length !== 8) {
+    if (cityEl) cityEl.value = '';
+    if (ufEl) ufEl.value = '';
+    setStatus(digits.length ? 'Digite os 8 números do CEP.' : '');
+    input.dataset.cepCity = '';
+    input.dataset.cepUf = '';
+    input.dataset.cepValid = '';
+    return { ok: false, reason: 'Informe um CEP com 8 dígitos.' };
+  }
+
+  const requestId = String((Number(input.dataset.cepRequest || 0) + 1));
+  input.dataset.cepRequest = requestId;
+  setStatus('Consultando CEP…', 'loading');
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) throw new Error('Falha na consulta');
+    const data = await response.json();
+    if (input.dataset.cepRequest !== requestId) return { ok: false, reason: 'Consulta substituída.' };
+    if (data.erro || !data.localidade || !data.uf) {
+      if (cityEl) cityEl.value = '';
+      if (ufEl) ufEl.value = '';
+      input.dataset.cepCity = '';
+      input.dataset.cepUf = '';
+      input.dataset.cepValid = 'false';
+      setStatus('CEP não encontrado. Confira os números.', 'error');
+      return { ok: false, reason: 'CEP não encontrado.' };
+    }
+    input.dataset.cepCity = data.localidade;
+    input.dataset.cepUf = data.uf;
+    input.dataset.cepValid = 'true';
+    if (cityEl) cityEl.value = data.localidade;
+    if (ufEl) ufEl.value = data.uf;
+    setStatus('Endereço localizado.', 'success');
+    return { ok: true, cep: digits, cidade: data.localidade, uf: data.uf };
+  } catch (error) {
+    if (input.dataset.cepRequest !== requestId) return { ok: false, reason: 'Consulta substituída.' };
+    input.dataset.cepValid = '';
+    setStatus('Não foi possível consultar agora. Tente novamente.', 'error');
+    return { ok: false, reason: 'Não foi possível validar o CEP.' };
+  }
+}
+
+async function ensureCep(inputId) {
+  const input = document.getElementById(inputId);
+  const digits = cepDigits(input?.value);
+  if (!digits) return { ok: true, cep: '', cidade: '', uf: '' };
+  if (digits.length !== 8) {
+    updateCepWarn(inputId, inputId === 'cartObs' ? 'cartCepWarn' : 'buyCepWarn');
+    return { ok: false, reason: 'Informe os 8 dígitos do CEP.' };
+  }
+  if (input.dataset.cepValid === 'true' && input.dataset.cepCity && input.dataset.cepUf) {
+    return { ok: true, cep: digits, cidade: input.dataset.cepCity, uf: input.dataset.cepUf };
+  }
+  return await lookupCep(inputId);
+}
+
+function bindCepField(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('input', () => {
+    let value = cepDigits(input.value).slice(0, 8);
+    if (value.length > 5) value = value.slice(0, 5) + '-' + value.slice(5);
+    input.value = value;
+    input.dataset.cepValid = '';
+    input.dataset.cepCity = '';
+    input.dataset.cepUf = '';
+    const prefix = inputId === 'cartObs' ? 'cart' : 'buy';
+    const city = document.getElementById(prefix + 'CepCity');
+    const uf = document.getElementById(prefix + 'CepUf');
+    if (city) city.value = '';
+    if (uf) uf.value = '';
+    updateCepWarn(inputId, inputId === 'cartObs' ? 'cartCepWarn' : 'buyCepWarn');
+    if (cepDigits(value).length === 8) lookupCep(inputId);
+    else {
+      const status = document.getElementById(prefix + 'CepStatus');
+      if (status) { status.textContent = ''; status.dataset.state = ''; }
+    }
+  });
+  input.addEventListener('blur', () => {
+    if (cepDigits(input.value).length === 8 && input.dataset.cepValid !== 'true') lookupCep(inputId);
+  });
+}
+
+async function confirmBuyMeta() {
   const p = pendingBuyProduct;
   if (!p) return;
   const nome = (document.getElementById('buyClientName')?.value || '').trim();
-  const cep = (document.getElementById('buyClientCep')?.value || '').trim();
+  const cepResult = await ensureCep('buyClientCep');
+  if (!cepResult.ok) {
+    alert(cepResult.reason || 'Não foi possível validar o CEP.');
+    return;
+  }
+  const { cep, cidade, uf } = cepResult;
   const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
-  updateCepWarn('buyClientCep', 'buyCepWarn');
   try {
-    localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep }));
+    localStorage.setItem('emporio_buy_meta', JSON.stringify({ nome, cep, cidade, uf }));
     const cn = document.getElementById('cartClientName');
     const cc = document.getElementById('cartObs');
     if (cn && nome) cn.value = nome;
     if (cc && cep) cc.value = cep;
   } catch (e) {}
   closeBuyMetaModal();
-  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, qty })}`, '_blank');
+  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, cidade, uf, qty })}`, '_blank');
 }
 
 function unitPrice(p, useAtacado) {
@@ -960,7 +1093,13 @@ function formatBRL(n) {
 function getCartMeta() {
   const nome = (document.getElementById('cartClientName')?.value || '').trim();
   const cep = (document.getElementById('cartObs')?.value || '').trim();
-  return { nome, cep, obs: cep };
+  const input = document.getElementById('cartObs');
+  return {
+    nome, cep,
+    cidade: input?.dataset.cepCity || '',
+    uf: input?.dataset.cepUf || '',
+    obs: cep
+  };
 }
 
 function buildCartWaMessage() {
@@ -1112,8 +1251,8 @@ function renderCart() {
     return `
     <div class="cart-item">
       <div class="cart-item-info">
-        <strong>${p.nome}</strong><br>
-        <span class="cart-item-meta">${p.brand || ''} · ${p.volume || '—'} · ${label}: R$ ${formatBRL(unit)}</span>
+        <strong>${escapeHtml(p.nome)}</strong><br>
+        <span class="cart-item-meta">${escapeHtml(p.brand || '')} · ${escapeHtml(p.volume || '—')} · ${label}: R$ ${formatBRL(unit)}</span>
         <div class="cart-qty">
           <button type="button" data-qty-minus="${i}" aria-label="Diminuir">−</button>
           <span>${p.qty}</span>
@@ -1322,9 +1461,15 @@ function absSophiaImg(u) {
   if (!u) return '';
   const s = String(u).trim();
   if (!s) return '';
-  if (s.startsWith('http://') || s.startsWith('https://')) return s;
-  // caminhos relativos vindos da Sophia/FacilZap
-  return 'https://arquivos-cdn.facilzap.app.br/' + s.replace(/^\//, '');
+  try {
+    const url = new URL(s, 'https://arquivos-cdn.facilzap.app.br/');
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    if (url.username || url.password) return '';
+    url.protocol = 'https:';
+    return url.toString();
+  } catch (e) {
+    return '';
+  }
 }
 
 function buildPhotoGallery(p) {
@@ -1338,16 +1483,15 @@ function buildPhotoGallery(p) {
   const main = fotos[0];
   const multi = fotos.length > 1;
   const thumbs = fotos.map((src, i) =>
-    `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-idx="${i}" data-src="${src}" aria-label="Foto ${i + 1}">
-      <img src="${src}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.style.display='none'">
+    `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-idx="${i}" data-src="${escapeHtml(src)}" aria-label="Foto ${i + 1}">
+      <img src="${escapeHtml(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">
     </button>`
   ).join('');
   const html = `
     <div class="gallery" data-count="${fotos.length}">
       <div class="gallery-main">
         ${multi ? `<button type="button" class="gallery-nav gallery-prev" aria-label="Foto anterior">‹</button>` : ''}
-        <img id="galleryMainImg" src="${main}" alt="${(p.nome || '').replace(/"/g, '&quot;')}" loading="eager" referrerpolicy="no-referrer"
-          onerror="this.onerror=null;this.parentElement.parentElement.classList.add('no-img');this.parentElement.innerHTML='SEM FOTO'">
+        <img id="galleryMainImg" src="${escapeHtml(main)}" alt="${escapeHtml(p.nome || '')}" loading="eager" referrerpolicy="no-referrer">
         ${multi ? `<button type="button" class="gallery-nav gallery-next" aria-label="Próxima foto">›</button>` : ''}
         ${multi ? `<span class="gallery-counter" id="galleryCounter">1 / ${fotos.length}</span>` : ''}
       </div>
@@ -1362,6 +1506,14 @@ function bindPhotoGallery(photoEl, fotos) {
   const mainImg = photoEl.querySelector('#galleryMainImg');
   const counter = photoEl.querySelector('#galleryCounter');
   const thumbs = () => Array.from(photoEl.querySelectorAll('.gallery-thumb'));
+  if (mainImg) mainImg.addEventListener('error', () => {
+    photoEl.classList.add('no-img');
+    mainImg.removeAttribute('src');
+    mainImg.alt = 'SEM FOTO';
+  }, { once: true });
+  thumbs().forEach((btn) => {
+    btn.querySelector('img')?.addEventListener('error', () => { btn.style.display = 'none'; }, { once: true });
+  });
 
   const show = (i) => {
     idx = (i + fotos.length) % fotos.length;
@@ -1416,9 +1568,9 @@ function buildVariacoesHtml(p, selectedId) {
     const id = String(v.id || v.nome || '');
     const sel = selectedId != null && String(selectedId) === id ? ' selected' : '';
     const disabled = ok ? '' : ' disabled';
-    const label = (v.nome || '—').replace(/</g, '&lt;');
+    const label = escapeHtml(v.nome || '—');
     const stock = ok ? `${qty} un.` : 'Esgotado';
-    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${id}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}>
+    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}>
       <span class="var-chip-name">${label}</span>
       <span class="var-chip-stock">${stock}</span>
     </button>`;
@@ -1516,7 +1668,7 @@ function openDetails(p, opts = {}) {
   let notasHtml = '';
   if (p.notas) {
     const titulo = (varCatalog || isScoop) ? 'Descrição' : 'Notas olfativas';
-    notasHtml += `<strong>${titulo}</strong><br>${String(p.notas).replace(/\n/g, '<br>')}`;
+    notasHtml += `<strong>${titulo}</strong><br>${escapeHtml(p.notas).replace(/\n/g, '<br>')}`;
   }
   if (varCatalog) {
     notasHtml += buildVariacoesHtml(p);
@@ -1700,11 +1852,11 @@ function buildFeaturedHtml() {
       variacoes: item.variacoes || [],
       total_estoque: item.total_estoque
     }));
-    const foto = item.foto || '';
+    const foto = absSophiaImg(item.foto);
     return `<button type="button" class="feat-card" data-p="${pdata}">
-      ${foto ? `<img src="${foto}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : '<div class="feat-ph">SEM FOTO</div>'}
-      <span class="feat-name">${item.nome}</span>
-      <span class="feat-price">R$ ${item.varejo}</span>
+      ${foto ? `<img src="${escapeHtml(foto)}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : '<div class="feat-ph">SEM FOTO</div>'}
+      <span class="feat-name">${escapeHtml(item.nome)}</span>
+      <span class="feat-price">R$ ${escapeHtml(item.varejo)}</span>
     </button>`;
   }).join('');
   return `<section class="featured-strip" aria-label="Novidades">
@@ -1736,11 +1888,11 @@ function updateNavCrumb() {
   parts.push(`<button type="button" data-nav="home">Início</button>`);
   if (g && g !== 'Todos') {
     parts.push(`<span class="sep">›</span>`);
-    parts.push(`<button type="button" data-nav="session">${genderLabel(g)}</button>`);
+    parts.push(`<button type="button" data-nav="session">${escapeHtml(genderLabel(g))}</button>`);
   }
   if (c && c !== 'Todos') {
     parts.push(`<span class="sep">›</span>`);
-    parts.push(`<span class="current">${c}</span>`);
+    parts.push(`<span class="current">${escapeHtml(c)}</span>`);
   }
   el.innerHTML = parts.join('');
   const back = document.getElementById('navBackSub');
@@ -1889,7 +2041,7 @@ function renderRecentSearches() {
   });
   if (!arr.length) { el.innerHTML = ''; return; }
   el.innerHTML = arr.map((q) => {
-    const safe = String(q).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const safe = escapeHtml(q);
     return `<button type="button" class="recent-chip" data-q="${safe}">${safe}</button>`;
   }).join('') + `<button type="button" class="recent-clear" id="recentClear">Limpar</button>`;
 }
@@ -1967,7 +2119,7 @@ function render() {
     const catTitle = (cat === 'Brand')
       ? (sectionDisplayName(cat) === cat ? 'Brand Collection' : sectionDisplayName(cat))
       : sectionDisplayName(cat);
-    html += `<div class="category ${lineClass}${cat === 'Brand' ? ' cat-brand' : ''}"><div class="category-title">${catTitle}</div>`;
+    html += `<div class="category ${lineClass}${cat === 'Brand' ? ' cat-brand' : ''}"><div class="category-title">${escapeHtml(catTitle)}</div>`;
     brands.sort((a, b) => a.brand.localeCompare(b.brand, 'pt-BR'));
 
     for (const b of brands) {
@@ -1976,14 +2128,14 @@ function render() {
         const SO = { 'scoop cobre': 1, 'scoop bronze': 2, 'scoop prata': 3, 'scoop ouro': 4, 'scoop diamante': 5 };
         sortedItems = [...b.items].sort((a, b) => (SO[(a.nome || '').toLowerCase()] || 99) - (SO[(b.nome || '').toLowerCase()] || 99));
       }
-      html += `<div class="brand-group"><div class="brand-name">${b.brand}</div><div class="products">`;
+      html += `<div class="brand-group"><div class="brand-name">${escapeHtml(b.brand)}</div><div class="products">`;
 
       for (const rawItem of sortedItems) {
         const item = validateProductPrices(rawItem);
         const avail = isAvailable(item);
         const isScoop = (item.badge === 'Scoop') || (item.nome || '').toLowerCase().includes('scoop');
-        const varejoShow = item.varejo ? `R$ ${item.varejo}` : '—';
-        const atacadoShow = item.atacado && item.atacado !== '—' ? `R$ ${item.atacado}` : '—';
+        const varejoShow = item.varejo ? `R$ ${escapeHtml(item.varejo)}` : '—';
+        const atacadoShow = item.atacado && item.atacado !== '—' ? `R$ ${escapeHtml(item.atacado)}` : '—';
         const pdata = encodeURIComponent(JSON.stringify({
           nome: item.nome,
           brand: b.brand,
@@ -2007,7 +2159,7 @@ function render() {
         const photoHtml = isScoop
           ? ''
           : (fotoCard
-            ? `<div class="photo photo-click loaded" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes"><img src="${fotoCard}" alt="${item.nome}" width="80" height="80" decoding="async" referrerpolicy="no-referrer" loading="lazy" onload="this.classList.add('is-loaded');this.parentElement.classList.add('loaded')" onerror="this.onerror=null;this.style.opacity='0.3';this.parentElement.classList.add('placeholder')"></div>`
+            ? `<div class="photo photo-click loaded" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes"><img src="${escapeHtml(fotoCard)}" alt="${escapeHtml(item.nome)}" width="80" height="80" decoding="async" referrerpolicy="no-referrer" loading="lazy"></div>`
             : `<div class="photo placeholder photo-click" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes">SEM<br>FOTO</div>`);
         const isNovo = isNovoRecente(item) || isLancamentoItem(item, cat);
         const badgeEsg = avail ? '' : '<span class="badge-esgotado">ESGOTADO</span>';
@@ -2034,8 +2186,8 @@ function render() {
             ${badgeEsg}
                         ${photoHtml}
             <div class="info">
-              <div class="name">${item.nome}</div>
-              <div class="meta">${item.volume || '—'} · ${stockHtml}</div>
+              <div class="name">${escapeHtml(item.nome)}</div>
+              <div class="meta">${escapeHtml(item.volume || '—')} · ${stockHtml}</div>
               <div class="prices">
                 <div><span class="price-label">Varejo</span><span class="price-v">${varejoShow}</span></div>
                 <div><span class="price-label">Atacado</span><span class="price-a">${atacadoShow}</span></div>
@@ -2056,6 +2208,16 @@ function render() {
   main.innerHTML = buildFeaturedHtml() + html;
 
   applyViewMode();
+  main.querySelectorAll('.photo-click img, .feat-card img').forEach((img) => {
+    img.addEventListener('load', () => {
+      img.classList.add('is-loaded');
+      img.parentElement?.classList.add('loaded');
+    }, { once: true });
+    img.addEventListener('error', () => {
+      img.style.opacity = '0.3';
+      img.parentElement?.classList.add('placeholder');
+    }, { once: true });
+  });
   main.querySelectorAll('.fav-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -2127,13 +2289,13 @@ function downloadCatalogPDF() {
 
   let table = rows.map(r =>
     `<tr>
-      <td>${r.marca}</td>
-      <td>${r.nome}</td>
-      <td>${r.volume}</td>
-      <td>${r.genero}</td>
-      <td>R$ ${r.varejo}</td>
-      <td>R$ ${r.atacado}</td>
-      <td>${r.status}</td>
+      <td>${escapeHtml(r.marca)}</td>
+      <td>${escapeHtml(r.nome)}</td>
+      <td>${escapeHtml(r.volume)}</td>
+      <td>${escapeHtml(r.genero)}</td>
+      <td>R$ ${escapeHtml(r.varejo)}</td>
+      <td>R$ ${escapeHtml(r.atacado)}</td>
+      <td>${escapeHtml(r.status)}</td>
     </tr>`
   ).join('');
 
@@ -2163,6 +2325,7 @@ function downloadCatalogPDF() {
     alert('Permita pop-ups para gerar o PDF.');
     return;
   }
+  try { w.opener = null; } catch (e) {}
   w.document.write(htmlDoc);
   w.document.close();
 }
@@ -2232,7 +2395,7 @@ function updateCategoryFiltersForGender(gender) {
     const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
     for (const c of sorted) {
-      html += `<button class="fbtn" data-filter="category" data-value="${c}">${c}</button>`;
+      html += `<button class="fbtn" data-filter="category" data-value="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
     }
     el.innerHTML = html;
     el.querySelectorAll('.fbtn').forEach(btn => {
@@ -2251,7 +2414,7 @@ function updateCategoryFiltersForGender(gender) {
     const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
     for (const c of sorted) {
-      html += `<button class="fbtn" data-filter="category" data-value="${c}">${c}</button>`;
+      html += `<button class="fbtn" data-filter="category" data-value="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
     }
     el.innerHTML = html;
     el.querySelectorAll('.fbtn').forEach(btn => {
@@ -2275,7 +2438,7 @@ function updateCategoryFiltersForGender(gender) {
     const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
     for (const c of sorted) {
-      const safe = String(c).replace(/"/g, '&quot;');
+      const safe = escapeHtml(c);
       html += `<button class="fbtn" data-filter="category" data-value="${safe}">${safe}</button>`;
     }
     el.innerHTML = html;
@@ -2358,8 +2521,23 @@ document.getElementById('cartClose').addEventListener('click', () => {
 document.getElementById('cartModal').addEventListener('click', e => {
   if (e.target.id === 'cartModal') document.getElementById('cartModal').classList.remove('open');
 });
-document.getElementById('cartCheckout').addEventListener('click', () => {
+document.getElementById('cartCheckout').addEventListener('click', async () => {
   if (!cart.length) return;
+  const cepResult = await ensureCep('cartObs');
+  if (!cepResult.ok) {
+    alert(cepResult.reason || 'Não foi possível validar o CEP.');
+    return;
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem('emporio_buy_meta') || '{}');
+    localStorage.setItem('emporio_buy_meta', JSON.stringify({
+      ...saved,
+      nome: document.getElementById('cartClientName')?.value?.trim() || saved.nome || '',
+      cep: cepResult.cep,
+      cidade: cepResult.cidade,
+      uf: cepResult.uf
+    }));
+  } catch (e) {}
   window.open(`https://wa.me/${WHATSAPP}?text=${buildCartWaMessage()}`, '_blank');
 });
 
@@ -2696,19 +2874,8 @@ document.getElementById('buyMetaModal')?.addEventListener('click', (e) => {
 });
 document.getElementById('buyMetaConfirm')?.addEventListener('click', confirmBuyMeta);
 
-document.getElementById('buyClientCep')?.addEventListener('input', () => updateCepWarn('buyClientCep', 'buyCepWarn'));
-document.getElementById('buyClientCep')?.addEventListener('blur', () => updateCepWarn('buyClientCep', 'buyCepWarn'));
-document.getElementById('cartObs')?.addEventListener('input', () => updateCepWarn('cartObs', 'cartCepWarn'));
-document.getElementById('cartObs')?.addEventListener('blur', () => updateCepWarn('cartObs', 'cartCepWarn'));
-document.getElementById('cartCheckout')?.addEventListener('click', () => updateCepWarn('cartObs', 'cartCepWarn'), true);
-
-document.getElementById('buyClientCep')?.addEventListener('input', () => {
-  const el = document.getElementById('buyClientCep');
-  if (!el) return;
-  let v = el.value.replace(/\D/g, '').slice(0, 8);
-  if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5);
-  el.value = v;
-});
+bindCepField('buyClientCep');
+bindCepField('cartObs');
 
 
 document.getElementById('navCrumb')?.addEventListener('click', (e) => {
