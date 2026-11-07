@@ -1694,7 +1694,7 @@ function openDetails(p, opts = {}) {
     notasHtml += `<strong>${titulo}</strong><br>${escapeHtml(p.notas).replace(/\n/g, '<br>')}`;
   }
   if (varCatalog) {
-    notasHtml += buildVariacoesHtml(p, (p.variacoesSelecionadas || []).map(v => v.id).filter(Boolean));
+    notasHtml += buildVariacoesHtml(p, opts.preserveVariation ? (p.variacoesSelecionadas || []).map(v => v.id).filter(Boolean) : []);
   }
   if (notasHtml) {
     notasEl.style.display = 'block';
