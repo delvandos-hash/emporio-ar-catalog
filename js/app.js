@@ -1438,6 +1438,7 @@ function setCartQty(index, qty) {
     item.qty = qty;
   }
   updateCartUI();
+  syncCartButtonStates();
   if (document.getElementById('cartModal').classList.contains('open')) renderCart();
 }
 
