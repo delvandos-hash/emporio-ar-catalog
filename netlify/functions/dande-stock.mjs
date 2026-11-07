@@ -24,7 +24,7 @@ function makeStockRef(id) {
   return "s_" + createHash("sha256").update("acessorios|" + String(id)).digest("hex").slice(0, 24);
 }
 function normCategory(value) {
-  return String(value || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
 function findProductUrl(html, id) {
   const namePos = html.indexOf(`data-store="product-item-name-${id}"`);
