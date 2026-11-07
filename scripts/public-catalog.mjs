@@ -5,7 +5,7 @@
 const GROUP_FIELDS = new Set(["brand", "cat"]);
 const PRODUCT_FIELDS = new Set([
   "nome", "volume", "varejo", "atacado", "foto", "fotos", "notas",
-  "disponivel", "badge", "fonte", "novoDesde", "variacoes"
+  "disponivel", "badge", "fonte", "novoDesde", "id_origem", "variacoes"
 ]);
 const VARIATION_FIELDS = new Set(["id", "nome", "estoque"]);
 
@@ -29,6 +29,7 @@ export function toPublicCatalog(DATA) {
       const safeGroup = pick(group, GROUP_FIELDS);
       safeGroup.items = Array.isArray(group?.items) ? group.items.map((item) => {
         const safeItem = pick(item, PRODUCT_FIELDS);
+        if (safeItem.id_origem != null) safeItem.id_origem = String(safeItem.id_origem).slice(0, 120);
         if (Array.isArray(safeItem.fotos)) {
           safeItem.fotos = safeItem.fotos.filter((url) => typeof url === "string");
         } else {
