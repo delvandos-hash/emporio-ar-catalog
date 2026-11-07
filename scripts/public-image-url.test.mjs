@@ -7,6 +7,13 @@ const options = {
   allowedHosts: ["images.example-cdn.com", "static.example-cdn.com"],
 };
 
+test("aceita o CDN oficial já usado no catálogo", () => {
+  assert.equal(
+    sanitizePublicImageUrl("https://arquivos-cdn.facilzap.app.br/produtos/item.webp"),
+    "https://arquivos-cdn.facilzap.app.br/produtos/item.webp"
+  );
+});
+
 test("aceita URL HTTPS de CDN autorizada", () => {
   assert.equal(
     sanitizePublicImageUrl("https://static.example-cdn.com/p/1.webp", options),
