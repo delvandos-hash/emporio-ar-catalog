@@ -1297,6 +1297,20 @@ function cartTotalQty() {
   return cart.reduce((s, p) => s + p.qty, 0);
 }
 
+function updateMobileCartBar() {
+  const bar = document.getElementById('mobileCartBar');
+  if (!bar) return;
+  const totalItems = cartTotalQty();
+  const useAtacado = totalItems >= 6;
+  const subtotal = cart.reduce((sum, item) => sum + unitPrice(item, useAtacado) * item.qty, 0);
+  const countEl = document.getElementById('mobileCartCount');
+  const totalEl = document.getElementById('mobileCartTotal');
+  if (countEl) countEl.textContent = String(totalItems);
+  if (totalEl) totalEl.textContent = formatBRL(subtotal);
+  bar.classList.toggle('show', totalItems > 0);
+  document.body.classList.toggle('has-mobile-cart', totalItems > 0);
+}
+
 function updateCartUI() {
   const fab = document.getElementById('cartFab');
   const count = document.getElementById('cartCount');
@@ -1305,6 +1319,7 @@ function updateCartUI() {
     fab.style.display = 'flex';
     count.textContent = total;
   } else fab.style.display = 'none';
+  updateMobileCartBar();
   persistCart();
 }
 
