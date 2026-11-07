@@ -1676,13 +1676,6 @@ async function refreshVariationStock(p) {
       variacaoSelecionada: selectedVariation || null
     };
     openDetails(updated, { fromNav: true, skipLiveStock: true, preserveVariation: true });
-    const updatedHint = document.getElementById('varHint');
-    if (updatedHint) {
-      updatedHint.textContent = variacoes.some(v => v.estoque > 0)
-        ? 'Estoque atualizado diretamente na origem.'
-        : 'Todas as variações estão esgotadas no momento.';
-      updatedHint.classList.toggle('ok', variacoes.some(v => v.estoque > 0));
-    }
   } catch (error) {
     if (!currentProduct || (currentProduct.public_id || currentProduct.stock_ref) !== requestId) return;
     const failHint = document.getElementById('varHint');
