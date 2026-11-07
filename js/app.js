@@ -691,6 +691,13 @@ function parsePrice(str) {
   return parsePriceStrict(str);
 }
 
+// Valores vindos do catálogo, URL e armazenamento local são tratados como texto não confiável.
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
 function isAvailable(item) {
   return (item.disponivel || 'Sim') === 'Sim';
 }
@@ -1109,8 +1116,8 @@ function renderCart() {
     return `
     <div class="cart-item">
       <div class="cart-item-info">
-        <strong>${p.nome}</strong><br>
-        <span class="cart-item-meta">${p.brand || ''} · ${p.volume || '—'} · ${label}: R$ ${formatBRL(unit)}</span>
+        <strong>${escapeHtml(p.nome)}</strong><br>
+        <span class="cart-item-meta">${escapeHtml(p.brand || '')} · ${escapeHtml(p.volume || '—')} · ${label}: R$ ${formatBRL(unit)}</span>
         <div class="cart-qty">
           <button type="button" data-qty-minus="${i}" aria-label="Diminuir">−</button>
           <span>${p.qty}</span>
@@ -1319,9 +1326,15 @@ function absSophiaImg(u) {
   if (!u) return '';
   const s = String(u).trim();
   if (!s) return '';
-  if (s.startsWith('http://') || s.startsWith('https://')) return s;
-  // caminhos relativos vindos da Sophia/FacilZap
-  return 'https://arquivos-cdn.facilzap.app.br/' + s.replace(/^\//, '');
+  try {
+    const url = new URL(s, 'https://arquivos-cdn.facilzap.app.br/');
+    if (url.protocol !== 'https:') return '';
+    const allowedHosts = new Set(['arquivos-cdn.facilzap.app.br']);
+    if (!allowedHosts.has(url.hostname)) return '';
+    return url.toString();
+  } catch (e) {
+    return '';
+  }
 }
 
 function buildPhotoGallery(p) {
@@ -1335,15 +1348,15 @@ function buildPhotoGallery(p) {
   const main = fotos[0];
   const multi = fotos.length > 1;
   const thumbs = fotos.map((src, i) =>
-    `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-idx="${i}" data-src="${src}" aria-label="Foto ${i + 1}">
-      <img src="${src}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.style.display='none'">
+    `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-idx="${i}" data-src="${escapeHtml(src)}" aria-label="Foto ${i + 1}">
+      <img src="${escapeHtml(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.style.display='none'">
     </button>`
   ).join('');
   const html = `
     <div class="gallery" data-count="${fotos.length}">
       <div class="gallery-main">
         ${multi ? `<button type="button" class="gallery-nav gallery-prev" aria-label="Foto anterior">‹</button>` : ''}
-        <img id="galleryMainImg" src="${main}" alt="${(p.nome || '').replace(/"/g, '&quot;')}" loading="eager" referrerpolicy="no-referrer"
+        <img id="galleryMainImg" src="${escapeHtml(main)}" alt="${escapeHtml(p.nome || '')}" loading="eager" referrerpolicy="no-referrer"
           onerror="this.onerror=null;this.parentElement.parentElement.classList.add('no-img');this.parentElement.innerHTML='SEM FOTO'">
         ${multi ? `<button type="button" class="gallery-nav gallery-next" aria-label="Próxima foto">›</button>` : ''}
         ${multi ? `<span class="gallery-counter" id="galleryCounter">1 / ${fotos.length}</span>` : ''}
@@ -1413,9 +1426,9 @@ function buildVariacoesHtml(p, selectedId) {
     const id = String(v.id || v.nome || '');
     const sel = selectedId != null && String(selectedId) === id ? ' selected' : '';
     const disabled = ok ? '' : ' disabled';
-    const label = (v.nome || '—').replace(/</g, '&lt;');
+    const label = escapeHtml(v.nome || '—');
     const stock = ok ? `${qty} un.` : 'Esgotado';
-    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${id}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}>
+    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-estoque="${qty}"${disabled}>
       <span class="var-chip-name">${label}</span>
       <span class="var-chip-stock">${stock}</span>
     </button>`;
@@ -1513,7 +1526,7 @@ function openDetails(p, opts = {}) {
   let notasHtml = '';
   if (p.notas) {
     const titulo = (varCatalog || isScoop) ? 'Descrição' : 'Notas olfativas';
-    notasHtml += `<strong>${titulo}</strong><br>${String(p.notas).replace(/\n/g, '<br>')}`;
+    notasHtml += `<strong>${titulo}</strong><br>${escapeHtml(p.notas).replace(/\n/g, '<br>')}`;
   }
   if (varCatalog) {
     notasHtml += buildVariacoesHtml(p);
@@ -1964,7 +1977,7 @@ function render() {
     const catTitle = (cat === 'Brand')
       ? (sectionDisplayName(cat) === cat ? 'Brand Collection' : sectionDisplayName(cat))
       : sectionDisplayName(cat);
-    html += `<div class="category ${lineClass}${cat === 'Brand' ? ' cat-brand' : ''}"><div class="category-title">${catTitle}</div>`;
+    html += `<div class="category ${lineClass}${cat === 'Brand' ? ' cat-brand' : ''}"><div class="category-title">${escapeHtml(catTitle)}</div>`;
     brands.sort((a, b) => a.brand.localeCompare(b.brand, 'pt-BR'));
 
     for (const b of brands) {
@@ -1973,7 +1986,7 @@ function render() {
         const SO = { 'scoop cobre': 1, 'scoop bronze': 2, 'scoop prata': 3, 'scoop ouro': 4, 'scoop diamante': 5 };
         sortedItems = [...b.items].sort((a, b) => (SO[(a.nome || '').toLowerCase()] || 99) - (SO[(b.nome || '').toLowerCase()] || 99));
       }
-      html += `<div class="brand-group"><div class="brand-name">${b.brand}</div><div class="products">`;
+      html += `<div class="brand-group"><div class="brand-name">${escapeHtml(b.brand)}</div><div class="products">`;
 
       for (const rawItem of sortedItems) {
         const item = validateProductPrices(rawItem);
@@ -2031,8 +2044,8 @@ function render() {
             ${badgeEsg}
                         ${photoHtml}
             <div class="info">
-              <div class="name">${item.nome}</div>
-              <div class="meta">${item.volume || '—'} · ${stockHtml}</div>
+              <div class="name">${escapeHtml(item.nome)}</div>
+              <div class="meta">${escapeHtml(item.volume || '—')} · ${stockHtml}</div>
               <div class="prices">
                 <div><span class="price-label">Varejo</span><span class="price-v">${varejoShow}</span></div>
                 <div><span class="price-label">Atacado</span><span class="price-a">${atacadoShow}</span></div>
@@ -2124,13 +2137,13 @@ function downloadCatalogPDF() {
 
   let table = rows.map(r =>
     `<tr>
-      <td>${r.marca}</td>
-      <td>${r.nome}</td>
-      <td>${r.volume}</td>
-      <td>${r.genero}</td>
-      <td>R$ ${r.varejo}</td>
-      <td>R$ ${r.atacado}</td>
-      <td>${r.status}</td>
+      <td>${escapeHtml(r.marca)}</td>
+      <td>${escapeHtml(r.nome)}</td>
+      <td>${escapeHtml(r.volume)}</td>
+      <td>${escapeHtml(r.genero)}</td>
+      <td>R$ ${escapeHtml(r.varejo)}</td>
+      <td>R$ ${escapeHtml(r.atacado)}</td>
+      <td>${escapeHtml(r.status)}</td>
     </tr>`
   ).join('');
 
