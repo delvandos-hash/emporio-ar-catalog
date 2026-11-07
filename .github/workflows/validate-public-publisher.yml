@@ -7,6 +7,9 @@ on:
       - 'scripts/publish-public-catalog.test.mjs'
       - 'scripts/public-catalog.mjs'
       - 'scripts/public-image-url.mjs'
+      - 'netlify/functions/get-catalog.mjs'
+      - 'netlify/functions/product-image.mjs'
+      - 'js/app.js'
       - 'js/data.js'
   workflow_dispatch:
     inputs:
@@ -31,13 +34,24 @@ jobs:
         with:
           node-version: '22'
       - name: Testar preparação isolada do catálogo público
-        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/publish-public-catalog.test.mjs
+        env:
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/publish-public-catalog.test.mjs
       - name: Executar dry-run sem publicar no Gist
         if: github.event_name == 'pull_request' || inputs.publish != 'publish'
+        env:
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
         run: node scripts/publish-public-catalog.mjs
       - name: Publicar snapshot sanitizado no Gist
         if: github.event_name == 'workflow_dispatch' && inputs.publish == 'publish'
         env:
           ALLOW_PUBLIC_GIST_WRITE: yes
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
         run: node scripts/publish-public-catalog.mjs --publish
