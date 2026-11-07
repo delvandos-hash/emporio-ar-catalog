@@ -46,29 +46,38 @@ function decodeEntities(s) {
     .replace(/&#39;/g, "'");
 }
 
-function parseVariantsFromHtml(html, id) {
-  if (id) {
-    const idx = html.indexOf(`data-product-id="${id}"`);
-    if (idx >= 0) {
-      const chunk = html.slice(idx, idx + 12000);
-      const vm = chunk.match(/data-variants="([^"]*)"/);
-      if (vm) {
-        try { return JSON.parse(decodeEntities(vm[1])); } catch {}
+export function parseVariantsFromHtml(html, id) {
+  const wantedId = String(id || "");
+  if (wantedId) {
+    const marker = `data-product-id="${wantedId}"`;
+    const start = html.indexOf(marker);
+    if (start >= 0) {
+      const chunk = html.slice(start, start + 12000);
+      const variantsMatch = chunk.match(/data-variants="([^"]*)"/);
+      const nextProduct = chunk.slice(1).search(/data-product-id="\d+"/);
+      const variantsPosition = variantsMatch ? chunk.indexOf(variantsMatch[0]) : -1;
+      // Never consume a later product card's variants when the current card has none.
+      if (variantsMatch && (nextProduct < 0 || variantsPosition < nextProduct + 1)) {
+        try {
+          const variants = JSON.parse(decodeEntities(variantsMatch[1]));
+          if (Array.isArray(variants) && variants.length &&
+              (!variants.some((variant) => variant?.product_id != null) ||
+               variants.some((variant) => String(variant.product_id) === wantedId))) {
+            return variants;
+          }
+        } catch {}
       }
     }
   }
+
   const all = [...html.matchAll(/data-variants="([^"]*)"/g)];
-  for (const m of all) {
+  for (const match of all) {
     try {
-      const variants = JSON.parse(decodeEntities(m[1]));
-      if (Array.isArray(variants) && variants.length) {
-        if (!id) return variants;
-        if (variants.some((v) => String(v.product_id) === String(id))) return variants;
-      }
+      const variants = JSON.parse(decodeEntities(match[1]));
+      if (!Array.isArray(variants) || !variants.length) continue;
+      if (!wantedId) return variants;
+      if (variants.some((variant) => String(variant?.product_id) === wantedId)) return variants;
     } catch {}
-  }
-  if (all.length) {
-    try { return JSON.parse(decodeEntities(all[0][1])); } catch {}
   }
   return null;
 }
