@@ -96,10 +96,9 @@ async function fetchCategoryPage(src, catId, page, cookie) {
 function buildVariacoes(found) {
   const estoqueMap = found.estoque || {};
   const varDict = found.variacoes || {};
-  const variacoes = Object.entries(varDict).map(([vid, vinfo]) => ({
-    id: String(vid),
+  const variacoes = Object.entries(varDict).map(([vid, vinfo], index) => ({
+    id: `v${index + 1}`,
     nome: ((vinfo && vinfo.nome) || "").trim() || String(vid),
-    cor: (vinfo && vinfo.cor) || null,
     estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
   }));
   const total =
