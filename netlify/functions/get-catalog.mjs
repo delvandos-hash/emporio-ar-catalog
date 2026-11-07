@@ -10,7 +10,7 @@ const BRAND_FIELDS = new Set(["name", "phone"]);
 const GROUP_FIELDS = new Set(["brand", "cat", "items"]);
 const PRODUCT_FIELDS = new Set([
   "nome", "volume", "varejo", "atacado", "foto", "fotos", "notas",
-  "disponivel", "badge", "fonte", "novoDesde", "variacoes"
+  "disponivel", "badge", "fonte", "novoDesde", "id_origem", "variacoes"
 ]);
 const VARIATION_FIELDS = new Set(["id", "nome", "estoque"]);
 
@@ -25,6 +25,7 @@ function pickFields(value, allowed) {
 
 function sanitizeProduct(value) {
   const product = pickFields(value, PRODUCT_FIELDS);
+  if (product.id_origem != null) product.id_origem = String(product.id_origem).slice(0, 120);
   if (Array.isArray(product.fotos)) {
     product.fotos = product.fotos.filter((v) => typeof v === "string");
   } else {
