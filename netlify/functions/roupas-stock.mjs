@@ -126,11 +126,12 @@ export default async (req) => {
       });
     }
 
-    const parsed = rawId ? parseId(rawId) : { source: "sophia", id: "" };
+    const sourceParam = url.searchParams.get("source") || "";
+    const parsed = rawId ? parseId(rawId) : { source: sourceParam === "franny" ? "franny" : "sophia", id: "" };
     const { source, id } = parsed;
     if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
-    if (!src || !id) {
+    if (!src || (!id && !stockRef)) {
       return new Response(JSON.stringify({ erro: "fonte/id inválidos", rawId }), {
         status: 400,
         headers,
