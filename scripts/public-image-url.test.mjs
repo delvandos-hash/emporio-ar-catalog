@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sanitizePublicImageUrl } from "./public-image-url.mjs";
+import { normalizeProductImagePath, sanitizePublicImageUrl } from "./public-image-url.mjs";
 
 test("aceita os dois CDNs confirmados no catálogo", () => {
   assert.equal(sanitizePublicImageUrl("https://arquivos-cdn.facilzap.app.br/produtos/a.webp"), "https://arquivos-cdn.facilzap.app.br/produtos/a.webp");
@@ -20,6 +20,14 @@ test("preserva somente a rota de proxy com caminho de produto válido", () => {
     "/api/product-image?path=%2Fuploads%2Fproducts%2Fitem.webp"
   );
   assert.equal(sanitizePublicImageUrl("/api/product-image?path=%2Fetc%2Fpasswd"), "");
+});
+
+test("bloqueia traversal literal, codificado e duplamente codificado", () => {
+  assert.equal(normalizeProductImagePath("/uploads/products/../private.txt"), "");
+  assert.equal(normalizeProductImagePath("/uploads/products/%2e%2e/private.txt"), "");
+  assert.equal(normalizeProductImagePath("/uploads/products/%252e%252e/private.txt"), "");
+  assert.equal(normalizeProductImagePath("/uploads/products/%2f..%2fprivate.txt"), "");
+  assert.equal(normalizeProductImagePath("/uploads/products/item.webp"), "/uploads/products/item.webp");
 });
 
 test("resolve caminho relativo no CDN configurado", () => {
