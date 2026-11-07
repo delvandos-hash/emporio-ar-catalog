@@ -2601,13 +2601,19 @@ function render() {
     });
   }
 main.querySelectorAll('.btn-details, .photo-click').forEach(el => {
-    el.addEventListener('click', (e) => {
+    const openProduct = (e) => {
       e.preventDefault();
       e.stopPropagation();
       try {
         openDetails(JSON.parse(decodeURIComponent(el.dataset.p)));
-      } catch (err) { console.warn(err); }
-    });
+      } catch (err) {}
+    };
+    el.addEventListener('click', openProduct);
+    if (el.classList.contains('photo-click')) {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') openProduct(e);
+      });
+    }
   });
   main.querySelectorAll('.btn-buy').forEach(btn => {
     btn.addEventListener('click', () => openWhatsApp(JSON.parse(decodeURIComponent(btn.dataset.p))));
