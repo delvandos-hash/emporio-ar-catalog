@@ -64,7 +64,7 @@ export async function getCompleteGistFileContent(file, fetchImpl = fetch) {
 
     const response = await fetchImpl(rawUrl, { method: "GET", redirect: "error" });
     if (!response.ok) {
-      throw new Error(\`Não foi possível obter o arquivo integral do Gist (HTTP \${response.status}).\`);
+      throw new Error("Não foi possível obter o arquivo integral do Gist (HTTP " + response.status + ").");
     }
     content = await response.text();
   }
