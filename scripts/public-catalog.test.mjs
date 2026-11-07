@@ -44,7 +44,7 @@ test("publica somente os campos usados pela vitrine", () => {
   assert.match(item.public_id, /^p_[a-f0-9]{20}$/);
 });
 
-test("converte imagem da Imarat para rota same-origin e remove URL inválida", () => {
+test("converte imagens de catálogo para rota same-origin e remove URL inválida", () => {
   const result = toPublicCatalog({
     perfumes: [{
       brand: "Marca",
@@ -149,4 +149,14 @@ test("remove identificadores internos e padroniza a fonte", () => {
   assert.equal(item.variacoes[0].id, "v1");
   assert.equal(JSON.stringify(result).includes("segredo-123"), false);
   assert.equal(JSON.stringify(result).includes("id-privado"), false);
+});
+
+test("usa a primeira foto pública quando foto contém somente nome relativo inválido", () => {
+  const result = toPublicCatalog({ perfumes: [{ brand: "Marca", cat: "Perfumes", items: [{
+    nome: "Produto", foto: "arquivo-sem-base.webp",
+    fotos: ["https://images-secondary.example/stores/a/produto.webp"]
+  }]}]});
+  const item = result.perfumes[0].items[0];
+  assert.equal(item.foto, "/api/product-image?source=b&path=%2Fstores%2Fa%2Fproduto.webp");
+  assert.deepEqual(item.fotos, [item.foto]);
 });
