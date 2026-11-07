@@ -1,8 +1,9 @@
 /**
- * GET /api/dande-stock?id=PRODUCT_ID&url=https://dandejoias.com/produtos/...
+ * GET /api/dande-stock?id=PRODUCT_ID&url=PRODUCT_PATH
  * Estoque ao vivo Dande Joias (Nuvemshop)
  * Preferir `url` (página do produto). Fallback: busca por id.
  */
+const DANDE_BASE = process.env.DANDE_BASE_URL;
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
@@ -72,6 +73,7 @@ export default async (req) => {
     const id = urlObj.searchParams.get("id");
     let productUrl = urlObj.searchParams.get("url") || "";
 
+    if (!DANDE_BASE) throw new Error("Origem de acessórios não configurada no ambiente privado.");
     if (!id && !productUrl) {
       return new Response(JSON.stringify({ erro: "id ou url obrigatório" }), {
         status: 400,
@@ -90,7 +92,9 @@ export default async (req) => {
     }
 
     let html = "";
-    if (productUrl && productUrl.includes("dandejoias.com")) {
+    if (productUrl) {
+      const parsedProductUrl = new URL(productUrl);
+      if (parsedProductUrl.origin !== new URL(DANDE_BASE).origin) throw new Error("URL de produto inválida.");
       const res = await fetch(productUrl, {
         headers: { "User-Agent": UA, Accept: "text/html", "Accept-Language": "pt-BR,pt;q=0.9" },
       });
@@ -99,7 +103,7 @@ export default async (req) => {
 
     // Fallback search by id
     if (!html && id) {
-      const searchUrl = `https://dandejoias.com/search/?q=${encodeURIComponent(id)}`;
+      const searchUrl = `${DANDE_BASE}/search/?q=${encodeURIComponent(id)}`;
       const res = await fetch(searchUrl, {
         headers: { "User-Agent": UA, Accept: "text/html" },
       });
@@ -107,7 +111,7 @@ export default async (req) => {
     }
 
     if (!html) {
-      return new Response(JSON.stringify({ erro: "página não carregou", id, url: productUrl }), {
+      return new Response(JSON.stringify({ erro: "página não carregou", id }), {
         status: 502,
         headers,
       });
@@ -116,7 +120,7 @@ export default async (req) => {
     const variants = parseVariantsFromHtml(html, id);
     if (!variants) {
       return new Response(
-        JSON.stringify({ erro: "produto não encontrado", id, url: productUrl }),
+        JSON.stringify({ erro: "produto não encontrado", id }),
         { status: 404, headers }
       );
     }
