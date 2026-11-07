@@ -38,6 +38,6 @@ test("prepara projeção pública sem alterar valores comerciais do snapshot", (
 });
 
 test("rejeita fonte sem DATA reconhecível ou DATA inválido", () => {
-  assert.throws(() => parseCatalogData("export const DATA = [];"), /DATA não encontrado/);
+  assert.throws(() => parseCatalogData("const DATA = [];"), /DATA não encontrado/);
   assert.throws(() => parseCatalogData("export const DATA = null;\nexport const WHATSAPP"), /DATA inválido/);
 });
