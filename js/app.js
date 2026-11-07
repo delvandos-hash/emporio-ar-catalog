@@ -5,33 +5,25 @@
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 
 async function loadCatalogData() {
-  // A API sanitiza os dados antes de entregá-los ao navegador.
-  // O Gist não é mais consultado diretamente pelo cliente.
-  const urls = ['/api/catalogo'];
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) continue;
-      const text = await res.text();
-      const j = JSON.parse(text.replace(/^\uFEFF/, ''));
-      if (j && j.DATA) return j;
-    } catch (e) {
-      // tenta o próximo
-    }
-  }
-
+  // O catálogo só é carregado pela API pública sanitizada.
+  // Não importar data.js diretamente: ele é um artefato público e não deve
+  // funcionar como caminho alternativo que contorne a sanitização.
   try {
-    const mod = await import('./data.js');
-    return {
-      DATA: mod.DATA,
-      WHATSAPP: mod.WHATSAPP,
-      BRAND: mod.BRAND,
-    };
+    const res = await fetch('/api/catalogo', { cache: 'no-store' });
+    if (res.ok) {
+      const text = await res.text();
+      const payload = JSON.parse(text.replace(/^\\uFEFF/, ''));
+      if (payload && payload.DATA && typeof payload.DATA === 'object') return payload;
+    }
   } catch (e) {
-    console.error('Fallback data.js falhou', e);
-    return { DATA: {}, WHATSAPP: '5562991134488', BRAND: { name: 'Empório A.R', phone: '(62) 99113-4488' } };
+    console.warn('API do catálogo indisponível');
   }
+
+  return {
+    DATA: {},
+    WHATSAPP: '5562991134488',
+    BRAND: { name: 'Empório A.R', phone: '(62) 99113-4488' },
+  };
 }
 
 // Loading visível enquanto busca o Gist
@@ -46,7 +38,10 @@ const { DATA, WHATSAPP, BRAND } = dadosDoServidor;
 
 try {
   const el = document.getElementById('bootStatus');
-  if (el) el.remove();
+  if (el) {
+    if (DATA && Object.keys(DATA).length) el.remove();
+    else el.textContent = 'Catálogo temporariamente indisponível. Tente novamente em instantes.';
+  }
 } catch (e) {}
 
 /** ID estável do produto (deep link ?produto= e feed Google) */
@@ -1457,10 +1452,8 @@ function absSophiaImg(u) {
   const s = String(u).trim();
   if (!s) return '';
   try {
-    const url = new URL(s, 'https://arquivos-cdn.facilzap.app.br/');
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
-    if (url.username || url.password) return '';
-    url.protocol = 'https:';
+    const url = new URL(s);
+    if (url.protocol !== 'https:' || url.username || url.password) return '';
     return url.toString();
   } catch (e) {
     return '';
