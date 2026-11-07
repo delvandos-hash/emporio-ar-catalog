@@ -72,7 +72,7 @@ test("rejeita endereço raw fora do host oficial do Gist", async () => {
 
 test("rejeita JSON integral inválido sem tentar publicá-lo", async () => {
   await assert.rejects(
-    getCompleteGistFileContent({ content: '{"produto":"sem fechamento"}', truncated: false }),
+    getCompleteGistFileContent({ content: '{"produto":"sem fechamento', truncated: false }),
     /não é JSON válido/
   );
 });
