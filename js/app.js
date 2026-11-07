@@ -196,7 +196,7 @@ function drawImageContain(ctx, img, x, y, w, h) {
 }
 
 async function loadProductImage(p) {
-  const src = p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '';
+  const src = absSophiaImg(p.foto || (Array.isArray(p.fotos) && p.fotos[0]) || '');
   if (!src) return null;
   const tryLoad = (url, cross) => new Promise((resolve) => {
     const img = new Image();
@@ -1328,9 +1328,9 @@ function absSophiaImg(u) {
   if (!s) return '';
   try {
     const url = new URL(s, 'https://arquivos-cdn.facilzap.app.br/');
-    if (url.protocol !== 'https:') return '';
-    const allowedHosts = new Set(['arquivos-cdn.facilzap.app.br']);
-    if (!allowedHosts.has(url.hostname)) return '';
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    if (url.username || url.password) return '';
+    url.protocol = 'https:';
     return url.toString();
   } catch (e) {
     return '';
@@ -1349,15 +1349,14 @@ function buildPhotoGallery(p) {
   const multi = fotos.length > 1;
   const thumbs = fotos.map((src, i) =>
     `<button type="button" class="gallery-thumb${i === 0 ? ' active' : ''}" data-idx="${i}" data-src="${escapeHtml(src)}" aria-label="Foto ${i + 1}">
-      <img src="${escapeHtml(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.style.display='none'">
+      <img src="${escapeHtml(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">
     </button>`
   ).join('');
   const html = `
     <div class="gallery" data-count="${fotos.length}">
       <div class="gallery-main">
         ${multi ? `<button type="button" class="gallery-nav gallery-prev" aria-label="Foto anterior">‹</button>` : ''}
-        <img id="galleryMainImg" src="${escapeHtml(main)}" alt="${escapeHtml(p.nome || '')}" loading="eager" referrerpolicy="no-referrer"
-          onerror="this.onerror=null;this.parentElement.parentElement.classList.add('no-img');this.parentElement.innerHTML='SEM FOTO'">
+        <img id="galleryMainImg" src="${escapeHtml(main)}" alt="${escapeHtml(p.nome || '')}" loading="eager" referrerpolicy="no-referrer">
         ${multi ? `<button type="button" class="gallery-nav gallery-next" aria-label="Próxima foto">›</button>` : ''}
         ${multi ? `<span class="gallery-counter" id="galleryCounter">1 / ${fotos.length}</span>` : ''}
       </div>
@@ -1372,6 +1371,14 @@ function bindPhotoGallery(photoEl, fotos) {
   const mainImg = photoEl.querySelector('#galleryMainImg');
   const counter = photoEl.querySelector('#galleryCounter');
   const thumbs = () => Array.from(photoEl.querySelectorAll('.gallery-thumb'));
+  if (mainImg) mainImg.addEventListener('error', () => {
+    photoEl.classList.add('no-img');
+    mainImg.removeAttribute('src');
+    mainImg.alt = 'SEM FOTO';
+  }, { once: true });
+  thumbs().forEach((btn) => {
+    btn.querySelector('img')?.addEventListener('error', () => { btn.style.display = 'none'; }, { once: true });
+  });
 
   const show = (i) => {
     idx = (i + fotos.length) % fotos.length;
@@ -1710,11 +1717,11 @@ function buildFeaturedHtml() {
       variacoes: item.variacoes || [],
       total_estoque: item.total_estoque
     }));
-    const foto = item.foto || '';
+    const foto = absSophiaImg(item.foto);
     return `<button type="button" class="feat-card" data-p="${pdata}">
-      ${foto ? `<img src="${foto}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : '<div class="feat-ph">SEM FOTO</div>'}
-      <span class="feat-name">${item.nome}</span>
-      <span class="feat-price">R$ ${item.varejo}</span>
+      ${foto ? `<img src="${escapeHtml(foto)}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : '<div class="feat-ph">SEM FOTO</div>'}
+      <span class="feat-name">${escapeHtml(item.nome)}</span>
+      <span class="feat-price">R$ ${escapeHtml(item.varejo)}</span>
     </button>`;
   }).join('');
   return `<section class="featured-strip" aria-label="Novidades">
@@ -1750,7 +1757,7 @@ function updateNavCrumb() {
   }
   if (c && c !== 'Todos') {
     parts.push(`<span class="sep">›</span>`);
-    parts.push(`<span class="current">${c}</span>`);
+    parts.push(`<span class="current">${escapeHtml(c)}</span>`);
   }
   el.innerHTML = parts.join('');
   const back = document.getElementById('navBackSub');
@@ -1899,7 +1906,7 @@ function renderRecentSearches() {
   });
   if (!arr.length) { el.innerHTML = ''; return; }
   el.innerHTML = arr.map((q) => {
-    const safe = String(q).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const safe = escapeHtml(q);
     return `<button type="button" class="recent-chip" data-q="${safe}">${safe}</button>`;
   }).join('') + `<button type="button" class="recent-clear" id="recentClear">Limpar</button>`;
 }
@@ -2017,7 +2024,7 @@ function render() {
         const photoHtml = isScoop
           ? ''
           : (fotoCard
-            ? `<div class="photo photo-click loaded" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes"><img src="${fotoCard}" alt="${item.nome}" width="80" height="80" decoding="async" referrerpolicy="no-referrer" loading="lazy" onload="this.classList.add('is-loaded');this.parentElement.classList.add('loaded')" onerror="this.onerror=null;this.style.opacity='0.3';this.parentElement.classList.add('placeholder')"></div>`
+            ? `<div class="photo photo-click loaded" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes"><img src="${escapeHtml(fotoCard)}" alt="${escapeHtml(item.nome)}" width="80" height="80" decoding="async" referrerpolicy="no-referrer" loading="lazy"></div>`
             : `<div class="photo placeholder photo-click" role="button" tabindex="0" data-p="${pdata}" title="Ver detalhes">SEM<br>FOTO</div>`);
         const isNovo = isNovoRecente(item) || isLancamentoItem(item, cat);
         const badgeEsg = avail ? '' : '<span class="badge-esgotado">ESGOTADO</span>';
@@ -2066,6 +2073,16 @@ function render() {
   main.innerHTML = buildFeaturedHtml() + html;
 
   applyViewMode();
+  main.querySelectorAll('.photo-click img, .feat-card img').forEach((img) => {
+    img.addEventListener('load', () => {
+      img.classList.add('is-loaded');
+      img.parentElement?.classList.add('loaded');
+    }, { once: true });
+    img.addEventListener('error', () => {
+      img.style.opacity = '0.3';
+      img.parentElement?.classList.add('placeholder');
+    }, { once: true });
+  });
   main.querySelectorAll('.fav-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -2242,7 +2259,7 @@ function updateCategoryFiltersForGender(gender) {
     const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
     for (const c of sorted) {
-      html += `<button class="fbtn" data-filter="category" data-value="${c}">${c}</button>`;
+      html += `<button class="fbtn" data-filter="category" data-value="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
     }
     el.innerHTML = html;
     el.querySelectorAll('.fbtn').forEach(btn => {
@@ -2261,7 +2278,7 @@ function updateCategoryFiltersForGender(gender) {
     const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
     for (const c of sorted) {
-      html += `<button class="fbtn" data-filter="category" data-value="${c}">${c}</button>`;
+      html += `<button class="fbtn" data-filter="category" data-value="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
     }
     el.innerHTML = html;
     el.querySelectorAll('.fbtn').forEach(btn => {
@@ -2285,7 +2302,7 @@ function updateCategoryFiltersForGender(gender) {
     const sorted = [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     let html = '<button class="fbtn active" data-filter="category" data-value="Todos">Todas categorias</button>';
     for (const c of sorted) {
-      const safe = String(c).replace(/"/g, '&quot;');
+      const safe = escapeHtml(c);
       html += `<button class="fbtn" data-filter="category" data-value="${safe}">${safe}</button>`;
     }
     el.innerHTML = html;
