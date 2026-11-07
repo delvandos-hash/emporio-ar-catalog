@@ -688,10 +688,7 @@ let currentProduct = null;
 let searchTimer = null;
 
 function parsePrice(str) {
-  if (!str || str === '—' || str === '-') return 0;
-  const n = String(str).replace(/[R$\s]/g, '').replace(',', '.');
-  const v = parseFloat(n);
-  return isNaN(v) ? 0 : v;
+  return parsePriceStrict(str);
 }
 
 function isAvailable(item) {
