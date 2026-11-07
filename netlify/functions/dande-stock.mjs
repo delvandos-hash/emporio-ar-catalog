@@ -50,7 +50,7 @@ function parseVariantsFromHtml(html, id) {
   if (id) {
     const idx = html.indexOf(`data-product-id="${id}"`);
     if (idx >= 0) {
-      const chunk = html.slice(Math.max(0, idx - 800), idx + 12000);
+      const chunk = html.slice(idx, idx + 12000);
       const vm = chunk.match(/data-variants="([^"]*)"/);
       if (vm) {
         try { return JSON.parse(decodeEntities(vm[1])); } catch {}
