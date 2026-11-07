@@ -1232,6 +1232,7 @@ function buildCartWaMessage() {
   let msg = 'Olá! Gostaria de *confirmar o pedido* no *Empório A.R*.\n\n';
   msg += `📅 ${dataHora}\n`;
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
+  if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
   if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\n`;
   if (meta.nome || meta.cep || (meta.cidade && meta.uf)) msg += '\n';
   if (hasScoop && hasRegular) {
@@ -1260,7 +1261,6 @@ function buildCartWaMessage() {
   msg += '────────────────\n';
   msg += `*Itens: ${totalItens}*\n`;
   msg += `*Total: R$ ${formatBRL(total)}*\n`;
-  if (meta.cep) msg += `\n📮 CEP: *${meta.cep}*\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
