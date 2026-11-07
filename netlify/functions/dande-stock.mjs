@@ -174,19 +174,19 @@ export default async (req) => {
     }
 
     if (!html) {
-      return new Response(JSON.stringify({ erro: "página não carregou", id }), { status: 502, headers });
+      return new Response(JSON.stringify({ erro: "página não carregou" }), { status: 502, headers });
     }
 
     const variants = parseVariantsFromHtml(html, resolvedId);
     if (!variants) {
-      return new Response(JSON.stringify({ erro: "produto não encontrado", id }), { status: 404, headers });
+      return new Response(JSON.stringify({ erro: "produto não encontrado" }), { status: 404, headers });
     }
 
     const variacoes = toVariacoes(variants);
     const total = variacoes.reduce((s, v) => s + v.estoque, 0);
 
     return new Response(
-      JSON.stringify({ id: stockRef || resolvedId, total_estoque: total, variacoes, atualizado_em: new Date().toISOString() }),
+      JSON.stringify({ id: stockRef || null, total_estoque: total, variacoes, atualizado_em: new Date().toISOString() }),
       { status: 200, headers }
     );
   } catch {
