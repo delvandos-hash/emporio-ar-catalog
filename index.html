@@ -1333,6 +1333,7 @@
     -webkit-overflow-scrolling: touch;
   }
   .feat-card {
+    position: relative;
     flex: 0 0 132px;
     scroll-snap-align: start;
     border: 1px solid #e5e7eb;
@@ -1342,6 +1343,26 @@
     text-align: left;
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .feat-fav-btn {
+    position: absolute;
+    top: .35rem;
+    right: .35rem;
+    z-index: 2;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(190, 24, 93, .18);
+    border-radius: 50%;
+    background: rgba(255,255,255,.96);
+    color: #be185d;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  }
+  .feat-fav-btn.on {
+    background: #fff1f2;
+    color: #e11d48;
   }
   .feat-card img, .feat-ph {
     width: 100%;
