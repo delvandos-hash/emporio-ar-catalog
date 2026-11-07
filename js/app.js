@@ -950,7 +950,7 @@ function buildWaMessage(p, meta = {}) {
   let msg = 'Olá! Gostaria de *comprar* no *Empório A.R*:\n\n';
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
   if (meta.cep) msg += `📮 CEP: *${meta.cep}*\n`;
-  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
+  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\n`;
   if (meta.nome || meta.cep) msg += '\n';
   msg += `*${p.nome}*\nMarca: ${p.brand || 'Empório A.R'}\n`;
   const productUrl = getProductShareUrl(p);
@@ -970,7 +970,6 @@ function buildWaMessage(p, meta = {}) {
     if (v?.nome) msg += `Variação / Tamanho: *${v.nome}*\n`;
     msg += `Qtd: *${qty}*\nTabela: *${wholesale ? 'ATACADO (6+)' : 'VAREJO'}*\nPreço unit.: *R$ ${formatBRL(unit)}*\nSubtotal: *R$ ${formatBRL(sub)}*\n`;
   }
-  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\\n`;
   msg += '\nPor favor, confirme *disponibilidade* e *formas de pagamento*. Obrigado!';
   return encodeURIComponent(msg);
 }
@@ -1233,6 +1232,8 @@ function buildCartWaMessage() {
   let msg = 'Olá! Gostaria de *confirmar o pedido* no *Empório A.R*.\n\n';
   msg += `📅 ${dataHora}\n`;
   if (meta.nome) msg += `👤 Cliente: *${meta.nome}*\n`;
+  if (meta.cidade && meta.uf) msg += `📍 Cidade/UF: *${meta.cidade} - ${meta.uf}*\n`;
+  if (meta.nome || meta.cep || (meta.cidade && meta.uf)) msg += '\n';
   if (hasScoop && hasRegular) {
     msg += `📋 Produtos convencionais: *${useAtacado ? 'ATACADO (6+ itens)' : 'VAREJO'}*\n`;
     msg += '📋 Scoops Premiados: *PREÇO FIXO*\n';
