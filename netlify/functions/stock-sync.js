@@ -48,7 +48,7 @@ async function fetchImaratStock() {
     if (fetched >= total || products.length < perPage) break;
     page++;
   }
-  return { map, byName, fetched, total, source: 'imarat' };
+  return { map, byName, fetched, total };
 }
 
 async function fetchBrandStock() {
@@ -104,7 +104,7 @@ async function fetchBrandStock() {
       fetched++;
     }
   }
-  return { map, byName, fetched, source: 'brand' };
+  return { map, byName, fetched };
 }
 
 exports.handler = async (event) => {
@@ -121,23 +121,19 @@ exports.handler = async (event) => {
     if (!IMARAT_API || !BRAND_BASE) throw new Error('Origem de estoque não configurada no ambiente privado.');
     const [imarat, brand] = await Promise.all([
       fetchImaratStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, total: 0, source: 'imarat', error: 'Origem indisponível.',
+        map: {}, byName: {}, fetched: 0, total: 0, error: 'Origem indisponível.',
       })),
       fetchBrandStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, source: 'brand', error: 'Origem indisponível.',
+        map: {}, byName: {}, fetched: 0, error: 'Origem indisponível.',
       })),
     ]);
     const body = {
       ok: true,
       updatedAt: new Date().toISOString(),
-      sources: [imarat.source, brand.source],
-      total: (imarat.fetched || 0) + (brand.fetched || 0),
-      imarat: { fetched: imarat.fetched, expected: imarat.total, error: imarat.error || null },
-      brand: { fetched: brand.fetched, error: brand.error || null },
-      map: imarat.map || {},
-      byName: imarat.byName || {},
-      brandMap: brand.map || {},
-      brandByName: brand.byName || {},
+      mapA: imarat.map || {},
+      byNameA: imarat.byName || {},
+      mapB: brand.map || {},
+      byNameB: brand.byName || {},
     };
     return { statusCode: 200, headers, body: JSON.stringify(body) };
   } catch (err) {
