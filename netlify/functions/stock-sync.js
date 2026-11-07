@@ -124,7 +124,7 @@ exports.handler = async (event) => {
         map: {}, byName: {}, fetched: 0, total: 0, source: 'imarat', error: 'Origem indisponível.',
       })),
       fetchBrandStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, source: 'brand', error: String(e.message || e),
+        map: {}, byName: {}, fetched: 0, source: 'brand', error: 'Origem indisponível.',
       })),
     ]);
     const body = {
@@ -146,7 +146,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         ok: false,
-        error: 'Falha na sincronização.'
+        error: 'Falha na sincronização.',
         updatedAt: new Date().toISOString(),
       }),
     };
