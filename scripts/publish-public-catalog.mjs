@@ -109,7 +109,9 @@ async function main() {
   console.log("PUBLICAÇÃO CONFIRMADA: catalogo.json corresponde exatamente à projeção sanitizada.");
 }
 
-main().catch((error) => {
-  console.error(`Falha na publicação isolada: ${error.message}`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(`Falha na publicação isolada: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
