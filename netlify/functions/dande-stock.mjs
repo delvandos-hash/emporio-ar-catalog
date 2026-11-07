@@ -87,7 +87,7 @@ export default async (req) => {
       } catch {}
       if (productUrl.startsWith("//")) productUrl = "https:" + productUrl;
       if (!productUrl.startsWith("http")) {
-        productUrl = "https://dandejoias.com/" + productUrl.replace(/^\//, "");
+        productUrl = new URL(productUrl.replace(/^\//, ""), DANDE_BASE + "/").toString();
       }
     }
 
