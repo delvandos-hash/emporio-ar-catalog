@@ -19,7 +19,6 @@ jobs:
         run: node --test scripts/public-image-url.test.mjs
         env:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
-          PUBLIC_IMAGE_HOSTS: ${{ secrets.PUBLIC_IMAGE_HOSTS }}
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
@@ -30,7 +29,6 @@ jobs:
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
           BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
-          PUBLIC_IMAGE_HOSTS: ${{ secrets.PUBLIC_IMAGE_HOSTS }}
           SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
           SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
@@ -45,4 +43,3 @@ jobs:
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
           BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
-          PUBLIC_IMAGE_HOSTS: ${{ secrets.PUBLIC_IMAGE_HOSTS }}
