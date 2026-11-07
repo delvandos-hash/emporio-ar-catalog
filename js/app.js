@@ -1616,9 +1616,11 @@ function openProductImageLightbox(src, alt = '') {
   const overlay = document.getElementById('productImageLightbox');
   const image = document.getElementById('productImageLightboxImg');
   if (!overlay || !image || !src) return;
+  overlay.__returnFocus = document.activeElement;
   image.src = src;
   image.alt = alt || 'Imagem ampliada do produto';
   overlay.classList.add('open');
+  requestAnimationFrame(() => document.getElementById('productImageLightboxClose')?.focus());
   overlay.setAttribute('aria-hidden', 'false');
   document.body.classList.add('image-lightbox-open');
 }
@@ -1631,6 +1633,8 @@ function closeProductImageLightbox() {
   overlay.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('image-lightbox-open');
   if (image) image.removeAttribute('src');
+  overlay.__returnFocus?.focus?.();
+  overlay.__returnFocus = null;
 }
 
 function bindPhotoGallery(photoEl, fotos) {
