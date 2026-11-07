@@ -1253,8 +1253,8 @@ async function confirmBuyMeta() {
     closeBuyMetaModal();
   } catch (error) {
     try { waWindow?.close(); } catch (closeError) {}
-    console.warn('Não foi possível preparar a compra no WhatsApp.', error);
-    alert('Não foi possível preparar sua mensagem agora. Tente novamente.');
+    console.warn('Não foi possível validar/preparar a compra no WhatsApp.', error);
+    alert(error?.message || 'Não foi possível confirmar o estoque. O pedido não foi enviado. Tente novamente.');
   } finally {
     confirmBuyMetaBusy = false;
     if (button) {
