@@ -19,6 +19,7 @@ jobs:
         run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs
         env:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
