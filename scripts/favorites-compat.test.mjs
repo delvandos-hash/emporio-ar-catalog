@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isFavoriteId } from "../js/favorites.js";
+import { isFavoriteId, toggleFavoriteIds } from "../js/favorites.js";
 
 test("reconhece favoritos novos pelo identificador público", () => {
   assert.equal(isFavoriteId(["p_publico"], "p_publico", "marca-produto-100ml"), true);
@@ -12,11 +12,30 @@ test("preserva compatibilidade com favoritos antigos baseados em marca, nome e v
   assert.deepEqual(stored, ["marca-produto-100ml"]);
 });
 
-test("não considera favorito quando só existe um identificador interno antigo", () => {
+test("não associa identificadores internos antigos sem mapeamento seguro", () => {
   assert.equal(isFavoriteId(["id-interno-do-fornecedor"], "p_novo", "marca-produto-100ml"), false);
+});
+
+test("desfavorita usando a chave legada reconhecida sem deixar duplicata pública", () => {
+  assert.deepEqual(
+    toggleFavoriteIds(["marca-produto-100ml", "outro-favorito"], "p_novo", "marca-produto-100ml"),
+    ["outro-favorito"]
+  );
+});
+
+test("desfavorita pela chave pública e pela legada, se ambas existirem", () => {
+  assert.deepEqual(
+    toggleFavoriteIds(["p_novo", "marca-produto-100ml", "outro-favorito"], "p_novo", "marca-produto-100ml"),
+    ["outro-favorito"]
+  );
+});
+
+test("adiciona somente o identificador público quando ainda não é favorito", () => {
+  assert.deepEqual(toggleFavoriteIds(["outro-favorito"], "p_novo", "marca-produto-100ml"), ["p_novo", "outro-favorito"]);
 });
 
 test("ignora armazenamento inválido e identificadores vazios", () => {
   assert.equal(isFavoriteId(null, "p_novo", "marca-produto-100ml"), false);
-  assert.equal(isFavoriteId([""], "", ""), false);
+  assert.deepEqual(toggleFavoriteIds(null, "p_novo", "marca-produto-100ml"), ["p_novo"]);
+  assert.deepEqual(toggleFavoriteIds([""], "", ""), [""]);
 });
