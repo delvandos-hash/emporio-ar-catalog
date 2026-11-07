@@ -1421,6 +1421,7 @@ function addToCart(p, qty = 1) {
       variacaoEstoque:variacao ? variacao.estoque : null, cat:p.cat || '' });
   }
   const saved = updateCartUI();
+  syncCartButtonStates();
   showCartToast(saved === false
     ? 'Adicionado nesta sessão, mas não foi salvo neste aparelho.'
     : (variacoes.length > 1 ? `${variacoes.length} variações adicionadas ao carrinho` : 'Adicionado ao carrinho'));
