@@ -2,6 +2,8 @@
  * API /api/catalogo — publica somente os campos necessários à vitrine.
  * A estrutura é validada por allowlist; campos novos ou internos ficam de fora.
  */
+import { sanitizePublicImageUrl } from "../../scripts/public-image-url.mjs";
+
 const GIST_RAW_URL =
   "https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json";
 
@@ -26,8 +28,15 @@ function pickFields(value, allowed) {
 function sanitizeProduct(value) {
   const product = pickFields(value, PRODUCT_FIELDS);
   if (product.id_origem != null) product.id_origem = String(product.id_origem).slice(0, 120);
+  if (product.foto != null) {
+    const safePhoto = sanitizePublicImageUrl(product.foto);
+    if (safePhoto) product.foto = safePhoto;
+    else delete product.foto;
+  }
   if (Array.isArray(product.fotos)) {
-    product.fotos = product.fotos.filter((v) => typeof v === "string");
+    product.fotos = product.fotos
+      .map((value) => sanitizePublicImageUrl(value))
+      .filter(Boolean);
   } else {
     delete product.fotos;
   }
