@@ -735,7 +735,13 @@ function loadCart() {
   } catch { return []; }
 }
 function persistCart() {
-  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    return true;
+  } catch (error) {
+    console.warn('Não foi possível salvar o carrinho neste aparelho.', error);
+    return false;
+  }
 }
 let cart = loadCart();
 let currentProduct = null;
@@ -1150,24 +1156,38 @@ function bindCepField(inputId) {
 async function confirmBuyMeta() {
   const p = pendingBuyProduct;
   if (!p) return;
-  const nome = (document.getElementById('buyClientName')?.value || '').trim();
-  const cepResult = await ensureCep('buyClientCep');
-  if (!cepResult.ok) {
-    alert(cepResult.reason || 'Não foi possível validar o CEP.');
+  const waWindow = window.open('about:blank', '_blank');
+  if (!waWindow) {
+    alert('O navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este catálogo e tente novamente.');
     return;
   }
-  const { cep, cidade, uf } = cepResult;
-  const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
-  if (Array.isArray(p.variacoesSelecionadas) && p.variacoesSelecionadas.some(v => qty > Number(v.estoque || 0))) { alert('A quantidade solicitada ultrapassa o estoque de uma ou mais variações selecionadas.'); return; }
   try {
+    const nome = (document.getElementById('buyClientName')?.value || '').trim();
+    const cepResult = await ensureCep('buyClientCep');
+    if (!cepResult.ok) {
+      waWindow.close();
+      alert(cepResult.reason || 'Não foi possível validar o CEP.');
+      return;
+    }
+    const { cep, cidade, uf } = cepResult;
+    const qty = Math.max(1, Math.min(99, parseInt(document.getElementById('buyQty')?.value, 10) || 1));
+    if (Array.isArray(p.variacoesSelecionadas) && p.variacoesSelecionadas.some(v => qty > Number(v.estoque || 0))) {
+      waWindow.close();
+      alert('A quantidade solicitada ultrapassa o estoque de uma ou mais variações selecionadas.');
+      return;
+    }
     saveCustomerMeta({ nome, cep, cidade, uf });
     const cn = document.getElementById('cartClientName');
     const cc = document.getElementById('cartObs');
     if (cn && nome) cn.value = nome;
     if (cc && cep) cc.value = cep;
-  } catch (e) {}
-  closeBuyMetaModal();
-  window.open(`https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, cidade, uf, qty })}`, '_blank');
+    waWindow.location.href = `https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, cidade, uf, qty })}`;
+    closeBuyMetaModal();
+  } catch (error) {
+    waWindow.close();
+    console.warn('Não foi possível preparar a compra no WhatsApp.', error);
+    alert('Não foi possível preparar sua mensagem agora. Tente novamente.');
+  }
 }
 
 function unitPrice(p, useAtacado) {
@@ -1248,16 +1268,16 @@ function openWhatsApp(p) {
 }
 
 function addToCart(p, qty = 1) {
-  if (!isAvailable(p)) { alert('Este produto está esgotado no momento.'); return; }
+  if (!isAvailable(p)) { alert('Este produto está esgotado no momento.'); return false; }
   let variacoes = [null];
   if (isVariacaoCatalogProduct(p)) {
     const vars = Array.isArray(p.variacoes) ? p.variacoes : [];
     if (vars.some(v => (Number(v.estoque) || 0) > 0)) {
       variacoes = getSelectedVariacoes();
-      if (!variacoes.length) { alert('Selecione uma ou mais variações antes de adicionar ao carrinho.'); document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (!variacoes.length) { alert('Selecione uma ou mais variações antes de adicionar ao carrinho.'); document.getElementById('variacoesBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
       for (const v of variacoes) {
         const existing = cart.find(item => cartKey(item) === cartKey(p) && item.variacaoNome === v.nome);
-        if ((existing?.qty || 0) + qty > v.estoque) { alert(`Estoque insuficiente para ${v.nome}. Disponível: ${v.estoque}.`); return; }
+        if ((existing?.qty || 0) + qty > v.estoque) { alert(`Estoque insuficiente para ${v.nome}. Disponível: ${v.estoque}.`); return false; }
       }
     }
   }
@@ -1272,8 +1292,11 @@ function addToCart(p, qty = 1) {
       disponivel:p.disponivel || 'Sim', qty, variacaoNome:variacao ? variacao.nome : '',
       variacaoEstoque:variacao ? variacao.estoque : null, cat:p.cat || '' });
   }
-  updateCartUI();
-  showCartToast(variacoes.length > 1 ? `${variacoes.length} variações adicionadas ao carrinho` : 'Adicionado ao carrinho');
+  const saved = updateCartUI();
+  showCartToast(saved === false
+    ? 'Adicionado nesta sessão, mas não foi salvo neste aparelho.'
+    : (variacoes.length > 1 ? `${variacoes.length} variações adicionadas ao carrinho` : 'Adicionado ao carrinho'));
+  return true;
 }
 
 function setCartQty(index, qty) {
@@ -1343,7 +1366,7 @@ function updateCartUI() {
     count.textContent = total;
   } else fab.style.display = 'none';
   updateMobileCartBar();
-  persistCart();
+  return persistCart();
 }
 
 function renderCart() {
@@ -2325,8 +2348,7 @@ function addAllFavoritesToCart() {
       needsChoice++;
       continue;
     }
-    addToCart(product, 1);
-    added++;
+    if (addToCart(product, 1)) added++;
   }
   renderFavoritesModal();
   if (added) {
@@ -2620,7 +2642,8 @@ main.querySelectorAll('.btn-details, .photo-click').forEach(el => {
   });
   main.querySelectorAll('.btn-add').forEach(btn => {
     btn.addEventListener('click', () => {
-      addToCart(JSON.parse(decodeURIComponent(btn.dataset.p)));
+      const added = addToCart(JSON.parse(decodeURIComponent(btn.dataset.p)));
+      if (!added) return;
       const prev = btn.textContent;
       btn.textContent = '✓ Adicionado';
       setTimeout(() => { btn.textContent = prev; }, 900);
@@ -2721,7 +2744,8 @@ document.getElementById('modalBuy').addEventListener('click', () => {
 });
 document.getElementById('modalAddCart').addEventListener('click', () => {
   if (currentProduct) {
-    addToCart(currentProduct);
+    const added = addToCart(currentProduct);
+    if (!added) return;
     const btn = document.getElementById('modalAddCart');
     const prev = btn.textContent;
     btn.textContent = '✓ Adicionado ao carrinho';
@@ -2918,20 +2942,37 @@ document.getElementById('cartModal').addEventListener('click', e => {
 });
 document.getElementById('cartCheckout').addEventListener('click', async () => {
   if (!cart.length) return;
-  const cepResult = await ensureCep('cartObs');
-  if (!cepResult.ok) {
-    alert(cepResult.reason || 'Não foi possível validar o CEP.');
+  const waWindow = window.open('about:blank', '_blank');
+  if (!waWindow) {
+    alert('O navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este catálogo e tente novamente.');
     return;
   }
+  const button = document.getElementById('cartCheckout');
+  const previousLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Validando pedido…';
   try {
+    const cepResult = await ensureCep('cartObs');
+    if (!cepResult.ok) {
+      waWindow.close();
+      alert(cepResult.reason || 'Não foi possível validar o CEP.');
+      return;
+    }
     saveCustomerMeta({
       nome: document.getElementById('cartClientName')?.value?.trim() || '',
       cep: cepResult.cep,
       cidade: cepResult.cidade,
       uf: cepResult.uf
     });
-  } catch (e) {}
-  window.open(`https://wa.me/${WHATSAPP}?text=${buildCartWaMessage()}`, '_blank');
+    waWindow.location.href = `https://wa.me/${WHATSAPP}?text=${buildCartWaMessage()}`;
+  } catch (error) {
+    waWindow.close();
+    console.warn('Não foi possível preparar o pedido no WhatsApp.', error);
+    alert('Não foi possível preparar seu pedido agora. Tente novamente.');
+  } finally {
+    button.disabled = false;
+    button.textContent = previousLabel;
+  }
 });
 
 document.getElementById('logoHome').addEventListener('click', e => {
@@ -3212,14 +3253,14 @@ document.getElementById('shareCopyText')?.addEventListener('click', async () => 
 document.getElementById('shareIgStory')?.addEventListener('click', async () => {
   if (!currentProduct) return;
   closeShareSheet();
-  await downloadStoryCard(currentProduct);
-  alert('Imagem salva! Abra o Instagram → Stories → Galeria e escolha a imagem do Empório A.R.');
+  const generated = await downloadStoryCard(currentProduct);
+  if (generated) alert('Imagem gerada. Abra o Instagram → Stories → Galeria e selecione a imagem do Empório A.R.');
 });
 document.getElementById('shareWaStatus')?.addEventListener('click', async () => {
   if (!currentProduct) return;
   closeShareSheet();
-  await downloadStoryCard(currentProduct);
-  alert('Imagem salva! Abra o WhatsApp → Status → Galeria e escolha a imagem do Empório A.R.');
+  const generated = await downloadStoryCard(currentProduct);
+  if (generated) alert('Imagem gerada. Abra o WhatsApp → Status → Galeria e selecione a imagem do Empório A.R.');
 });
 
 document.getElementById('shareDownloadStory')?.addEventListener('click', async () => {
