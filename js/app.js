@@ -855,7 +855,7 @@ function allGroups(forceAll = false) {
           ...g,
           line: 'brand',
           cat: g.brand || 'Brand', // subcategoria = nome da coleção
-          items: g.items.map(it => withLiveStock(applyOverride(it, g.brand, overrides), g.brand, g.cat || '', line))
+          items: g.items.map(it => withLiveStock(applyOverride(it, g.brand, overrides), g.brand, g.cat || '', 'brand'))
         });
       }
     }
