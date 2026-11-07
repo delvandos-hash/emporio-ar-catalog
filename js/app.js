@@ -2670,10 +2670,6 @@ document.addEventListener('keydown', trapDialogFocus);
 document.getElementById('productImageLightbox')?.addEventListener('click', e => {
   if (e.target.id === 'productImageLightbox') closeProductImageLightbox();
 });
-document.addEventListener('keydown', e => {
-  const lightbox = document.getElementById('productImageLightbox');
-  if (e.key === 'Escape' && lightbox?.classList.contains('open')) closeProductImageLightbox();
-});
 document.getElementById('modalBuy').addEventListener('click', () => {
   if (currentProduct) openWhatsApp(currentProduct);
 });
