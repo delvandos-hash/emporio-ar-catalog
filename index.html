@@ -2314,6 +2314,61 @@
   }
 
 
+  /* Atalho de favoritos com contador sobre o coração — padrão do catálogo Beauty */
+  .favorites-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #57534e;
+    border-radius: 10px;
+    background: transparent;
+    color: #e7e5e4;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .favorites-trigger-heart {
+    display: block;
+    font-size: 1.55rem;
+    line-height: 1;
+    transform: translateY(2px);
+  }
+  .favorites-trigger-badge {
+    position: absolute;
+    top: -9px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #1c1917;
+    border-radius: 999px;
+    background: #b89a5a;
+    color: #1a1a1a;
+    font-size: .66rem;
+    line-height: 1;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 1px 4px rgba(0,0,0,.22);
+  }
+  body:not([class*="theme-"]) .favorites-trigger {
+    border-color: #d1d5db;
+    color: #374151;
+  }
+  body:not([class*="theme-"]) .favorites-trigger-badge {
+    border-color: #f7f5f2;
+  }
+  @media (max-width: 380px) {
+    .favorites-trigger { width: 38px; height: 38px; }
+  }
+
   /* Favoritos, busca recente, lista/grade */
   .view-toggle {
     display: inline-flex;
@@ -2771,7 +2826,7 @@
     <div class="recent-searches" id="recentSearches" aria-label="Buscas recentes"></div>
   </div>
   <div class="toolbar-row">
-    <button type="button" class="fbtn" id="btnFavOnly" title="Só favoritos">♥ Favoritos</button>
+    <button type="button" class="favorites-trigger" id="btnFavOnly" title="Favoritos" aria-label="Abrir favoritos"><span class="favorites-trigger-heart" aria-hidden="true">♥</span><span class="favorites-trigger-badge" id="favoritesBadge" aria-live="polite">0</span></button>
     <div class="view-toggle" role="group" aria-label="Visualização">
       <button type="button" id="viewGrid" class="active" title="Grade">▦</button>
       <button type="button" id="viewList" title="Lista">☰</button>
