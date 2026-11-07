@@ -2,6 +2,16 @@
   publish = "."
   functions = "netlify/functions"
 
+# Cabeçalhos de segurança aplicados a todas as respostas do site.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+
 [[headers]]
   for = "/netlify/functions/*"
   [headers.values]
@@ -26,7 +36,7 @@
   from = "/api/dande-stock"
   to = "/.netlify/functions/dande-stock"
   status = 200
-  
+
 [[redirects]]
   from = "/feed.xml"
   to = "/.netlify/functions/get-feed"
@@ -43,4 +53,3 @@
   [headers.values]
     Content-Type = "application/javascript; charset=utf-8"
     Cache-Control = "no-cache"
-
