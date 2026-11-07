@@ -166,7 +166,7 @@ body:not([class*="theme-"]) .card:hover {
   background: linear-gradient(145deg, #faf7f0, #f0e9dd);
 }
 .photo img { object-fit: contain; }
-.featured-strip {
+body:not([class*="theme-"]) .featured-strip {
   margin: .4rem 0 1.5rem;
   padding: 1.1rem 1rem 1rem;
   border: 1px solid #e9dfce;
