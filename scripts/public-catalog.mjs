@@ -58,7 +58,12 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         const safeItem = pick(item, PRODUCT_FIELDS);
         safeItem.public_id = publicId(line, group, item);
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
-        if (liveRef) safeItem.stock_ref = liveRef;
+        if (liveRef) {
+          safeItem.stock_ref = liveRef;
+          if (safeItem.fonte === "roupas" || publicSource(line, group?.cat) === "roupas") {
+            safeItem.stock_route = String(item?.id_origem || "").toLowerCase().startsWith("franny-") ? "b" : "a";
+          }
+        }
         safeItem.fonte = publicSource(line, group?.cat);
         if (Array.isArray(safeItem.fotos)) {
           safeItem.fotos = safeItem.fotos.map(url => sanitizePublicImageUrl(url, imageOptions)).filter(Boolean);
