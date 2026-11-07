@@ -10,7 +10,7 @@ async function loadCatalogData() {
   // Não importar data.js diretamente: ele é um artefato público e não deve
   // funcionar como caminho alternativo que contorne a sanitização.
   try {
-    const res = await fetch('/api/catalogo', { cache: 'no-store' });
+    const res = await fetch('/api/catalogo');
     if (res.ok) {
       const text = await res.text();
       const payload = JSON.parse(text.replace(/^\uFEFF/, ''));
@@ -1825,6 +1825,8 @@ function collectFeatured(limit = 12) {
 }
 
 function buildFeaturedHtml() {
+  // O carrossel não pode furar o filtro de favoritos exibindo itens não salvos.
+  if (state.favoritesOnly) return '';
   // só na home (sem busca / filtros fechados)
   if (state.search.trim()) return '';
   if (state.gender !== 'Todos' && state.gender.toLowerCase() !== 'todos') return '';
@@ -2004,12 +2006,12 @@ function saveFavs(arr) {
 function favId(p) {
   return String(p.public_id || productId(p) || p.nome || '').trim();
 }
-function isFav(p) {
+function isFav(p, favorites = loadFavs()) {
   const id = favId(p);
   // Compatibilidade: versões anteriores também salvavam productId (marca-nome-volume).
   // IDs internos antigos permanecem no armazenamento, mas não são publicados nem recriados.
   const legacyId = productId(p);
-  return isFavoriteId(loadFavs(), id, legacyId);
+  return isFavoriteId(favorites, id, legacyId);
 }
 function toggleFav(p) {
   const id = favId(p);
@@ -2064,6 +2066,8 @@ function applyViewMode() {
 }
 
 function render() {
+  // Uma única leitura do armazenamento por renderização, em vez de uma leitura por produto.
+  const favoriteIds = new Set(loadFavs());
   if (state.category !== 'Todos' && !sectionActive(state.category)) {
     state.category = 'Todos';
   }
@@ -2082,7 +2086,7 @@ function render() {
       if (!matchesSearch(item, g.brand, g.cat, state.search)) return false;
       if (!matchesVolumeFilter(item, g.cat, state.volume, g.brand)) return false;
       if (state.vitrine === 'Lancamentos' && !isLancamentoItem(item, g.cat)) return false;
-      if (state.favoritesOnly && !isFav({ ...item, brand: g.brand, cat: g.cat })) return false;
+      if (state.favoritesOnly && !isFav({ ...item, brand: g.brand, cat: g.cat }, favoriteIds)) return false;
       return true;
     });
     if (!items.length) continue;
@@ -2183,7 +2187,7 @@ function render() {
           ? `<button class="btn-sm btn-buy" data-p="${pdata}">Comprar</button>`
           : `<button class="btn-sm btn-buy btn-disabled" disabled>Esgotado</button>`;
 
-        const favOn = isFav(item);
+        const favOn = isFav(item, favoriteIds);
         html += `
           <div class="${cardClass}${isNovo ? ' has-novo' : ''}">
             <button type="button" class="fav-btn${favOn ? ' on' : ''}" data-fav="${pdata}" aria-label="Favoritar">${favOn ? '♥' : '♡'}</button>
