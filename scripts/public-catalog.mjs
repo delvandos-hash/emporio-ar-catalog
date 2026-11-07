@@ -37,6 +37,10 @@ function publicLine(line, groups) {
   if (categories.some(cat => cat.includes("perf"))) return "perfumaria";
   return "outros";
 }
+function stockRef(source, originId) {
+  if (!originId || !["roupas", "acessorios"].includes(source)) return "";
+  return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
+}
 function publicId(line, group, item) {
   const identity = [line, group?.brand, group?.cat, item?.nome, item?.volume, ].map(x => String(x || "").trim().toLowerCase()).join("|");
   return "p_" + createHash("sha256").update(identity).digest("hex").slice(0, 20);
@@ -53,6 +57,8 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
         safeItem.public_id = publicId(line, group, item);
+        const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
+        if (liveRef) safeItem.stock_ref = liveRef;
         safeItem.fonte = publicSource(line, group?.cat);
         if (Array.isArray(safeItem.fotos)) {
           safeItem.fotos = safeItem.fotos.map(url => sanitizePublicImageUrl(url, imageOptions)).filter(Boolean);
