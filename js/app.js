@@ -1654,7 +1654,7 @@ function openDetails(p, opts = {}) {
   const overlay = document.getElementById('modal');
   overlay.classList.remove('closing');
   const avail = isAvailable(p);
-  const isScoop = (p.badge === 'Scoop') || (p.nome || '').toLowerCase().includes('scoop');
+  const isScoop = isScoopProduct(p);
   const roupas = isRoupasProduct(p);
   const acessorios = isAcessoriosProduct(p);
   const varCatalog = isVariacaoCatalogProduct(p);
@@ -2156,7 +2156,7 @@ function render() {
       for (const rawItem of sortedItems) {
         const item = validateProductPrices(rawItem);
         const avail = isAvailable(item);
-        const isScoop = (item.badge === 'Scoop') || (item.nome || '').toLowerCase().includes('scoop');
+        const isScoop = isScoopProduct({ ...item, cat });
         const varejoShow = item.varejo ? `R$ ${escapeHtml(item.varejo)}` : '—';
         const atacadoShow = item.atacado && item.atacado !== '—' ? `R$ ${escapeHtml(item.atacado)}` : '—';
         const pdata = encodeURIComponent(JSON.stringify({
