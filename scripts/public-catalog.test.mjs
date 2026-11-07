@@ -97,6 +97,20 @@ test("normaliza estoque de variações e limita identificadores/textos", () => {
   assert.equal("sku" in item.variacoes[0], false);
 });
 
+test("gera referência opaca para estoque ao vivo sem publicar IDs de origem", () => {
+  const source = { roupas: [{ brand: "Empório A.R", cat: "VESTIDOS", items: [{
+    nome: "Vestido", id_origem: "franny-987654", fonte: "roupas",
+    variacoes: [{ id: "tamanho-privado", nome: "M", estoque: 2 }]
+  }]}] };
+  const result = toPublicCatalog(source);
+  const item = result.roupas[0].items[0];
+  assert.match(item.stock_ref, /^s_[a-f0-9]{24}$/);
+  assert.equal(JSON.stringify(result).includes("franny-987654"), false);
+  assert.equal(JSON.stringify(result).includes("987654"), false);
+  assert.equal(JSON.stringify(result).includes("tamanho-privado"), false);
+  assert.equal(toPublicCatalog(source).roupas[0].items[0].stock_ref, item.stock_ref);
+});
+
 test("rejeita DATA inválido", () => {
   assert.throws(() => toPublicCatalog(null), /DATA inválido/);
   assert.throws(() => toPublicCatalog([]), /DATA inválido/);
