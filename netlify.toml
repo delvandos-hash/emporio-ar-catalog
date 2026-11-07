@@ -8,6 +8,11 @@
     Access-Control-Allow-Origin = "*"
 
 [[redirects]]
+  from = "/api/admin-auth"
+  to = "/.netlify/functions/admin-auth"
+  status = 200
+
+[[redirects]]
   from = "/api/catalogo"
   to = "/.netlify/functions/get-catalog"
   status = 200
