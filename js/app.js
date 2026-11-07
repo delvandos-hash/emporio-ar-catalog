@@ -1162,15 +1162,26 @@ function bindCepField(inputId) {
   });
 }
 
+let confirmBuyMetaBusy = false;
+
 async function confirmBuyMeta() {
   const p = pendingBuyProduct;
-  if (!p) return;
-  const waWindow = window.open('about:blank', '_blank');
-  if (!waWindow) {
-    alert('O navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este catálogo e tente novamente.');
-    return;
+  if (!p || confirmBuyMetaBusy) return;
+  confirmBuyMetaBusy = true;
+  const button = document.getElementById('buyMetaConfirm');
+  const previousLabel = button?.textContent || '📲 Continuar no WhatsApp';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Validando pedido…';
   }
+  let waWindow = null;
   try {
+    // Abrir sincronamente no clique evita bloqueio do navegador após o await.
+    waWindow = window.open('about:blank', '_blank');
+    if (!waWindow) {
+      alert('O navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este catálogo e tente novamente.');
+      return;
+    }
     const nome = (document.getElementById('buyClientName')?.value || '').trim();
     const cepResult = await ensureCep('buyClientCep');
     if (!cepResult.ok) {
@@ -1193,9 +1204,15 @@ async function confirmBuyMeta() {
     waWindow.location.href = `https://wa.me/${WHATSAPP}?text=${buildWaMessage(p, { nome, cep, cidade, uf, qty })}`;
     closeBuyMetaModal();
   } catch (error) {
-    waWindow.close();
+    try { waWindow?.close(); } catch (closeError) {}
     console.warn('Não foi possível preparar a compra no WhatsApp.', error);
     alert('Não foi possível preparar sua mensagem agora. Tente novamente.');
+  } finally {
+    confirmBuyMetaBusy = false;
+    if (button) {
+      button.disabled = false;
+      button.textContent = previousLabel;
+    }
   }
 }
 
