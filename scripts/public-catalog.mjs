@@ -17,12 +17,11 @@ function publicSource(line, cat) {
   if (c === "brand" || c.startsWith("brand")) return "brand";
   if (ln.includes("roup")) return "roupas";
   if (ln.includes("acessor")) return "acessorios";
-  if (["masculino", "feminino", "unissex"].includes(ln)) return "perfumaria";
+  if (["masculino", "feminino", "unissex"].includes(ln) || ln.includes("perf") || c.includes("perf")) return "perfumaria";
   return "outros";
 }
 function publicId(line, group, item) {
-  const identity = [line, group?.brand, group?.cat, item?.nome, item?.volume, item?.foto,
-    Array.isArray(item?.fotos) ? item.fotos[0] : ""].map(x => String(x || "").trim().toLowerCase()).join("|");
+  const identity = [line, group?.brand, group?.cat, item?.nome, item?.volume, ].map(x => String(x || "").trim().toLowerCase()).join("|");
   return "p_" + createHash("sha256").update(identity).digest("hex").slice(0, 20);
 }
 export function toPublicCatalog(DATA, imageOptions = {}) {
