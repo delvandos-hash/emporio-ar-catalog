@@ -1,0 +1,43 @@
+name: Validar publicação pública isolada
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/publish-public-catalog.mjs'
+      - 'scripts/publish-public-catalog.test.mjs'
+      - 'scripts/public-catalog.mjs'
+      - 'scripts/public-image-url.mjs'
+      - 'js/data.js'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Escolha publicar o snapshot sanitizado ou executar apenas dry-run'
+        required: true
+        type: choice
+        options:
+          - dry-run
+          - publish
+        default: dry-run
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Testar preparação isolada do catálogo público
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/publish-public-catalog.test.mjs
+      - name: Executar dry-run sem publicar no Gist
+        if: github.event_name == 'pull_request' || inputs.publish != 'publish'
+        run: node scripts/publish-public-catalog.mjs
+      - name: Publicar snapshot sanitizado no Gist
+        if: github.event_name == 'workflow_dispatch' && inputs.publish == 'publish'
+        env:
+          ALLOW_PUBLIC_GIST_WRITE: yes
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: node scripts/publish-public-catalog.mjs --publish
