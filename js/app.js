@@ -797,7 +797,7 @@ function isAvailable(item) {
 }
 
 
-const STOCK_CACHE_KEY = 'emporio_ar_stock_cache_v2';
+const STOCK_CACHE_KEY = 'emporio_ar_stock_cache_v3';
 const STOCK_CACHE_TTL_MS = 5 * 60 * 1000;
 let stockLiveMap = null;
 
@@ -815,8 +815,8 @@ function lookupLiveStock(item, brand, cat, line) {
   if (!stockLiveMap) return null;
   const n = normStockKey(item.nome);
   const isBrand = line === 'brand' || cat === 'Brand' || String(cat || '').startsWith('Brand') || String(brand || '').toUpperCase().includes('BRAND') || String(brand || '').toUpperCase().includes('ARABIC') || String(brand || '').toUpperCase().includes('DREAM') || String(brand || '').toUpperCase().includes('FLACONETE') || String(brand || '').toUpperCase().includes('SAPATINHO') || String(brand || '').toUpperCase().includes('BODY') || String(brand || '').toUpperCase().includes('BEAUTY') || String(brand || '').toUpperCase().includes('COLE');
-  const map = isBrand ? (stockLiveMap.brandMap || {}) : (stockLiveMap.map || {});
-  const byName = isBrand ? (stockLiveMap.brandByName || {}) : (stockLiveMap.byName || {});
+  const map = isBrand ? (stockLiveMap.mapB || {}) : (stockLiveMap.mapA || {});
+  const byName = isBrand ? (stockLiveMap.byNameB || {}) : (stockLiveMap.byNameA || {});
   const b = normStockKey(brand);
   const k1 = n + '|' + b;
   if (map[k1]) return map[k1];
@@ -843,9 +843,9 @@ async function fetchFreshStockSnapshot() {
   const response = await fetch('/api/stock-sync?fresh=' + Date.now(), { cache: 'no-store' });
   if (!response.ok) throw new Error('Não foi possível consultar o estoque atualizado.');
   const data = await response.json();
-  if (!data || !data.ok || !data.updatedAt || !data.map || !data.brandMap) throw new Error('A origem não confirmou o estoque dos produtos.');
+  if (!data || !data.ok || !data.updatedAt || !data.mapA || !data.mapB) throw new Error('A origem não confirmou o estoque dos produtos.');
   stockLiveMap = data;
-  try { localStorage.setItem(STOCK_CACHE_KEY, JSON.stringify({ map: data.map || {}, byName: data.byName || {}, brandMap: data.brandMap || {}, brandByName: data.brandByName || {}, updatedAt: data.updatedAt })); } catch (e) {}
+  try { localStorage.setItem(STOCK_CACHE_KEY, JSON.stringify({ mapA: data.mapA || {}, byNameA: data.byNameA || {}, mapB: data.mapB || {}, byNameB: data.byNameB || {}, updatedAt: data.updatedAt })); } catch (e) {}
   return data;
 }
 
@@ -907,10 +907,10 @@ async function syncStockFromRoot() {
       stockLiveMap = data;
       try {
         localStorage.setItem(STOCK_CACHE_KEY, JSON.stringify({
-          map: data.map || {},
-          byName: data.byName || {},
-          brandMap: data.brandMap || {},
-          brandByName: data.brandByName || {},
+          mapA: data.mapA || {},
+          byNameA: data.byNameA || {},
+          mapB: data.mapB || {},
+          byNameB: data.byNameB || {},
           updatedAt: data.updatedAt || new Date().toISOString(),
         }));
       } catch (e) {}
