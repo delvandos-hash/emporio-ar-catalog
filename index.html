@@ -2986,7 +2986,8 @@ footer img{opacity:.85}
   }
   .featured-row { gap: .85rem !important; padding: .35rem .1rem .8rem !important; }
   /* Contraste: textos claros sobre superfícies escuras. */
-  .category:not(.cat-scoop) .category-title { color: #fff !important; }
+  .category:not(.cat-scoop):not(.cat-brand) .category-title { color: #fff !important; }
+  .category.cat-brand .category-title { color: #9a7b3c !important; }
   .editorial-hero,
   .editorial-hero :is(h2, p, span, a, strong, i) { color: #fffaf2; }
   .editorial-hero .editorial-kicker,
@@ -3068,17 +3069,7 @@ footer img{opacity:.85}
   </div>
 </div>
 
-<section class="editorial-hero" aria-label="Empório A.R">
-  <div class="editorial-hero-copy">
-    <span class="editorial-kicker">CURADORIA • BELEZA • ESTILO</span>
-    <p class="editorial-hero-overline">Uma experiência para descobrir</p>
-    <h2>Seu próximo<br><em>favorito</em> está aqui.</h2>
-    <p class="editorial-hero-text">Fragrâncias marcantes, beleza e escolhas especiais em uma curadoria feita para você.</p>
-    <a class="editorial-cta" href="#catalog">Explorar coleção <span aria-hidden="true">↗</span></a>
-  </div>
-  <div class="editorial-hero-mark" aria-hidden="true"><span>EMPÓRIO</span><strong>A.R</strong><i>BEAUTY & STYLE</i></div>
-  <div class="editorial-hero-orbit" aria-hidden="true"></div>
-</section>
+
 
 <div class="toolbar">
   <div class="search" id="searchWrap">
