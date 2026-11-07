@@ -1,3 +1,5 @@
+import { sanitizePublicImageUrl } from "./public-image-url.mjs";
+
 /**
  * Projeção pública do catálogo.
  * O Gist é público: enviar apenas os campos consumidos pela vitrine.
@@ -30,8 +32,15 @@ export function toPublicCatalog(DATA) {
       safeGroup.items = Array.isArray(group?.items) ? group.items.map((item) => {
         const safeItem = pick(item, PRODUCT_FIELDS);
         if (safeItem.id_origem != null) safeItem.id_origem = String(safeItem.id_origem).slice(0, 120);
+        if (safeItem.foto != null) {
+          const safePhoto = sanitizePublicImageUrl(safeItem.foto);
+          if (safePhoto) safeItem.foto = safePhoto;
+          else delete safeItem.foto;
+        }
         if (Array.isArray(safeItem.fotos)) {
-          safeItem.fotos = safeItem.fotos.filter((url) => typeof url === "string");
+          safeItem.fotos = safeItem.fotos
+            .map((url) => sanitizePublicImageUrl(url))
+            .filter(Boolean);
         } else {
           delete safeItem.fotos;
         }
