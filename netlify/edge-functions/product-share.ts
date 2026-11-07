@@ -32,7 +32,7 @@ function setMeta(html: string, attribute: string, key: string, value: string): s
 
 function setCanonical(html: string, url: string): string {
   const replacement = `<link rel="canonical" href="${escapeHtml(url)}" />`;
-  const pattern = /<link\\s+[^>]*rel=["']canonical["'][^>]*>/i;
+  const pattern = new RegExp('<link[^>]*canonical[^>]*>', 'i');
   return pattern.test(html) ? html.replace(pattern, replacement) : html.replace("</head>", `  ${replacement}\\n</head>`);
 }
 
@@ -41,7 +41,7 @@ export default async (request: Request, context: any) => {
   if (!response.ok) return response;
 
   const url = new URL(request.url);
-  const match = url.pathname.match(/^\\/p\\/(p_[a-f0-9]{20})\\/?$/);
+  const match = url.pathname.match(new RegExp('^/p/(p_[a-f0-9]{20})/?$'));
   if (!match) return response;
 
   try {
@@ -55,7 +55,7 @@ export default async (request: Request, context: any) => {
     const productUrl = new URL(`/p/${encodeURIComponent(match[1])}`, url.origin).toString();
     const rawImage = String(product.foto || product.fotos?.[0] || "/assets/logo.jpg");
     const imageUrl = new URL(rawImage, url.origin);
-    if (imageUrl.origin !== url.origin || !/^\\/(api\\/product-image|assets\\/)/.test(imageUrl.pathname)) {
+    if (imageUrl.origin !== url.origin || !new RegExp('^/(api/product-image|assets/)').test(imageUrl.pathname)) {
       imageUrl.pathname = "/assets/logo.jpg";
       imageUrl.search = "";
     }
@@ -72,7 +72,7 @@ export default async (request: Request, context: any) => {
       : `Confira ${product.nome || "este produto"} no catálogo Empório A.R.`;
 
     let html = await response.text();
-    html = html.replace(/<title>[^<]*<\\/title>/i, `<title>${escapeHtml(title)}</title>`);
+    html = html.replace(new RegExp('<title>[^<]*</title>', 'i'), '<title>' + escapeHtml(title) + '</title>');
     html = setMeta(html, "property", "og:title", title);
     html = setMeta(html, "property", "og:description", description);
     html = setMeta(html, "property", "og:url", productUrl);
