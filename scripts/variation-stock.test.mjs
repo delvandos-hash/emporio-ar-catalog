@@ -59,3 +59,17 @@ test("Dande mantém compatibilidade com página de produto sem ID solicitado", (
     { option0: "Único", stock: 4 }
   ]);
 });
+
+import { readFile } from "node:fs/promises";
+
+test("endpoints de estoque não devolvem identificadores internos nas respostas", async () => {
+  const roupas = await readFile(new URL("../netlify/functions/roupas-stock.mjs", import.meta.url), "utf8");
+  const dande = await readFile(new URL("../netlify/functions/dande-stock.mjs", import.meta.url), "utf8");
+
+  assert.doesNotMatch(roupas, /erro:\s*"fonte\/id inválidos",\s*rawId/);
+  assert.doesNotMatch(roupas, /erro:\s*"produto não encontrado",\s*id/);
+  assert.doesNotMatch(roupas, /id:\s*stockRef\s*\|\|\s*String\(found\.id\)/);
+  assert.doesNotMatch(dande, /erro:\s*"página não carregou",\s*id/);
+  assert.doesNotMatch(dande, /erro:\s*"produto não encontrado",\s*id/);
+  assert.doesNotMatch(dande, /id:\s*stockRef\s*\|\|\s*resolvedId/);
+});
