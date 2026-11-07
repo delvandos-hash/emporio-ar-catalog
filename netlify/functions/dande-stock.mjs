@@ -131,7 +131,7 @@ export default async (req) => {
           });
           if (!pageRes.ok) break;
           const pageHtml = await pageRes.text();
-          const ids = [...pageHtml.matchAll(/data-product-id="(\\d+)"/g)].map((m) => m[1]);
+          const ids = [...pageHtml.matchAll(/data-product-id="(\d+)"/g)].map((m) => m[1]);
           if (!ids.length) break;
           const matchId = ids.find((candidate) => makeStockRef(candidate) === stockRef);
           if (matchId) {
