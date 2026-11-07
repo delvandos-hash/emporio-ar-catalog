@@ -1429,6 +1429,8 @@ function buildDetailsNavList() {
         cat: g.cat || '',
         fonte: item.fonte || '',
         public_id: item.public_id || '',
+          stock_ref: item.stock_ref || '',
+          stock_route: item.stock_route || '',
                         variacoes: item.variacoes || [],
         total_estoque: item.total_estoque
       });
@@ -1635,6 +1637,62 @@ function bindVariacaoSelector() {
 
 let detailsScrollY = 0;
 
+async function refreshVariationStock(p) {
+  if (!p || !p.stock_ref || !isVariacaoCatalogProduct(p)) return;
+  const isClothing = isRoupasProduct(p);
+  const endpoint = isClothing
+    ? `/api/roupas-stock?ref=${encodeURIComponent(p.stock_ref)}&source=${encodeURIComponent(p.stock_route || 'a')}`
+    : `/api/dande-stock?ref=${encodeURIComponent(p.stock_ref)}&category=${encodeURIComponent(p.cat || '')}`;
+  const requestId = p.public_id || p.stock_ref;
+  const btnAdd = document.getElementById('modalAddCart');
+  const btnBuy = document.getElementById('modalBuy');
+  if (btnAdd) { btnAdd.disabled = true; btnAdd.classList.add('btn-disabled'); btnAdd.textContent = 'Consultando estoque...'; }
+  if (btnBuy) { btnBuy.disabled = true; btnBuy.classList.add('btn-disabled'); btnBuy.textContent = 'Consultando estoque...'; }
+  const hint = document.getElementById('varHint');
+  if (hint) { hint.textContent = 'Consultando disponibilidade atual das variações...'; hint.classList.remove('ok'); }
+  try {
+    const response = await fetch(endpoint, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (!Array.isArray(data.variacoes)) throw new Error('Resposta de estoque inválida');
+    if (!currentProduct || (currentProduct.public_id || currentProduct.stock_ref) !== requestId) return;
+    const variacoes = data.variacoes.map((v) => ({
+      id: String(v.id || ''),
+      nome: String(v.nome || '—'),
+      estoque: Math.max(0, Math.floor(Number(v.estoque) || 0))
+    }));
+    const total = Number.isFinite(Number(data.total_estoque))
+      ? Math.max(0, Math.floor(Number(data.total_estoque)))
+      : variacoes.reduce((sum, v) => sum + v.estoque, 0);
+    const updated = {
+      ...currentProduct,
+      variacoes,
+      total_estoque: total,
+      disponivel: total > 0 ? 'Sim' : 'Não',
+      variacaoSelecionada: null
+    };
+    openDetails(updated, { fromNav: true, skipLiveStock: true });
+    const updatedHint = document.getElementById('varHint');
+    if (updatedHint) {
+      updatedHint.textContent = variacoes.some(v => v.estoque > 0)
+        ? 'Estoque atualizado diretamente na origem.'
+        : 'Todas as variações estão esgotadas no momento.';
+      updatedHint.classList.toggle('ok', variacoes.some(v => v.estoque > 0));
+    }
+  } catch (error) {
+    if (!currentProduct || (currentProduct.public_id || currentProduct.stock_ref) !== requestId) return;
+    const failHint = document.getElementById('varHint');
+    if (failHint) {
+      failHint.textContent = 'Não foi possível confirmar o estoque ao vivo. Feche e abra os detalhes novamente para tentar outra consulta.';
+      failHint.classList.remove('ok');
+    }
+    const add = document.getElementById('modalAddCart');
+    const buy = document.getElementById('modalBuy');
+    if (add) { add.disabled = true; add.classList.add('btn-disabled'); add.textContent = 'Estoque não confirmado'; }
+    if (buy) { buy.disabled = true; buy.classList.add('btn-disabled'); buy.textContent = 'Estoque não confirmado'; }
+  }
+}
+
 function openDetails(p, opts = {}) {
   if (!opts.fromNav) {
     detailsScrollY = window.scrollY || window.pageYOffset || 0;
@@ -1732,6 +1790,7 @@ function openDetails(p, opts = {}) {
   }
   const ov = document.getElementById('modal');
   setProductUrl(p);
+  if (!opts.skipLiveStock) refreshVariationStock(p);
   if (opts.fromNav) {
     ov.classList.remove('closing');
     ov.classList.add('open');
@@ -1855,6 +1914,8 @@ function buildFeaturedHtml() {
       cat: item.cat || '',
       fonte: item.fonte || '',
         public_id: item.public_id || '',
+          stock_ref: item.stock_ref || '',
+          stock_route: item.stock_route || '',
                   variacoes: item.variacoes || [],
       total_estoque: item.total_estoque
     }));
@@ -2269,6 +2330,8 @@ function render() {
           cat: cat || item.cat || '',
           fonte: item.fonte || '',
         public_id: item.public_id || '',
+          stock_ref: item.stock_ref || '',
+          stock_route: item.stock_route || '',
                               variacoes: item.variacoes || [],
           total_estoque: item.total_estoque
         }));
