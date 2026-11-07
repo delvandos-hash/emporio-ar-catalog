@@ -2033,6 +2033,14 @@ function getFavoriteProducts() {
 
 }
 
+function updateFavoritesBadge() {
+  const badge = document.getElementById('favoritesBadge');
+  if (!badge) return;
+  const count = getFavoriteProducts().length;
+  badge.textContent = String(count);
+  badge.setAttribute('aria-label', `${count} produto(s) favoritado(s)`);
+}
+
 function openFavoritesModal() {
   renderFavoritesModal();
   document.getElementById('favoritesModal')?.classList.add('open');
@@ -2049,6 +2057,7 @@ function renderFavoritesModal() {
   if (!list) return;
   const products = getFavoriteProducts();
   if (count) count.textContent = String(products.length);
+  updateFavoritesBadge();
   if (addAll) {
     addAll.disabled = !products.some((p) => isAvailable(p) && !isVariacaoCatalogProduct(p));
     addAll.textContent = '🛒 Adicionar favoritos disponíveis ao carrinho';
@@ -2333,6 +2342,7 @@ function render() {
       try {
         const p = JSON.parse(decodeURIComponent(btn.dataset.fav));
         toggleFav(p);
+        updateFavoritesBadge();
         const on = isFav(p);
         btn.classList.toggle('on', on);
         btn.textContent = on ? '♥' : '♡';
@@ -3114,6 +3124,7 @@ try {
 
 updateCartUI();
 render();
+updateFavoritesBadge();
 syncStockFromRoot().then((ok) => {
   if (ok) render();
   openProductFromUrl();
