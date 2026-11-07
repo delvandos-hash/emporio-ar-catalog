@@ -19,6 +19,12 @@
   status = 404
   force = true
 
+# Links curtos de produtos: a aplicação resolve /p/<public_id> sem expor IDs longos.
+[[redirects]]
+  from = "/p/*"
+  to = "/index.html"
+  status = 200
+
 [[redirects]]
   from = "/api/product-image"
   to = "/.netlify/functions/product-image"
