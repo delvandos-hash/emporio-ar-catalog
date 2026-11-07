@@ -2805,6 +2805,9 @@ document.getElementById('cartFab').addEventListener('click', () => {
   renderCart();
   document.getElementById('cartModal').classList.add('open');
 });
+document.getElementById('mobileCartOpen')?.addEventListener('click', () => {
+  document.getElementById('cartFab')?.click();
+});
 document.getElementById('cartClose').addEventListener('click', () => {
   document.getElementById('cartModal').classList.remove('open');
 });
