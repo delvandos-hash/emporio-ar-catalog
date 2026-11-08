@@ -1,11 +1,8 @@
-/**
- * Feed Google Merchant Center (RSS 2.0 + namespace g)
- * URL pública: https://catalogoemporio.netlify.app/feed.xml
- */
+/** Feed Google Merchant Center — usa a mesma projeção pública sanitizada da API. */
+import { toPublicCatalog } from "../../scripts/public-catalog.mjs";
 const GIST_RAW =
   "https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json";
 const BASE_URL = "https://catalogoemporio.netlify.app";
-const IMG_BASE = "https://arquivos-cdn.facilzap.app.br/";
 
 function normId(s) {
   return String(s || "")
@@ -26,8 +23,13 @@ function absImg(u) {
   if (!u) return "";
   const s = String(u.url || u).trim();
   if (!s) return "";
-  if (s.startsWith("http://") || s.startsWith("https://")) return s;
-  return IMG_BASE + s.replace(/^\//, "");
+  try {
+    const url = new URL(s, BASE_URL);
+    if (url.protocol !== "https:" || url.origin !== BASE_URL) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
 function escapeCdata(s) {
@@ -51,7 +53,7 @@ export default async (req, context) => {
     if (rawText.startsWith("\uFEFF")) rawText = rawText.slice(1);
 
     const data = JSON.parse(rawText);
-    const DATA = data.DATA || {};
+    const DATA = toPublicCatalog(data.DATA || {});
     const feedItems = [];
 
     for (const line of Object.keys(DATA)) {
@@ -138,7 +140,7 @@ ${feedItems.join("\n")}
     });
   } catch (error) {
     return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?><error><![CDATA[${String(error.message || error)}]]></error>`,
+      `<?xml version="1.0" encoding="UTF-8"?><error><![CDATA[Feed temporariamente indisponível.]]></error>`,
       {
         status: 500,
         headers: { "Content-Type": "application/xml; charset=utf-8" },

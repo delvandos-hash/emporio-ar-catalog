@@ -3,6 +3,12 @@
  * Estoque ao vivo Roupas — Sophia Moda e Franny (FacilZap)
  * id pode vir como "123" (Sophia) ou "franny-123" (Franny)
  */
+import { createHash } from "node:crypto";
+
+function makeStockRef(source, originId) {
+  return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
+}
+
 const SOURCES = {
   sophia: {
     // tenta domínio próprio e, se cair, FacilZap
@@ -87,13 +93,12 @@ async function fetchCategoryPage(src, catId, page, cookie) {
   }
 }
 
-function buildVariacoes(found) {
+export function buildVariacoes(found) {
   const estoqueMap = found.estoque || {};
   const varDict = found.variacoes || {};
-  const variacoes = Object.entries(varDict).map(([vid, vinfo]) => ({
-    id: String(vid),
+  const variacoes = Object.entries(varDict).map(([vid, vinfo], index) => ({
+    id: `v${index + 1}`,
     nome: ((vinfo && vinfo.nome) || "").trim() || String(vid),
-    cor: (vinfo && vinfo.cor) || null,
     estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
   }));
   const total =
@@ -106,24 +111,27 @@ export default async (req) => {
   const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-    "Cache-Control": "public, max-age=20",
+    "Cache-Control": "no-store, no-cache, must-revalidate",
   };
 
   try {
     const url = new URL(req.url);
     const rawId = url.searchParams.get("id");
-    if (!rawId) {
+    const stockRef = url.searchParams.get("ref") || "";
+    if (!rawId && !stockRef) {
       return new Response(JSON.stringify({ erro: "id obrigatório" }), {
         status: 400,
         headers,
       });
     }
 
-    const { source, id } = parseId(rawId);
+    const sourceParam = url.searchParams.get("source") || "";
+    const parsed = rawId ? parseId(rawId) : { source: sourceParam === "b" ? "franny" : "sophia", id: "" };
+    const { source, id } = parsed;
     if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
-    if (!src || !id) {
-      return new Response(JSON.stringify({ erro: "fonte/id inválidos", rawId }), {
+    if (!src || (!id && !stockRef)) {
+      return new Response(JSON.stringify({ erro: "fonte/id inválidos" }), {
         status: 400,
         headers,
       });
@@ -140,7 +148,8 @@ export default async (req) => {
       let baseUsable = false;
 
       for (const catId of srcTry.categories) {
-        for (let page = 1; page <= 5; page++) {
+        const maxCategoryPages = source === "franny" ? 30 : 8;
+        for (let page = 1; page <= maxCategoryPages; page++) {
           let data;
           try {
             data = await fetchCategoryPage(srcTry, catId, page, cookie);
@@ -152,14 +161,14 @@ export default async (req) => {
           const produtos = data.produtos || [];
           if (!produtos.length) break;
 
-          const found = produtos.find((p) => String(p.id) === String(id));
+          const found = produtos.find((p) => stockRef
+            ? makeStockRef(source === "franny" ? "roupas" : "roupas", source === "franny" ? `franny-${p.id}` : p.id) === stockRef
+            : String(p.id) === String(id));
           if (found) {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: String(found.id),
-                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
-                fonte: source,
+                id: stockRef || null,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -184,14 +193,14 @@ export default async (req) => {
           if (!data) break;
           const produtos = data.produtos || [];
           if (!produtos.length) break;
-          const found = produtos.find((p) => String(p.id) === String(id));
+          const found = produtos.find((p) => stockRef
+            ? makeStockRef("roupas", source === "franny" ? `franny-${p.id}` : p.id) === stockRef
+            : String(p.id) === String(id));
           if (found) {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: String(found.id),
-                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
-                fonte: source,
+                id: stockRef || null,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -209,7 +218,7 @@ export default async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ erro: "produto não encontrado", id, fonte: source }),
+      JSON.stringify({ erro: "produto não encontrado" }),
       { status: 404, headers }
     );
   } catch (error) {
