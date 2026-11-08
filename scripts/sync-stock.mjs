@@ -5,12 +5,14 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { toPublicCatalog } from './public-catalog.mjs';
+import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
-const IMARAT_API = 'https://imaratperfumaria.com/api/products';
-const BRAND_BASE = 'https://brandcollectionpy.com.br';
+const IMARAT_API = process.env.IMARAT_API_URL;
+const BRAND_BASE = process.env.BRAND_BASE_URL;
 const BRAND_SELLER = 'darlanaugusto';
 
 function norm(s) {
@@ -159,6 +161,8 @@ function resolve(item, brand, map, byName) {
 }
 
 async function main() {
+  const missingSources = ['IMARAT_API_URL','BRAND_BASE_URL'].filter((key) => !process.env[key]);
+  if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Buscando Imarat...');
   const imarat = await fetchImarat();
   console.log(`Imarat: ${imarat.fetched}/${imarat.total}`);
@@ -192,6 +196,36 @@ async function main() {
     }
   }
 
+  for (const groups of Object.values(DATA)) {
+    for (const group of groups || []) {
+      for (const item of group.items || []) {
+        delete item.original;
+        delete item.custo;
+        delete item.precoCusto;
+        delete item.preco_custo;
+        delete item.cost;
+        delete item.costPrice;
+        if (item.url_origem) {
+          try {
+            const sourceUrl = new URL(String(item.url_origem), 'https://dandejoias.com');
+            item.url_origem = sourceUrl.pathname;
+          } catch {
+            delete item.url_origem;
+          }
+        }
+        if (item.foto) {
+          const safePhoto = sanitizePublicImageUrl(item.foto);
+          if (safePhoto) item.foto = safePhoto;
+          else delete item.foto;
+        }
+        if (Array.isArray(item.fotos)) {
+          item.fotos = item.fotos.map(sanitizePublicImageUrl).filter(Boolean);
+          if (!item.fotos.length) delete item.fotos;
+        }
+      }
+    }
+  }
+
   const out = '/** Empório A.R — estoque sincronizado ' + new Date().toISOString() + ' (Imarat+Brand) */\n' + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
 
   fs.writeFileSync(dataPath, out, 'utf8');
@@ -203,7 +237,7 @@ async function main() {
     const gistId = "11918b7196b3ee6a0d8a91739167b312";
     const githubToken = process.env.GIST_TOKEN;
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
-    const dadosParaSite = { DATA: DATA, WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
+    const dadosParaSite = { DATA: toPublicCatalog(DATA), WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
     const response = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
@@ -211,7 +245,10 @@ async function main() {
     });
     if (!response.ok) { const errorText = await response.text(); throw new Error(`GitHub API ${response.status}: ${errorText}`); }
     console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
-  } catch (error) { console.error('❌ Erro ao enviar para o GitHub Gist:', error); }
+  } catch (error) {
+    console.error('❌ Erro ao enviar para o GitHub Gist:', error);
+    throw error; // faz a Action falhar em vez de sinalizar sucesso sem atualizar o catálogo público
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

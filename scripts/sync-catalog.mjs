@@ -7,12 +7,15 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { toPublicCatalog } from './public-catalog.mjs';
+import { sanitizePublicImageUrl } from './public-image-url.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
-const IMARAT_API = 'https://imaratperfumaria.com/api/products';
-const IMARAT_ORIGIN = 'https://imaratperfumaria.com';
-const BRAND_BASE = 'https://brandcollectionpy.com.br';
+const IMARAT_API = process.env.IMARAT_API_URL;
+const IMARAT_ORIGIN = process.env.IMARAT_ORIGIN_URL;
+const BRAND_BASE = process.env.BRAND_BASE_URL;
+const CDN_IMAGE_BASE = process.env.CDN_IMAGE_BASE_URL;
 const BRAND_SELLER = 'darlanaugusto';
 
 const BRAND_ALLOWED_SESSIONS = [
@@ -341,10 +344,8 @@ async function fetchBrandList() {
 
 // ========== SOPHIA MODA (ROUPAS) ==========
 // Fallback: domínio próprio → FacilZap (resolveSophiaBase escolhe a que responde JSON)
-const SOPHIA_CANDIDATES = [
-  'https://sophiamoda.com.br',
-  'https://facilzap.app.br/sophiamodafemi',
-];
+const SOPHIA_CANDIDATES = [process.env.SOPHIA_PRIMARY_URL, process.env.SOPHIA_FALLBACK_URL].filter(Boolean);
+const SOPHIA_FALLBACK_ORIGIN = process.env.SOPHIA_FALLBACK_ORIGIN;
 let SOPHIA_BASE = SOPHIA_CANDIDATES[0];
 const SOPHIA_LOJA = 'lojavendedoras';
 const SOPHIA_CATEGORIES = [
@@ -443,7 +444,7 @@ async function resolveSophiaBase(UA) {
       await warm.text().catch(() => {});
 
       const probeUrl = `${base}/c/atacado/carregar_produtos/1/108042/${SOPHIA_LOJA}?mobile=0`;
-      const origin = base.includes('facilzap') ? 'https://facilzap.app.br' : base;
+      const origin = base === SOPHIA_CANDIDATES[1] ? SOPHIA_FALLBACK_ORIGIN : base;
       const res = await fetch(probeUrl, {
         method: 'POST',
         headers: {
@@ -485,7 +486,7 @@ async function fetchSophiaRoupas() {
   // Escolhe base viva (próprio ou FacilZap) + cookie
   const resolved = await resolveSophiaBase(UA);
   const cookie = resolved.cookie || '';
-  const origin = SOPHIA_BASE.includes('facilzap') ? 'https://facilzap.app.br' : SOPHIA_BASE;
+  const origin = SOPHIA_BASE === SOPHIA_CANDIDATES[1] ? SOPHIA_FALLBACK_ORIGIN : SOPHIA_BASE;
 
   const headers = {
     'User-Agent': UA,
@@ -520,7 +521,7 @@ async function fetchSophiaRoupas() {
             p.preco_por ?? p.preco ?? p.preco_de ?? p.valor ?? 0;
           const { atacado, varejo } = calcPrecosRoupas(precoBase);
 
-          const SOPHIA_IMG_BASE = 'https://arquivos-cdn.facilzap.app.br/';
+          const SOPHIA_IMG_BASE = CDN_IMAGE_BASE;
           const toAbsImg = (u) => {
             if (!u) return '';
             const s = String(u.url || u).trim();
@@ -590,7 +591,7 @@ async function fetchSophiaRoupas() {
 
 
 // ========== FRANNY (ROUPAS) ==========
-const FRANNY_BASE = 'https://frannyloja.com.br';
+const FRANNY_BASE = process.env.FRANNY_BASE_URL;
 const FRANNY_LOJA = '62999336607';
 const FRANNY_CATEGORIES = [
   { id: '265229', nome: 'VESTIDOS' },
@@ -607,7 +608,7 @@ const FRANNY_CATEGORIES = [
 const ADD_FRANNY = process.env.ADD_FRANNY !== '0';
 const ADD_ACESSORIOS = process.env.ADD_ACESSORIOS !== '0';
 
-const FACILZAP_IMG = 'https://arquivos-cdn.facilzap.app.br/';
+const FACILZAP_IMG = CDN_IMAGE_BASE;
 
 function toAbsFacilImg(u) {
   if (!u) return '';
@@ -809,7 +810,13 @@ function mergeRoupasGroups(listOfGroupArrays, prevRoupas = []) {
 }
 
 // ========== DANDE (ACESSÓRIOS) ==========
-const DANDE_BASE = 'https://dandejoias.com';
+const DANDE_BASE = process.env.DANDE_BASE_URL;
+function dandePathOnly(value) {
+  if (!value) return '';
+  try { const parsed = new URL(String(value), DANDE_BASE); return parsed.pathname + parsed.search; }
+  catch { return ''; }
+}
+
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -1059,7 +1066,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
             badge: prev?.badge || '',
             fonte: 'acessorios',
             id_origem: String(p.id),
-            url_origem: p.url || (prev && prev.url_origem) || '',
+            url_origem: dandePathOnly(p.url || (prev && prev.url_origem) || ''),
             total_estoque: totalEstoque,
             variacoes,
             cat: cat.nome,
@@ -1112,6 +1119,9 @@ async function fetchDandeAcessorios(existingGroups = []) {
 
 
 async function main() {
+  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
+  const missingSources = requiredSources.filter((key) => !process.env[key]);
+  if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Carregando data.js...');
   let raw = fs.readFileSync(dataPath, 'utf8');
   const m = raw.match(/export const DATA = (\{[\s\S]*?\});\s*\nexport const WHATSAPP/);
@@ -1324,7 +1334,7 @@ async function main() {
       const nome = p.nome || ''; if (!nome) continue; let session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session && norm(nome).includes('tubete')) session = 'TUBETES BRAND'; if (!session) continue;
       const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(session)}`) || indexNormal.has(limparParaComparacao(nome)); if (duplicado) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
-      const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `https://arquivos-cdn.facilzap.app.br/${img}?width=700&height=700&quality=85&format=webp`; }
+      const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
       const group = ensureBrandGroup(DATA, line, session, 'Brand');
       group.items.push(stampNovoDesde({ 
@@ -1428,6 +1438,36 @@ async function main() {
     DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
   }
 
+  for (const groups of Object.values(DATA)) {
+    for (const group of groups || []) {
+      for (const item of group.items || []) {
+        delete item.original;
+        delete item.custo;
+        delete item.precoCusto;
+        delete item.preco_custo;
+        delete item.cost;
+        delete item.costPrice;
+        if (item.url_origem) {
+          try {
+            const sourceUrl = new URL(String(item.url_origem), 'https://dandejoias.com');
+            item.url_origem = sourceUrl.pathname;
+          } catch {
+            delete item.url_origem;
+          }
+        }
+        if (item.foto) {
+          const safePhoto = sanitizePublicImageUrl(item.foto);
+          if (safePhoto) item.foto = safePhoto;
+          else delete item.foto;
+        }
+        if (Array.isArray(item.fotos)) {
+          item.fotos = item.fotos.map(sanitizePublicImageUrl).filter(Boolean);
+          if (!item.fotos.length) delete item.fotos;
+        }
+      }
+    }
+  }
+
   const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount}+${frannyCount} Roupas +${acessoriosCount} Acc | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
   fs.writeFileSync(dataPath, out, 'utf8');
 
@@ -1444,7 +1484,7 @@ async function main() {
     const gistId = "11918b7196b3ee6a0d8a91739167b312";
     const githubToken = process.env.GIST_TOKEN;
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
-    const dadosParaSite = { DATA: DATA, WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
+    const dadosParaSite = { DATA: toPublicCatalog(DATA), WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
     const response = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
@@ -1452,7 +1492,10 @@ async function main() {
     });
     if (!response.ok) { const errorText = await response.text(); throw new Error(`GitHub API ${response.status}: ${errorText}`); }
     console.log('✅ Dados enviados para o GitHub Gist com sucesso!');
-  } catch (error) { console.error('❌ Erro ao enviar para o GitHub Gist:', error); }
+  } catch (error) {
+    console.error('❌ Erro ao enviar para o GitHub Gist:', error);
+    throw error; // faz a Action falhar em vez de sinalizar sucesso sem atualizar o catálogo público
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

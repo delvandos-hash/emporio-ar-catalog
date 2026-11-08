@@ -2,8 +2,8 @@
  * Netlify Function — sincroniza estoque Imarat + Brand Collection
  * GET /.netlify/functions/stock-sync
  */
-const IMARAT_API = 'https://imaratperfumaria.com/api/products';
-const BRAND_BASE = 'https://brandcollectionpy.com.br';
+const IMARAT_API = process.env.IMARAT_API_URL;
+const BRAND_BASE = process.env.BRAND_BASE_URL;
 const BRAND_SELLER = 'darlanaugusto';
 
 function norm(s) {
@@ -48,7 +48,7 @@ async function fetchImaratStock() {
     if (fetched >= total || products.length < perPage) break;
     page++;
   }
-  return { map, byName, fetched, total, source: 'imarat' };
+  return { map, byName, fetched, total };
 }
 
 async function fetchBrandStock() {
@@ -104,7 +104,7 @@ async function fetchBrandStock() {
       fetched++;
     }
   }
-  return { map, byName, fetched, source: 'brand' };
+  return { map, byName, fetched };
 }
 
 exports.handler = async (event) => {
@@ -112,31 +112,28 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Cache-Control': 'public, max-age=60',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
   };
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers, body: '' };
   }
   try {
+    if (!IMARAT_API || !BRAND_BASE) throw new Error('Origem de estoque não configurada no ambiente privado.');
     const [imarat, brand] = await Promise.all([
       fetchImaratStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, total: 0, source: 'imarat', error: String(e.message || e),
+        map: {}, byName: {}, fetched: 0, total: 0, error: 'Origem indisponível.',
       })),
       fetchBrandStock().catch((e) => ({
-        map: {}, byName: {}, fetched: 0, source: 'brand', error: String(e.message || e),
+        map: {}, byName: {}, fetched: 0, error: 'Origem indisponível.',
       })),
     ]);
     const body = {
-      ok: true,
+      ok: !imarat.error && !brand.error,
       updatedAt: new Date().toISOString(),
-      sources: [imarat.source, brand.source],
-      total: (imarat.fetched || 0) + (brand.fetched || 0),
-      imarat: { fetched: imarat.fetched, expected: imarat.total, error: imarat.error || null },
-      brand: { fetched: brand.fetched, error: brand.error || null },
-      map: imarat.map || {},
-      byName: imarat.byName || {},
-      brandMap: brand.map || {},
-      brandByName: brand.byName || {},
+      mapA: imarat.map || {},
+      byNameA: imarat.byName || {},
+      mapB: brand.map || {},
+      byNameB: brand.byName || {},
     };
     return { statusCode: 200, headers, body: JSON.stringify(body) };
   } catch (err) {
@@ -145,7 +142,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         ok: false,
-        error: String(err && err.message ? err.message : err),
+        error: 'Falha na sincronização.',
         updatedAt: new Date().toISOString(),
       }),
     };

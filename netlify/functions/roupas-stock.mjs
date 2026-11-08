@@ -3,19 +3,25 @@
  * Estoque ao vivo Roupas — Sophia Moda e Franny (FacilZap)
  * id pode vir como "123" (Sophia) ou "franny-123" (Franny)
  */
+import { createHash } from "node:crypto";
+
+function makeStockRef(source, originId) {
+  return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
+}
+
 const SOURCES = {
   sophia: {
     // tenta domínio próprio e, se cair, FacilZap
     bases: [
-      "https://sophiamoda.com.br",
-      "https://facilzap.app.br/sophiamodafemi",
+      process.env.SOPHIA_PRIMARY_URL,
+      process.env.SOPHIA_FALLBACK_URL,
     ],
-    base: "https://sophiamoda.com.br",
+    base: process.env.SOPHIA_PRIMARY_URL,
     loja: "lojavendedoras",
     categories: ["108042", "108328", "108333", "108339", "108338", "379539"],
   },
   franny: {
-    base: "https://frannyloja.com.br",
+    base: process.env.FRANNY_BASE_URL,
     loja: "62999336607",
     categories: [
       "265229", // Vestido
@@ -69,7 +75,7 @@ async function fetchCategoryPage(src, catId, page, cookie) {
     headers: {
       "User-Agent": UA,
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      Origin: src.base.includes("facilzap") ? "https://facilzap.app.br" : src.base,
+      Origin: src.base === process.env.SOPHIA_FALLBACK_URL ? process.env.SOPHIA_FALLBACK_ORIGIN : src.base,
       Referer: `${src.base}/c/atacado/${src.loja}`,
       "X-Requested-With": "XMLHttpRequest",
       Accept: "application/json, text/javascript, */*; q=0.01",
@@ -87,13 +93,12 @@ async function fetchCategoryPage(src, catId, page, cookie) {
   }
 }
 
-function buildVariacoes(found) {
+export function buildVariacoes(found) {
   const estoqueMap = found.estoque || {};
   const varDict = found.variacoes || {};
-  const variacoes = Object.entries(varDict).map(([vid, vinfo]) => ({
-    id: String(vid),
+  const variacoes = Object.entries(varDict).map(([vid, vinfo], index) => ({
+    id: `v${index + 1}`,
     nome: ((vinfo && vinfo.nome) || "").trim() || String(vid),
-    cor: (vinfo && vinfo.cor) || null,
     estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
   }));
   const total =
@@ -106,23 +111,27 @@ export default async (req) => {
   const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-    "Cache-Control": "public, max-age=20",
+    "Cache-Control": "no-store, no-cache, must-revalidate",
   };
 
   try {
     const url = new URL(req.url);
     const rawId = url.searchParams.get("id");
-    if (!rawId) {
+    const stockRef = url.searchParams.get("ref") || "";
+    if (!rawId && !stockRef) {
       return new Response(JSON.stringify({ erro: "id obrigatório" }), {
         status: 400,
         headers,
       });
     }
 
-    const { source, id } = parseId(rawId);
+    const sourceParam = url.searchParams.get("source") || "";
+    const parsed = rawId ? parseId(rawId) : { source: sourceParam === "b" ? "franny" : "sophia", id: "" };
+    const { source, id } = parsed;
+    if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
-    if (!src || !id) {
-      return new Response(JSON.stringify({ erro: "fonte/id inválidos", rawId }), {
+    if (!src || (!id && !stockRef)) {
+      return new Response(JSON.stringify({ erro: "fonte/id inválidos" }), {
         status: 400,
         headers,
       });
@@ -139,7 +148,8 @@ export default async (req) => {
       let baseUsable = false;
 
       for (const catId of srcTry.categories) {
-        for (let page = 1; page <= 5; page++) {
+        const maxCategoryPages = source === "franny" ? 30 : 8;
+        for (let page = 1; page <= maxCategoryPages; page++) {
           let data;
           try {
             data = await fetchCategoryPage(srcTry, catId, page, cookie);
@@ -151,15 +161,14 @@ export default async (req) => {
           const produtos = data.produtos || [];
           if (!produtos.length) break;
 
-          const found = produtos.find((p) => String(p.id) === String(id));
+          const found = produtos.find((p) => stockRef
+            ? makeStockRef(source === "franny" ? "roupas" : "roupas", source === "franny" ? `franny-${p.id}` : p.id) === stockRef
+            : String(p.id) === String(id));
           if (found) {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: String(found.id),
-                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
-                fonte: source,
-                base,
+                id: stockRef || null,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -184,15 +193,14 @@ export default async (req) => {
           if (!data) break;
           const produtos = data.produtos || [];
           if (!produtos.length) break;
-          const found = produtos.find((p) => String(p.id) === String(id));
+          const found = produtos.find((p) => stockRef
+            ? makeStockRef("roupas", source === "franny" ? `franny-${p.id}` : p.id) === stockRef
+            : String(p.id) === String(id));
           if (found) {
             const { variacoes, total } = buildVariacoes(found);
             return new Response(
               JSON.stringify({
-                id: String(found.id),
-                id_origem: source === "franny" ? `franny-${found.id}` : String(found.id),
-                fonte: source,
-                base,
+                id: stockRef || null,
                 nome: found.nome,
                 total_estoque: total,
                 variacoes,
@@ -210,12 +218,12 @@ export default async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ erro: "produto não encontrado", id, fonte: source }),
+      JSON.stringify({ erro: "produto não encontrado" }),
       { status: 404, headers }
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ erro: "falha", mensagem: error.message }),
+      JSON.stringify({ erro: "falha inesperada" }),
       { status: 500, headers }
     );
   }
