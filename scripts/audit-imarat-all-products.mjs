@@ -127,6 +127,27 @@ for(const [line,groups] of Object.entries(DATA)) {
   }
 }
 const {all:source,total,pages}=await fetchAllImarat();
+const imaratNameSet = new Set(source.map(p => norm(p.name)).filter(Boolean));
+const unmatchedCandidates = catalog.filter(x =>
+  ["perfumes","miniaturas","oleos"].includes(norm(x.category)) &&
+  !imaratNameSet.has(norm(x.name)) &&
+  x.source.toLowerCase() !== "imarat"
+);
+console.log("AUDITORIA DE PROCEDÊNCIA DOS TÍTULOS NÃO LOCALIZADOS NA IMARAT: "+unmatchedCandidates.length);
+for (const x of unmatchedCandidates) {
+  const imageValues = [x.item?.foto, ...(Array.isArray(x.item?.fotos) ? x.item.fotos : [])].filter(Boolean);
+  const imageInfo = imageValues.map(value => {
+    const raw = String(value);
+    const match = raw.match(/[?&]source=([^&]+)/i);
+    let host = "";
+    try { host = new URL(raw, "https://catalogoemporio.netlify.app").hostname; } catch {}
+    return { source: match?.[1] || "", host, prefix: raw.slice(0, 110) };
+  });
+  console.log("ORIGEM NÃO CONFIRMADA "+JSON.stringify({
+    nome:x.name, marca:x.brand, categoria:x.category, fonte:x.source||"",
+    id_origem:x.originId||"", campos:Object.keys(x.item||{}), imagens:imageInfo
+  }));
+}
 const catalogByKey=new Map();
 for(const item of catalog) add(catalogByKey,item.key,item);
 const apiByKey=new Map();
