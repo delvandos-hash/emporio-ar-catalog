@@ -1311,8 +1311,16 @@ async function main() {
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       for (const it of g.items) {
-        indexNormal.add(`${limparParaComparacao(it.nome)}|${norm(g.brand)}`);
-        if (isMiniatura(it.nome, it.volume, g.cat)) indexMiniImarat.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
+        const nomeNormalizado = limparParaComparacao(it.nome);
+        // A chave sem marca é intencional: a Imarat pode cadastrar o mesmo perfume
+        // com marcas/grupos diferentes. A checagem global evita reimportá-lo.
+        indexNormal.add(`${nomeNormalizado}|${norm(g.brand)}`);
+        indexNormal.add(nomeNormalizado);
+        if (isMiniatura(it.nome, it.volume, g.cat)) {
+          const chaveMini = chaveComparacaoMini(it.nome);
+          indexMiniImarat.add(chaveMini);
+          indexMiniImarat.add(`${chaveMini}|${norm(g.brand)}`);
+        }
       }
     }
   }
@@ -1370,7 +1378,10 @@ async function main() {
           fonte: 'imarat',
       }, true));
       
+      // Mantém as duas chaves após inserir: nome+marca e nome global.
+      // Sem a chave global, outro registro da Imarat com marca diferente reaparece.
       indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
+      indexNormal.add(limparParaComparacao(nome));
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
         indexMiniImarat.add(chave);
