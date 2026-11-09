@@ -1,11 +1,6 @@
 name: Validar miniaturas Imarat sem publicar
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "scripts/sync-catalog.mjs"
-      - ".github/workflows/test-imarat-mini-sync.yml"
   workflow_dispatch:
 
 permissions:
