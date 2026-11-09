@@ -151,3 +151,9 @@ test("restauração do Imarat preserva preços públicos divergentes e mídia ex
   assert.match(source, /precoManual: true/);
   assert.match(source, /publicMatch\?\.fotos/);
 });
+
+test("restauração pública registra correspondências e preços preservados", () => {
+  assert.match(source, /function priceNumber\(/);
+  assert.match(source, /publicPricesPreserved/);
+  assert.match(source, /publicGistMatches/);
+});
