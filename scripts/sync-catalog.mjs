@@ -1313,6 +1313,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
 }
 
 
+// A restauração pública compara marca, nome e volume antes de preservar preços do Gist.
 let LIVE_GIST_DATA = null;
 
 function findPublicCatalogMatch(DATA, brand, name, volume, mini) {
