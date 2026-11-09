@@ -168,9 +168,10 @@ async function main() {
   // Recupera apenas roupas e acessórios Empório A.R que ainda estão no Gist.
   // stock_ref identifica variantes distintas; sem stock_ref, exige identidade inequívoca.
   for (const [line, groups] of Object.entries(liveDATA)) {
-    if (!["roupas", "acessorios"].includes(norm(line))) continue;
     for (const group of Array.isArray(groups) ? groups : []) {
-      if (norm(group?.brand) !== "emporio a r") continue;
+      const isEmporioLegacy = ["roupas", "acessorios"].includes(norm(line)) && norm(group?.brand) === "emporio a r";
+      const isBrandLegacy = norm(group?.cat) === "brand" || norm(group?.cat).includes("brand");
+      if (!isEmporioLegacy && !isBrandLegacy) continue;
       for (const publicItem of Array.isArray(group?.items) ? group.items : []) {
         if (!publicItem?.nome) continue;
         const key = identity(line, group, publicItem);
@@ -222,9 +223,10 @@ async function main() {
   const check = buildIndexes(DATA);
   const missing = [];
   for (const [line, groups] of Object.entries(liveDATA)) {
-    if (!["roupas", "acessorios"].includes(norm(line))) continue;
     for (const group of groups || []) {
-      if (norm(group?.brand) !== "emporio a r") continue;
+      const isEmporioLegacy = ["roupas", "acessorios"].includes(norm(line)) && norm(group?.brand) === "emporio a r";
+      const isBrandLegacy = norm(group?.cat) === "brand" || norm(group?.cat).includes("brand");
+      if (!isEmporioLegacy && !isBrandLegacy) continue;
       for (const item of group.items || []) {
         const stockRef = String(item.stock_ref || "").trim();
         const stockMatches = stockRef ? (check.stockIndex.get(stockRef) || []) : [];
