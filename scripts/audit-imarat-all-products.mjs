@@ -267,7 +267,16 @@ const liveOnlyKeys=[...liveKeySet].filter(key=>!internalPublicIndex.has(key));
 console.log(`COMPARAÇÃO POR PUBLIC ID: data.js interno=${internalItemCount} IDs; Gist vivo=${catalog.length} itens; IDs só no data.js=${internalOnlyKeys.length}; IDs só no Gist=${liveOnlyKeys.length}; variantes sem correspondência=${rekeyAudit.unmatched}`);
 const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
 const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, row: internalPublicIndex.get(key) }));
-const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ row }) =>
+const liveStockRefs = new Set(catalog.map(x => String(x.item?.stock_ref || "").trim()).filter(Boolean));
+const duplicateInternalSourceRows = internalOnlySourceRows.filter(({ row }) =>
+  Boolean(String(row?.publicItem?.stock_ref || "").trim()) &&
+  liveStockRefs.has(String(row.publicItem.stock_ref).trim())
+);
+const eligibleInternalOnlyRows = internalOnlySourceRows.filter(({ row }) =>
+  !String(row?.publicItem?.stock_ref || "").trim() ||
+  !liveStockRefs.has(String(row.publicItem.stock_ref).trim())
+);
+const internalOnlySourceConfirmed = eligibleInternalOnlyRows.every(({ row }) =>
   Boolean(row) &&
   allowedAdditiveSources.has(norm(row.item?.fonte)) &&
   (norm(row.item?.fonte) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
@@ -275,11 +284,12 @@ const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ row }) =>
 const additiveReconciliationSafe =
   rekeyAudit.unmatched === 0 &&
   liveOnlyKeys.length === 0 &&
-  internalOnlyKeys.length > 0 &&
+  eligibleInternalOnlyRows.length > 0 &&
+  eligibleInternalOnlyRows.length <= 80 &&
   internalOnlyKeys.length <= 80 &&
   Math.abs(catalog.length - internalItemCount) <= 80 &&
   internalOnlySourceConfirmed;
-console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
+console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} duplicateSourceRepresentations=${duplicateInternalSourceRows.length} eligibleInternalOnly=${eligibleInternalOnlyRows.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
 for (const row of internalOnlySourceRows) {
   const item = row.row?.item || {};
   const group = row.row?.group || {};
