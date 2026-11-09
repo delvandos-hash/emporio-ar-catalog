@@ -1306,6 +1306,8 @@ async function main() {
     }
   }
 
+  // Índice convencional global: nome sem volume e nome+marca, conforme regra homologada.
+  // A chave sem marca impede reimportação quando a fonte muda a marca ou o grupo.
   const indexNormal = new Set();
   const indexMiniImarat = new Set();
   for (const line of Object.keys(DATA)) {
