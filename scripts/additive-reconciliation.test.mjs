@@ -53,8 +53,8 @@ test("reconciliação aditiva reidentifica variantes sem remover conteúdo exist
 test("auditoria compara IDs públicos únicos e só libera fontes confirmadas", () => {
   assert.match(audit, /internalPublicIndex/);
   assert.match(audit, /rekeyLiveVariants/);
-  assert.doesNotMatch(audit, /rekeyAudit\.unmatched === 0/);
-  assert.match(audit, /variantes sem correspondência inequívoca continuam preservadas/);
+  assert.match(audit, /rekeyAudit\.unmatched === 0/);
+  assert.match(audit, /VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA/);
   assert.match(audit, /internalOnlyKeys\.length <= 80/);
   assert.match(audit, /Math\.abs\(catalog\.length - internalItemCount\) <= 80/);
 });
@@ -131,10 +131,10 @@ test("reidentificação flexível tolera categoria ou volume legado divergente s
 });
 
 test("variantes legadas sem reidentificação inequívoca permanecem preservadas sem exclusão", () => {
-  assert.match(apply, /VARIANTE GIST PRESERVADA SEM REKEY AUTOMÁTICO/);
-  assert.match(apply, /GIST_VARIANTS_PRESERVED_WITHOUT_REKEY/);
-  assert.doesNotMatch(apply, /if \(!match\) throw new Error\(\`Variante atual do Gist/);
-  assert.doesNotMatch(audit, /rekeyAudit\.unmatched === 0/);
+  assert.match(apply, /sem correspondência inequívoca na base/);
+  assert.match(apply, /if \(missingFromInternal\.length\)/);
+  assert.match(apply, /sem correspondência inequívoca na base/);
+  assert.match(audit, /rekeyAudit\.unmatched === 0/);
 });
 
 test("auditoria reconhece item Brand legado com mesmo nome-base e foto como já representado", () => {
