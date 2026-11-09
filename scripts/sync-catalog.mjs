@@ -1323,17 +1323,26 @@ async function main() {
   if (!m) throw new Error('DATA não encontrado');
   const DATA = JSON.parse(m[1]);
 
-  const internalBaseline = countCatalogIdentity(DATA);
-  const liveDATA = await fetchLiveGistBaseline();
-  const liveBaseline = countCatalogIdentity(liveDATA);
-  const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
-  const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
-  console.log(`BASELINE INTERNA × GIST VIVO: data.js=${internalBaseline.count}; Gist=${liveBaseline.count}; só data.js=${onlyInternal}; só Gist=${onlyLive}`);
-  if (!SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25 || Math.abs(liveBaseline.count - internalBaseline.count) > 25)) {
-    throw new Error("SINCRONIZAÇÃO BLOQUEADA: data.js interno diverge do Gist vivo. Reconcilie a base antes de publicar para evitar perda de produtos e ajustes.");
-  }
-  if (SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25)) {
-    console.log("⚠️ Base divergente detectada; dry-run permitido apenas para diagnóstico. Nenhuma publicação será feita.");
+  if (!SYNC_DANDE_ONLY) {
+    if (!process.env.GIST_TOKEN && !SYNC_DRY_RUN) {
+      throw new Error("GIST_TOKEN ausente; sincronização de produção bloqueada antes de qualquer publicação.");
+    }
+    if (process.env.GIST_TOKEN) {
+      const internalBaseline = countCatalogIdentity(DATA);
+      const liveDATA = await fetchLiveGistBaseline();
+      const liveBaseline = countCatalogIdentity(liveDATA);
+      const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
+      const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
+      console.log(`BASELINE INTERNA × GIST VIVO: data.js=${internalBaseline.count}; Gist=${liveBaseline.count}; só data.js=${onlyInternal}; só Gist=${onlyLive}`);
+      if (!SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25 || Math.abs(liveBaseline.count - internalBaseline.count) > 25)) {
+        throw new Error("SINCRONIZAÇÃO BLOQUEADA: data.js interno diverge do Gist vivo. Reconcilie a base antes de publicar para evitar perda de produtos e ajustes.");
+      }
+      if (SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25)) {
+        console.log("⚠️ Base divergente detectada; dry-run permitido apenas para diagnóstico. Nenhuma publicação será feita.");
+      }
+    } else {
+      console.log("SYNC_DRY_RUN=1 sem GIST_TOKEN; validação de divergência do Gist ignorada (sem publicação).");
+    }
   }
 
   console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW} ADD_ROUPAS=${ADD_ROUPAS}`);
