@@ -96,6 +96,6 @@ test("auditoria e reconciliação usam stock_ref global para acessórios fora da
   assert.match(apply, /byStockRef\.length === 1/);
 });
 test("restauração aditiva também preserva itens legados da categoria Brand", () => {
-  assert.match(restoreLegacy, /isBrandLegacy/);
-  assert.match(restoreLegacy, /LEGACY_GIST_RESTORED/);
+  assert.match(restore, /isBrandLegacy/);
+  assert.match(restore, /LEGACY_GIST_RESTORED/);
 });
