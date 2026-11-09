@@ -59,7 +59,7 @@ function baseMiniName(name) {
 }
 function volumeOf(item) {
   const explicit = String(item?.volume || "").trim();
-  if (explicit && explicit !== "—") return norm(explicit);
+  if (explicit && explicit !== "—") return norm(explicit).replace(/\\s+/g, "");
   const match = String(item?.nome || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
   return match ? norm(match[1].replace(",", ".") + match[2]) : "sem-volume";
 }
