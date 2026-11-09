@@ -42,3 +42,15 @@ test("resolve nome relativo e rejeita host, protocolo e credenciais não autoriz
   assert.equal(sanitizePublicImageUrl("https://user:pass@images-primary.example/a.webp", options), "");
   assert.equal(sanitizePublicImageUrl("javascript:alert(1)", options), "");
 });
+
+test("converte imagens da Dande para alias privado autorizado", () => {
+  const dandeOptions = { ...options, dandeBase: "https://dandejoias.com/" };
+  assert.equal(
+    sanitizePublicImageUrl("https://dandejoias.com/products/anel.webp", dandeOptions),
+    "/api/product-image?source=d&path=%2Fproducts%2Fanel.webp"
+  );
+  assert.equal(
+    sanitizePublicImageUrl("/api/product-image?source=d&path=%2Fproducts%2Fanel.webp", dandeOptions),
+    "/api/product-image?source=d&path=%2Fproducts%2Fanel.webp"
+  );
+});
