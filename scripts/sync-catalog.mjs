@@ -1730,6 +1730,15 @@ async function main() {
         duplicado = indexNormal.has(`${norm(brand)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`);
       }
       if (duplicado) continue;
+      console.log('IMARAT NOVO CANDIDATO: ' + JSON.stringify({
+        id: p.id ?? p.productId ?? '',
+        nome,
+        marca: brand,
+        volume,
+        categoria,
+        miniatura: ehMini,
+        oleo: ehOleo
+      }));
 
       let notas = '';
       let detail = null;
