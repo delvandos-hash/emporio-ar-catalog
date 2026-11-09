@@ -253,26 +253,27 @@ const additiveReconciliationSafe =
   internalOnlySourceConfirmed;
 console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
 for (const row of internalOnlySourceRows) {
-  const item = row.items[0] || {};
+  const item = row.row?.item || {};
+  const group = row.row?.group || {};
   console.log("ADDITIVE SOURCE ITEM " + JSON.stringify({
     key: row.key, fonte: item.fonte || "", id_origem: item.id_origem || "",
-    nome: item.nome || "", precoManual: item.precoManual || false
+    marca: group.brand || "", nome: item.nome || "", precoManual: item.precoManual || false
   }));
 }
 
-const summarizeKeys=keys=>{
+const summarizeRows=rows=>{
   const byBrand=new Map();
-  for(const key of keys) {
-    const parts=key.split("|");
-    const brand=parts[1]||"sem marca";
+  for(const row of rows) {
+    const brand=norm(row?.group?.brand)||"sem marca";
     byBrand.set(brand,(byBrand.get(brand)||0)+1);
   }
   return [...byBrand.entries()].sort((x,y)=>y[1]-x[1]).map(([brand,count])=>({brand,count}));
 };
-console.log("DIFERENÇAS AGRUPADAS — SÓ DATA.JS "+JSON.stringify(summarizeKeys(internalOnlyKeys)));
-console.log("DIFERENÇAS AGRUPADAS — SÓ GIST "+JSON.stringify(summarizeKeys(liveOnlyKeys)));
-for(const key of internalOnlyKeys) console.log("SÓ NO DATA.JS "+key);
-for(const key of liveOnlyKeys) console.log("SÓ NO GIST "+key);
+const liveOnlyRows=liveOnlyKeys.map(key=>catalog.find(x=>String(x.item.public_id||"")===key));
+console.log("DIFERENÇAS AGRUPADAS — SÓ DATA.JS "+JSON.stringify(summarizeRows(internalOnlyKeys.map(key=>internalPublicIndex.get(key)))));
+console.log("DIFERENÇAS AGRUPADAS — SÓ GIST "+JSON.stringify(summarizeRows(liveOnlyRows)));
+for(const key of internalOnlyKeys) console.log("SÓ NO DATA.JS "+JSON.stringify({public_id:key,nome:internalPublicIndex.get(key)?.item?.nome||"",marca:internalPublicIndex.get(key)?.group?.brand||""}));
+for(const key of liveOnlyKeys) console.log("SÓ NO GIST "+JSON.stringify({public_id:key,nome:catalog.find(x=>String(x.item.public_id||"")===key)?.name||"",marca:catalog.find(x=>String(x.item.public_id||"")===key)?.brand||""}));
 
 const {all:source,total,pages}=await fetchAllImarat();
 function volumeCompatible(left,right) {
