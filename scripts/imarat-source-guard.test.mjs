@@ -176,3 +176,10 @@ test("deduplicação de perfumes usa IDs de origem e não apenas nome/volume", (
   assert.match(source, /isDuplicateMiniSource\(normalCandidates, candidateId\)/);
   assert.match(source, /normalCandidates = indexNormal\.get/);
 });
+
+test("preservação pública prioriza stock_ref por marca e só mescla cópias equivalentes", () => {
+  assert.match(source, /stock_ref identifica a variante física/);
+  assert.match(source, /liveByStockRef\.get\(stockKey\)/);
+  assert.match(source, /sameRecord = origins\.every/);
+  assert.match(source, /LIVE_PUBLIC_DUPLICATE_REPRESENTATIONS_MERGED/);
+});
