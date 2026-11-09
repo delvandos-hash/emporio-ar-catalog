@@ -114,6 +114,11 @@ function dedupeExactLiveVariants(DATA) {
   return 0;
 }
 
+function looseIdentity(line, group, item) {
+  const name = String(item?.nome || "").replace(/\d+(?:[.,]\d+)?\s*(?:ml|g)\b/gi, " ");
+  return [norm(line), norm(group?.brand), norm(name)].join("|");
+}
+
 function collectInternalIndex(DATA) {
   const publicData = toPublicCatalog(DATA);
   const publicBuckets = new Map();
@@ -146,6 +151,7 @@ function collectInternalIndex(DATA) {
 
 function rekeyLiveVariants(liveDATA, internalIndex) {
   const internalByBase = new Map();
+  const internalByLooseIdentity = new Map();
   const internalByOriginRef = new Map();
   const internalByPublicId = new Map();
   const internalByStockRef = new Map();
@@ -163,6 +169,9 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
       if (!internalByStockRef.has(stockRef)) internalByStockRef.set(stockRef, []);
       internalByStockRef.get(stockRef).push(row);
     }
+    const looseKey = looseIdentity(row.publicLine, row.publicGroup, row.publicItem);
+    if (!internalByLooseIdentity.has(looseKey)) internalByLooseIdentity.set(looseKey, []);
+    internalByLooseIdentity.get(looseKey).push(row);
     const originRef = String(row.publicItem?.origin_ref || "").trim();
     if (originRef) {
       if (!internalByOriginRef.has(originRef)) internalByOriginRef.set(originRef, []);
@@ -191,6 +200,9 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
           : [];
         const photoFingerprint = publicPhotoFingerprint(item);
         const byPhoto = photoFingerprint !== "[]" ? candidates.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
+        const looseKey = looseIdentity(line, group, item);
+        const byLooseIdentity = (internalByLooseIdentity.get(looseKey) || []).filter(row => !used.has(row.publicItem.public_id));
+        const byLoosePhoto = photoFingerprint !== "[]" ? byLooseIdentity.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
         const byExactContent = candidates.filter(row => publicFingerprint(row.publicItem) === fingerprint);
         const match = byGlobalId.length === 1
           ? byGlobalId[0]
@@ -206,8 +218,12 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
               ? byExactContent[0]
               : candidates.length === 1
                 ? candidates[0]
-                : null;
-        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (public_id_global=${byGlobalId.length}, stock_ref_global=${byStockRef.length}, candidatas=${candidates.length}, origin_ref=${byOriginRef.length}, fotosCompatíveis=${byPhoto.length}, conteúdoExato=${byExactContent.length})`);
+                : byLoosePhoto.length === 1
+                  ? byLoosePhoto[0]
+                  : byLooseIdentity.length === 1
+                    ? byLooseIdentity[0]
+                    : null;
+        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (public_id_global=${byGlobalId.length}, stock_ref_global=${byStockRef.length}, candidatas=${candidates.length}, identidadeFlexível=${byLooseIdentity.length}, fotoFlexível=${byLoosePhoto.length}, origin_ref=${byOriginRef.length}, fotosCompatíveis=${byPhoto.length}, conteúdoExato=${byExactContent.length})`);
         used.add(match.publicItem.public_id);
         if (item.public_id !== match.publicItem.public_id) {
           item.public_id = match.publicItem.public_id;
