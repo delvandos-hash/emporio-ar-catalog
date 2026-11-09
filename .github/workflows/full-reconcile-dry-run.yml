@@ -36,7 +36,7 @@ jobs:
           node --check scripts/sync-catalog.mjs
           node --check scripts/restore-gist-only-legacy.mjs
           node --check scripts/apply-additive-reconciliation.mjs
-          node --test scripts/imarat-source-guard.test.mjs
+          node --test scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs
       - name: Gerar snapshot interno completo sem publicar
         run: node scripts/sync-catalog.mjs
         env:
