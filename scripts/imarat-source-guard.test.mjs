@@ -157,3 +157,11 @@ test("restauração pública registra correspondências e preços preservados", 
   assert.match(source, /publicPricesPreserved/);
   assert.match(source, /publicGistMatches/);
 });
+
+test("preços de produtos existentes são preservados quando divergem da regra e não há sinal seguro para recalcular", () => {
+  assert.match(source, /const nomePublicoAnterior = it\.nome/);
+  assert.match(source, /findPublicCatalogMatch\(LIVE_GIST_DATA, marcaPublicaAnterior, nomePublicoAnterior/);
+  assert.match(source, /if \(publicPriceDiffers\) \{/);
+  assert.match(source, /it\.precoManual = true/);
+  assert.match(source, /existingPricesProtectedWithoutMatch\+\+/);
+});
