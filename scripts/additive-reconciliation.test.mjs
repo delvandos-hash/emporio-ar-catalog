@@ -156,3 +156,9 @@ test("restauração preserva stock_ref e stock_route canônicos do Gist", () => 
   assert.match(restore, /publicItem\.stock_ref && target\.stock_ref !== publicItem\.stock_ref/);
   assert.match(restore, /publicItem\.stock_route && target\.stock_route !== publicItem\.stock_route/);
 });
+
+test("auditoria e aplicação aceitam estado já reconciliado sem novas adições", () => {
+  assert.doesNotMatch(audit, /eligibleInternalOnlyRows\.length > 0/);
+  assert.match(apply, /ADDITIVE_RECONCILIATION_NOOP=true/);
+  assert.match(apply, /if \(!additions\.length\)/);
+});
