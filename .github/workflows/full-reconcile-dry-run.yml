@@ -7,6 +7,7 @@ on:
       - "scripts/sync-catalog.mjs"
       - "scripts/audit-imarat-all-products.mjs"
       - "scripts/restore-gist-only-legacy.mjs"
+      - "scripts/apply-additive-reconciliation.mjs"
       - ".github/workflows/full-reconcile-dry-run.yml"
 
 permissions:
@@ -76,6 +77,10 @@ jobs:
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+      - name: Simular publicação aditiva sem gravar no Gist
+        run: node scripts/apply-additive-reconciliation.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Guardar snapshot para revisão
         uses: actions/upload-artifact@v4
         with:
