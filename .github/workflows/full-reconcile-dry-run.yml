@@ -8,6 +8,13 @@ on:
       - "scripts/audit-imarat-all-products.mjs"
       - "scripts/restore-gist-only-legacy.mjs"
       - "scripts/apply-additive-reconciliation.mjs"
+      - "scripts/public-catalog.mjs"
+      - "scripts/public-catalog.test.mjs"
+      - "scripts/catalog-identity.mjs"
+      - "scripts/catalog-identity.test.mjs"
+      - "scripts/imarat-source-guard.test.mjs"
+      - "scripts/additive-reconciliation.test.mjs"
+      - "js/app.js"
       - ".github/workflows/full-reconcile-dry-run.yml"
 
 permissions:
@@ -36,7 +43,10 @@ jobs:
           node --check scripts/sync-catalog.mjs
           node --check scripts/restore-gist-only-legacy.mjs
           node --check scripts/apply-additive-reconciliation.mjs
-          node --test scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs scripts/catalog-identity.test.mjs
+          node --check scripts/public-catalog.mjs
+          node --check scripts/catalog-identity.mjs
+          node --check js/app.js
+          node --test scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs scripts/catalog-identity.test.mjs scripts/public-catalog.test.mjs
       - name: Gerar snapshot interno completo sem publicar
         run: node scripts/sync-catalog.mjs
         env:
