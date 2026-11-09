@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 471dcd18817239069df7311418548a3b6909b8ee
+          ref: rebuild-gist-from-homologated-471dcd1
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
