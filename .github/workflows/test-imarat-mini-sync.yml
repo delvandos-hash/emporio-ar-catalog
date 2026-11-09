@@ -45,6 +45,16 @@ jobs:
           ADD_ROUPAS: "0"
           ADD_FRANNY: "0"
           ADD_ACESSORIOS: "0"
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Comparar data.js gerado com Gist vivo (somente leitura)
         run: node scripts/audit-imarat-all-products.mjs
@@ -57,13 +67,3 @@ jobs:
           name: data-js-dry-run-${{ github.run_id }}
           path: js/data.js
           retention-days: 7
-          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
-          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
-          BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
-          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
-          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
-          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
-          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
-          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
-          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
-          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
