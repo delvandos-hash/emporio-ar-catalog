@@ -24,8 +24,15 @@ const gistResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
 assert.ok(gistResponse.ok, `Não foi possível ler o snapshot público: HTTP ${gistResponse.status}`);
 const gist = await gistResponse.json();
 const file = gist.files?.["catalogo.json"];
-assert.ok(file?.content, "O Gist público não contém catalogo.json");
-const catalog = JSON.parse(file.content.replace(/^\\uFEFF/, ""));
+assert.ok(file, "O Gist público não contém catalogo.json");
+let snapshot = file.content;
+if (!snapshot && file.raw_url) {
+  const rawResponse = await fetch(file.raw_url, { headers: { "User-Agent": "EmporioAR-Image-Validation/1.0" } });
+  assert.ok(rawResponse.ok, `Não foi possível ler o snapshot bruto: HTTP ${rawResponse.status}`);
+  snapshot = await rawResponse.text();
+}
+assert.ok(snapshot, "O conteúdo do catálogo não foi disponibilizado pelo Gist");
+const catalog = JSON.parse(snapshot.replace(/^\uFEFF/, ""));
 
 const found = new Map([["a", new Set()], ["b", new Set()], ["p", new Set()]]);
 function visit(value) {
