@@ -286,10 +286,20 @@ const duplicateInternalSourceRows = internalOnlySourceRows.filter(({ row }) =>
   Boolean(String(row?.publicItem?.stock_ref || "").trim()) &&
   liveStockRefs.has(String(row.publicItem.stock_ref).trim())
 );
-const eligibleInternalOnlyRows = internalOnlySourceRows.filter(({ row }) =>
-  !String(row?.publicItem?.stock_ref || "").trim() ||
-  !liveStockRefs.has(String(row.publicItem.stock_ref).trim())
-);
+const liveLoosePhotoKeys = new Set(catalog.map(x => {
+  const photo = publicPhotoFingerprint(x.item);
+  return photo ? looseIdentity(x.line, x.group, x.item) + "|" + photo : "";
+}).filter(Boolean));
+const legacyBrandDuplicateRows = internalOnlySourceRows.filter(({ row }) => {
+  if (norm(row?.item?.fonte) || !norm(row?.group?.cat).includes("brand")) return false;
+  const photo = publicPhotoFingerprint(row?.publicItem);
+  return Boolean(photo && liveLoosePhotoKeys.has(looseIdentity(row.line, row.group, row.item) + "|" + photo));
+});
+const duplicateInternalKeys = new Set([
+  ...duplicateInternalSourceRows.map(x => x.key),
+  ...legacyBrandDuplicateRows.map(x => x.key)
+]);
+const eligibleInternalOnlyRows = internalOnlySourceRows.filter(({ key }) => !duplicateInternalKeys.has(key));
 const KNOWN_BRAND_GROUPS = new Set(["arabic collection","beauty brand","body splash","colecao dream","colecao brand","dream brand 80 100ml","dream brand","flaconete brand","sapatinho good girl","tubetes brand"]);
 function effectiveAdditiveSource(row) {
   const source = norm(row?.item?.fonte);
@@ -310,7 +320,7 @@ const additiveReconciliationSafe =
   internalOnlyKeys.length <= 80 &&
   Math.abs(catalog.length - internalItemCount) <= 80 &&
   internalOnlySourceConfirmed;
-console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} duplicateSourceRepresentations=${duplicateInternalSourceRows.length} eligibleInternalOnly=${eligibleInternalOnlyRows.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
+console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} duplicateSourceRepresentations=${duplicateInternalSourceRows.length} legacyBrandRepresentations=${legacyBrandDuplicateRows.length} eligibleInternalOnly=${eligibleInternalOnlyRows.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
 for (const row of internalOnlySourceRows) {
   const item = row.row?.item || {};
   const group = row.row?.group || {};
