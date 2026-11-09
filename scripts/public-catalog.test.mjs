@@ -202,3 +202,22 @@ test("gera public_id distinto para variantes do mesmo nome, mantendo a URL antig
   assert.equal(JSON.stringify(first).includes("1474"), false);
   assert.equal(JSON.stringify(first).includes("1481"), false);
 });
+
+test("public_id legado é reservado antes de gerar IDs de variantes", () => {
+  const single = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "Roupas", items: [
+      { nome: "Calça Resinada", varejo: "99,90", atacado: "69,90", foto: "https://img.example/a.webp" }
+    ]}]
+  });
+  const legacyId = single.roupas[0].items[0].public_id;
+  const mixed = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "Roupas", items: [
+      { nome: "Calça Resinada", varejo: "109,90", atacado: "79,90", foto: "https://img.example/b.webp" },
+      { public_id: legacyId, nome: "Calça Resinada", varejo: "99,90", atacado: "69,90", foto: "https://img.example/a.webp" }
+    ]}]
+  });
+  const items = mixed.roupas[0].items;
+  assert.equal(items[1].public_id, legacyId);
+  assert.notEqual(items[0].public_id, legacyId);
+  assert.notEqual(items[0].public_id, items[1].public_id);
+});
