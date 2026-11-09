@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
+const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
+const GIST_TOKEN = process.env.GIST_TOKEN;
 if (!IMARAT_API) throw new Error("IMARAT_API_URL não configurado.");
+if (!GIST_TOKEN) throw new Error("GIST_TOKEN não configurado.");
 
 const norm = (s) => String(s || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -95,6 +98,31 @@ function add(map,key,value) {
   if(!map.has(key)) map.set(key,[]);
   map.get(key).push(value);
 }
+async function fetchLiveCatalog() {
+  const headers={
+    Authorization:`Bearer ${GIST_TOKEN}`,
+    Accept:"application/vnd.github+json",
+    "X-GitHub-Api-Version":"2022-11-28",
+    "User-Agent":"EmporioAR-All-Products-Audit/2.1"
+  };
+  const response=await fetch(`https://api.github.com/gists/${GIST_ID}`,{headers});
+  if(!response.ok) throw new Error(`Falha ao ler Gist: HTTP ${response.status}`);
+  const gist=await response.json();
+  const file=gist.files?.["catalogo.json"];
+  if(!file) throw new Error("Gist não contém catalogo.json.");
+  let raw=file.content;
+  if(file.truncated||!raw) {
+    if(!file.raw_url) throw new Error("Gist truncado e sem raw_url.");
+    const rawResponse=await fetch(file.raw_url,{headers});
+    if(!rawResponse.ok) throw new Error(`Falha ao baixar snapshot: HTTP ${rawResponse.status}`);
+    raw=await rawResponse.text();
+  }
+  if(raw.charCodeAt(0)===0xFEFF) raw=raw.slice(1);
+  const snapshot=JSON.parse(raw);
+  const DATA=snapshot.DATA||snapshot;
+  if(!DATA||typeof DATA!=="object"||Array.isArray(DATA)) throw new Error("Estrutura DATA inválida no Gist.");
+  return DATA;
+}
 
 // Testes de contrato: evitam que a auditoria se afaste da regra real do sincronizador.
 const checks=[
@@ -109,7 +137,17 @@ for(const [actual,expected,label] of checks) {
   if(actual!==expected) throw new Error(`Falha no teste ${label}: esperado "${expected}", recebido "${actual}"`);
 }
 
-const DATA=parseInternalData();
+const INTERNAL_DATA=parseInternalData();
+const internalIndex=new Map();
+for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
+  if(!Array.isArray(groups)) continue;
+  for(const group of groups) for(const item of (Array.isArray(group?.items)?group.items:[])) {
+    const key=[norm(line),norm(group.brand),norm(item.nome),volumeFrom(item.volume,item.nome)].join("|");
+    if(!internalIndex.has(key)) internalIndex.set(key,[]);
+    internalIndex.get(key).push(item);
+  }
+}
+const DATA=await fetchLiveCatalog();
 const catalog=[];
 for(const [line,groups] of Object.entries(DATA)) {
   if(!Array.isArray(groups)) continue;
@@ -117,11 +155,12 @@ for(const [line,groups] of Object.entries(DATA)) {
     const name=String(item.nome||"").trim();
     if(!name) continue;
     const volume=String(item.volume||volumeFrom(null,name));
+    const internalKey=[norm(line),norm(group.brand),norm(name),volumeFrom(volume,name)].join("|");
+    const internal=internalIndex.get(internalKey)?.[0];
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
-      source:String(item.fonte||""),originId:String(item.id_origem||""),
-      manual:item.precoManual??false,
+      source:"",originId:"",manual:internal?.precoManual??false,
       key:syncKey(name,volume,group.cat),item
     });
   }
