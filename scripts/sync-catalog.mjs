@@ -1338,7 +1338,7 @@ function findPublicCatalogMatch(DATA, brand, name, volume, mini) {
 function priceNumber(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return NaN;
-  return Number(raw.includes(',') ? raw.replace(/\\./g, '').replace(',', '.') : raw);
+  return Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw);
 }
 
 async function main() {
