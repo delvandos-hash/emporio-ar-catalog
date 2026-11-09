@@ -18,12 +18,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Testar sanitização do catálogo público
-        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/imarat-image-url.test.mjs scripts/imarat-source-guard.test.mjs
+      - name: Testar sanitização, identidade e recuperação legada
+        run: |
+          node --check scripts/restore-gist-only-legacy.mjs
+          node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/imarat-image-url.test.mjs scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs scripts/legacy-restore-identity.test.mjs
         env:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+      - name: Restaurar registros legados do Gist antes da sincronização
+        run: node scripts/restore-gist-only-legacy.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
