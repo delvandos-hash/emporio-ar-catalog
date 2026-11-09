@@ -5,10 +5,12 @@ const originalFetch = globalThis.fetch;
 const originalPrimary = process.env.CDN_IMAGE_BASE_URL;
 const originalSecondary = process.env.CDN_IMAGE_FALLBACK_BASE_URL;
 const originalProduct = process.env.IMARAT_ORIGIN_URL;
-async function runWith({ source = "p", path = "/uploads/products/test.webp", fetchImpl, primary = "https://primary.example/", secondary = "https://secondary.example/", product = "https://products.example/" } = {}) {
+const originalDande = process.env.DANDE_BASE_URL;
+async function runWith({ source = "p", path = "/uploads/products/test.webp", fetchImpl, primary = "https://primary.example/", secondary = "https://secondary.example/", product = "https://products.example/", dande = "https://dande.example/" } = {}) {
   process.env.CDN_IMAGE_BASE_URL = primary;
   process.env.CDN_IMAGE_FALLBACK_BASE_URL = secondary;
   process.env.IMARAT_ORIGIN_URL = product;
+  process.env.DANDE_BASE_URL = dande;
   globalThis.fetch = fetchImpl || (async () => new Response(new Uint8Array([1,2,3]), { status: 200, headers: { "content-type": "image/webp" } }));
   try { return await productImage(new Request("https://catalog.example/api/product-image?source="+source+"&path="+encodeURIComponent(path))); }
   finally {
@@ -16,6 +18,7 @@ async function runWith({ source = "p", path = "/uploads/products/test.webp", fet
     if (originalPrimary === undefined) delete process.env.CDN_IMAGE_BASE_URL; else process.env.CDN_IMAGE_BASE_URL = originalPrimary;
     if (originalSecondary === undefined) delete process.env.CDN_IMAGE_FALLBACK_BASE_URL; else process.env.CDN_IMAGE_FALLBACK_BASE_URL = originalSecondary;
     if (originalProduct === undefined) delete process.env.IMARAT_ORIGIN_URL; else process.env.IMARAT_ORIGIN_URL = originalProduct;
+    if (originalDande === undefined) delete process.env.DANDE_BASE_URL; else process.env.DANDE_BASE_URL = originalDande;
   }
 }
 test("retorna indisponível quando a origem selecionada não está configurada", async () => {
@@ -62,4 +65,8 @@ test("entrega imagem pela origem secundária Nuvemshop", async () => {
 });
 test("entrega imagem pela origem de produtos Imarat", async () => {
   await assertImageDelivery({ source: "p", path: "/uploads/products/c.webp", expectedOrigin: "https://products.example" });
+});
+
+test("entrega imagem pela origem Dande", async () => {
+  await assertImageDelivery({ source: "d", path: "/products/anel.webp", expectedOrigin: "https://dande.example" });
 });
