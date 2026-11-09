@@ -45,3 +45,13 @@ export function miniIdentityKey(item, brand) {
 export function miniIdentityNameVolumeKey(item) {
   return [miniBaseName(item?.nome, ""), normalizedVolume(item?.volume)].join("|");
 }
+
+export function isDuplicateMiniSource(existingItems, candidateOriginId) {
+  if (!Array.isArray(existingItems) || existingItems.length === 0) return false;
+  const candidateId = String(candidateOriginId ?? "").trim();
+  if (!candidateId) return true;
+  const existingIds = existingItems.map(item => String(item?.id_origem ?? item?.originId ?? "").trim());
+  if (existingIds.includes(candidateId)) return true;
+  // Se algum registro legado não tem ID, aplica o fallback marca + nome + volume.
+  return existingIds.some(id => !id);
+}
