@@ -42,12 +42,12 @@ function isOleo(nome) {
   return n.startsWith("oleo") || n.includes(" oleo ");
 }
 function volumeFrom(sizeMl,nome) {
-  if (sizeMl) return String(sizeMl)+"ml";
-  const m=String(nome||"").toUpperCase().match(/(\d+(?:[.,]\d+)?)\s*ML\b/);
-  if(m) return m[1].replace(",",".")+"ml";
-  const g=String(nome||"").toUpperCase().match(/(\d+)\s*G\b/);
-  if(g) return g[1]+"g";
-  return "—";
+  let raw=String(sizeMl||"").trim();
+  if(raw && /^\d+(?:[.,]\d+)?$/.test(raw)) raw += "ml";
+  const explicit=raw.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  const fromName=String(nome||"").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  const m=explicit||fromName;
+  return m ? String(Number(m[1].replace(",", ".")))+m[2].toLowerCase() : "—";
 }
 function isMiniatura(nome,volume,categoria) {
   const n=norm(nome), cat=norm(categoria||"");
@@ -127,25 +127,100 @@ for(const [line,groups] of Object.entries(DATA)) {
   }
 }
 const {all:source,total,pages}=await fetchAllImarat();
+function volumeCompatible(left,right) {
+  return left==="—" || right==="—" || !left || !right || left===right;
+}
+function sourceTitleKey(name,category,brand) {
+  const cat=norm(category);
+  let key=limparParaComparacao(name);
+  if(cat.includes("miniatura")) key=chaveComparacaoMini(name);
+  if(cat.includes("oleo")) key=key.replace(/^oleo\\s+/,"");
+  if(norm(brand)==="arabiyat") key=key.replace(/^prestige\\s+/,"");
+  return key;
+}
+function sourceBrandMatches(catalogBrand,sourceBrand) {
+  const b=norm(catalogBrand), s=norm(sourceBrand);
+  if(b==="arabiyat" && s.includes("arabiyat prestige")) return true;
+  if(b==="emporio a r" && s==="imarat") return true;
+  if(b==="outros" || b==="outra") return !s;
+  return Boolean(b && s && b===s);
+}
+function matchSourceForCatalog(item) {
+  const itemVolume=volumeFrom(item.volume,item.name);
+  const itemKey=sourceTitleKey(item.name,item.category,item.brand);
+  const generic=["outros","outra"].includes(norm(item.brand));
+  const candidates=source.filter(p=>{
+    if(!sourceBrandMatches(item.brand,p.brand)) return false;
+    const sourceVolume=volumeFrom(p.sizeMl,p.name);
+    if(!volumeCompatible(itemVolume,sourceVolume)) return false;
+    const sourceKey=sourceTitleKey(p.name,p.categoria_nome||p.categoria||item.category,p.brand);
+    return itemKey && itemKey===sourceKey;
+  });
+  if(generic) {
+    const exact=candidates.filter(p=>norm(p.name)===norm(item.name));
+    return exact.length===1 ? exact[0] : null;
+  }
+  return candidates.length===1 ? candidates[0] : null;
+}
+function sourceIdentity(p) {
+  const id=String(p.id||p.productId||"").trim();
+  if(id) return "id|"+id;
+  const slug=String(p.slug||"").trim();
+  if(slug) return "slug|"+slug;
+  return "key|"+norm(p.brand)+"|"+sourceTitleKey(p.name,p.categoria_nome||p.categoria,p.brand)+"|"+volumeFrom(p.sizeMl,p.name);
+}
+function apiDuplicateKey(p) {
+  const name=String(p.name||"").trim();
+  const volume=volumeFrom(p.sizeMl,name);
+  const category=p.categoria_nome||p.categoria||"";
+  const mini=isMiniatura(name,volume,category)&&!isOleo(name);
+  return mini
+    ? "mini|"+chaveComparacaoMini(name)
+    : "normal|"+norm(p.brand||"outros")+"|"+limparParaComparacao(name)+"|"+volume;
+}
+const matchedCatalog=catalog.map(item=>({...item,matchedSource:matchSourceForCatalog(item)}));
 const catalogByKey=new Map();
-for(const item of catalog) add(catalogByKey,item.key,item);
+for(const item of matchedCatalog) add(catalogByKey,item.key,item);
+const catalogCollisionGroups=[...catalogByKey].filter(([,items])=>items.length>1);
 const apiByKey=new Map();
 for(const p of source) {
   const name=String(p.name||"").trim();
   if(!name) continue;
-  const volume=volumeFrom(p.sizeMl,name);
-  const category=p.categoria_nome||p.categoria||"";
-  const key=syncKey(name,volume,category);
-  add(apiByKey,key,{
-    name,brand:String(p.brand||"Sem marca"),volume,slug:String(p.slug||""),
-    id:String(p.id||p.productId||"")
+  add(apiByKey,apiDuplicateKey(p),{
+    name,brand:String(p.brand||"Sem marca"),volume:volumeFrom(p.sizeMl,name),
+    category:String(p.categoria_nome||p.categoria||"Sem categoria"),
+    slug:String(p.slug||""),id:String(p.id||p.productId||"")
   });
 }
-const catalogDuplicateGroups=[...catalogByKey].filter(([,items])=>items.length>1);
 const apiDuplicateGroups=[...apiByKey].filter(([,items])=>items.length>1);
-const imaratKeys=new Set(apiByKey.keys());
-const imaratDuplicateGroups=catalogDuplicateGroups.filter(([key,items])=>
-  imaratKeys.has(key)||items.some(x=>x.source.toLowerCase()==="imarat"||x.originId)
+const catalogBySourceIdentity=new Map();
+for(const item of matchedCatalog) {
+  if(!item.matchedSource) continue;
+  const identity=sourceIdentity(item.matchedSource);
+  if(!catalogBySourceIdentity.has(identity)) catalogBySourceIdentity.set(identity,[]);
+  catalogBySourceIdentity.get(identity).push(item);
+}
+const confirmedNormalDuplicates=[...catalogBySourceIdentity].filter(([,items])=>items.length>1);
+const miniGlobalGroups=new Map();
+for(const item of matchedCatalog) {
+  if(!item.matchedSource) continue;
+  if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
+  const key=chaveComparacaoMini(item.name);
+  if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
+  miniGlobalGroups.get(key).push(item);
+}
+const confirmedMiniDuplicates=[...miniGlobalGroups].filter(([,items])=>items.length>1);
+const sourceDistinctCollisions=catalogCollisionGroups.filter(([,items])=>{
+  const matched=items.filter(x=>x.matchedSource);
+  if(matched.length<2) return false;
+  const identities=new Set(matched.map(x=>sourceIdentity(x.matchedSource)));
+  return identities.size>1;
+});
+const unconfirmedNameCollisions=catalogCollisionGroups.filter(([,items])=>
+  items.filter(x=>x.matchedSource).length<2
+);
+const categoryMismatches=matchedCatalog.filter(x=>
+  x.matchedSource && norm(x.category)!==norm(x.matchedSource.categoria_nome||x.matchedSource.categoria||"")
 );
 // Simula, em memória, a ordem de importação da Imarat usando as mesmas chaves
 // e as mesmas atualizações de índice de sync-catalog.mjs. Não altera DATA/Gist.
@@ -191,8 +266,13 @@ for(const p of source) {
 }
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
 console.log(`Produtos recebidos da API: ${source.length} | total informado: ${total||"não informado"} | páginas: ${pages}`);
-console.log(`Grupos de colisão de chave no catálogo (2+ itens para chave Imarat): ${imaratDuplicateGroups.length}`);
-console.log(`Grupos duplicados na própria API Imarat: ${apiDuplicateGroups.length}`);
+console.log(`Itens do catálogo com correspondência segura por marca/nome/volume: ${matchedCatalog.filter(x=>x.matchedSource).length}`);
+console.log(`Duplicidades normais confirmadas pelo mesmo produto da origem: ${confirmedNormalDuplicates.length}`);
+console.log(`Duplicidades de miniaturas confirmadas pela regra global: ${confirmedMiniDuplicates.length}`);
+console.log(`Colisões de nome/chave no catálogo sem confirmação de duplicidade: ${unconfirmedNameCollisions.length}`);
+console.log(`Colisões entre produtos distintos da origem (mesma chave global): ${sourceDistinctCollisions.length}`);
+console.log(`Itens com categoria diferente da categoria da origem: ${categoryMismatches.length}`);
+console.log(`Grupos duplicados na própria API por identidade de produto: ${apiDuplicateGroups.length}`);
 
 console.log(`Simulação do sincronizador: ${simulatedNew.length} novos produtos únicos | ${blockedByCatalog.length} bloqueados pelo catálogo atual | ${blockedWithinImarat.length} bloqueados por repetição na própria lista Imarat`);
 if(new Set(simulatedNew.map(x=>x.key)).size!==simulatedNew.length) throw new Error("Simulação detectou chave duplicada entre novos produtos: regra global falhou.");
@@ -205,14 +285,44 @@ for(const id of repeatedOriginIds) {
   for(const x of imaratSourceCatalog.filter(item=>item.originId===id))
     console.log(JSON.stringify({linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,fonte:x.source||"não informada"}));
 }
-for(const [key,items] of imaratDuplicateGroups) {
-  console.log("COLISÃO DE CHAVE NO CATÁLOGO "+key);
+for(const [identity,items] of confirmedNormalDuplicates) {
+  console.log("DUPLICIDADE NORMAL CONFIRMADA "+identity);
   for(const x of items) console.log(JSON.stringify({
     linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,
-    varejo:x.retail,atacado:x.wholesale,fonte:x.source||"não informada",
-    id_origem:x.originId||"não informado",precoManual:x.manual
+    varejo:x.retail,atacado:x.wholesale,marcaOrigem:x.matchedSource.brand||"sem marca",
+    categoriaOrigem:x.matchedSource.categoria_nome||x.matchedSource.categoria||"não informada",
+    idOrigem:x.matchedSource.id||x.matchedSource.productId||x.matchedSource.slug||"sem id"
   }));
 }
+for(const [key,items] of confirmedMiniDuplicates) {
+  console.log("DUPLICIDADE GLOBAL DE MINIATURA CONFIRMADA "+key);
+  for(const x of items) console.log(JSON.stringify({
+    linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,
+    marcaOrigem:x.matchedSource.brand||"sem marca",
+    idOrigem:x.matchedSource.id||x.matchedSource.productId||x.matchedSource.slug||"sem id"
+  }));
+}
+for(const [key,items] of unconfirmedNameCollisions) {
+  console.log("COLISÃO DE NOME/CHAVE SEM DUPLICIDADE CONFIRMADA "+key);
+  for(const x of items) console.log(JSON.stringify({
+    linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,
+    correspondenciaImarat:Boolean(x.matchedSource),marcaOrigem:x.matchedSource?.brand||"sem correspondência"
+  }));
+}
+for(const [key,items] of sourceDistinctCollisions) {
+  console.log("MESMA CHAVE, PRODUTOS DISTINTOS NA ORIGEM "+key);
+  for(const x of items) console.log(JSON.stringify({
+    linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,
+    marcaOrigem:x.matchedSource?.brand||"sem marca",
+    idOrigem:x.matchedSource?.id||x.matchedSource?.productId||x.matchedSource?.slug||"sem id"
+  }));
+}
+for(const x of categoryMismatches) console.log("CATEGORIA DIVERGENTE "+JSON.stringify({
+  linha:x.line,marca:x.brand,nome:x.name,volume:x.volume,
+  categoriaCatalogo:x.category,categoriaOrigem:x.matchedSource.categoria_nome||x.matchedSource.categoria||"não informada",
+  marcaOrigem:x.matchedSource.brand||"sem marca",
+  idOrigem:x.matchedSource.id||x.matchedSource.productId||x.matchedSource.slug||"sem id"
+}));
 for(const [key,items] of apiDuplicateGroups) {
   console.log("DUPLICIDADE NA API "+key);
   for(const x of items) console.log(JSON.stringify(x));
