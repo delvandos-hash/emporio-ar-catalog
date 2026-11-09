@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
-import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource } from './catalog-identity.mjs';
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint } from './catalog-identity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1671,9 +1671,30 @@ async function main() {
     }
   }
 
-  // A base homologada é preservada: esta etapa não apaga produtos existentes.
-  // Duplicidades antigas serão apenas auditadas; nenhuma remoção por aproximação.
-  console.log('Deduplicação destrutiva desativada: todos os registros existentes foram preservados.');
+  // Remove somente cópias integralmente idênticas. Qualquer diferença de marca,
+  // volume, ID de origem, preço, fotos ou metadados mantém os dois registros.
+  let exactDuplicatesRemoved = 0;
+  const exactSeen = new Set();
+  for (const groups of Object.values(DATA)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const kept = [];
+      for (const item of Array.isArray(group.items) ? group.items : []) {
+        const fingerprint = exactCatalogFingerprint(item, group.brand, item.fonte);
+        if (exactSeen.has(fingerprint)) {
+          exactDuplicatesRemoved++;
+          console.log('CÓPIA EXATA REMOVIDA: ' + JSON.stringify({
+            marca: group.brand, nome: item.nome, volume: item.volume,
+            idOrigem: item.id_origem || ''
+          }));
+          continue;
+        }
+        exactSeen.add(fingerprint);
+        kept.push(item);
+      }
+      group.items = kept;
+    }
+  }
+  console.log(`Duplicatas integralmente idênticas removidas: ${exactDuplicatesRemoved}`);
 
   const indexNormal = new Set();
   const indexNameVolume = new Set();
