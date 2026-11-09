@@ -165,7 +165,14 @@ console.log(`Produtos do catálogo vinculados à Imarat (fonte/ID/chave de sync)
 console.log(`Grupos duplicados no catálogo que envolvem chave Imarat: ${imaratDuplicateGroups.length}`);
 console.log(`Grupos duplicados na própria API Imarat: ${apiDuplicateGroups.length}`);
 console.log(`Produtos da API cuja chave já existe no catálogo (bloqueio esperado): ${apiAlreadyPresent.length}`);
-console.log(`Produtos do catálogo com ID de origem repetido: ${[...new Set(catalog.filter(x=>x.originId).map(x=>x.originId))].filter(id=>catalog.filter(x=>x.originId===id).length>1).length}`);
+const repeatedOriginIds=[...new Set(catalog.filter(x=>x.originId).map(x=>x.originId))]
+  .filter(id=>catalog.filter(x=>x.originId===id).length>1);
+console.log(`IDs de origem repetidos no catálogo: ${repeatedOriginIds.length}`);
+for(const id of repeatedOriginIds) {
+  console.log("ID DE ORIGEM REPETIDO "+id);
+  for(const x of catalog.filter(item=>item.originId===id))
+    console.log(JSON.stringify({linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,fonte:x.source||"não informada"}));
+}
 for(const [key,items] of imaratDuplicateGroups) {
   console.log("DUPLICIDADE NO CATÁLOGO "+key);
   for(const x of items) console.log(JSON.stringify({
