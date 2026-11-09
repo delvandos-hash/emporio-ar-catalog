@@ -179,7 +179,7 @@ console.log('AFEER — TÍTULOS RELACIONADOS A ATHERRI NA ORIGEM: ' + JSON.strin
 const afeersCatalog = Object.entries(DATA).flatMap(([line, groups]) =>
   (groups || []).filter(g => norm(g.cat).includes('miniatura') && norm(g.brand).includes('afeer'))
     .flatMap(g => (g.items || []).filter(item => /(atherr|atheri)/.test(norm(item.nome)))
-      .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, fonte: item.fonte || null })))
+      .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, volume: item.volume || null, retail: item.varejo ?? null, wholesale: item.atacado ?? null, fonte: item.fonte || null, id: item.id || null, id_origem: item.id_origem || null })))
 );
 console.log('AFEER — TÍTULOS RELACIONADOS A ATHERRI NO GIST: ' + JSON.stringify(afeersCatalog));
 const arabiyatRoot = imaratList.filter(p => norm(p.brand).includes('arabiyat prestige') && /(noire|prestige)/.test(norm(p.name)));
