@@ -26,6 +26,7 @@ const BRAND_ALLOWED_SESSIONS = [
   'FLACONETE  BRAND', 'SAPATINHO GOOD GIRL',
 ];
 
+const SYNC_DRY_RUN = process.env.SYNC_DRY_RUN === '1';
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
 const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura armaf', 'miniatura', 'mini'];
@@ -1014,11 +1015,6 @@ async function fetchDandeAcessorios(existingGroups = []) {
         const html = await fetchDandeCategoryPage(cat.path, page);
         const list = parseDandeListProducts(html);
         if (!list.length) break;
-        if (!hasDandeNextPage(html, page)) {
-          console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
-          break;
-        }
-
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
           console.log(`    p${page}: página repetida; encerrando categoria`);
@@ -1121,7 +1117,13 @@ async function fetchDandeAcessorios(existingGroups = []) {
           added++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
-        if (list.length < 8) break;
+
+        // Processa a página atual antes de decidir se existe uma próxima.
+        // Sem link de paginação, encerra somente DEPOIS de salvar os itens desta página.
+        if (!hasDandeNextPage(html, page)) {
+          console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+          break;
+        }
         await sleep(400);
       } catch (e) {
         console.log(`    Dande erro ${cat.nome} p${page}: ${e.message}`);
@@ -1525,6 +1527,11 @@ async function main() {
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log(`Preços alterados: ${priceChanged}`);
   console.log('data.js atualizado localmente (com correção forçada).');
+
+  if (SYNC_DRY_RUN) {
+    console.log('SYNC_DRY_RUN=1 — execução de validação concluída; Gist de produção NÃO foi alterado.');
+    return;
+  }
 
   console.log('Enviando dados para o GitHub Gist...');
   try {
