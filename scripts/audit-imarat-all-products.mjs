@@ -281,10 +281,13 @@ const liveOnlyKeys=[...liveKeySet].filter(key=>!internalPublicIndex.has(key));
 console.log(`COMPARAÇÃO POR PUBLIC ID: data.js interno=${internalItemCount} IDs; Gist vivo=${catalog.length} itens; IDs só no data.js=${internalOnlyKeys.length}; IDs só no Gist=${liveOnlyKeys.length}; variantes sem correspondência=${rekeyAudit.unmatched}`);
 const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
 const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, row: internalPublicIndex.get(key) }));
-const liveStockRefs = new Set(catalog.map(x => String(x.item?.stock_ref || "").trim()).filter(Boolean));
+const liveStockRefs = new Set(catalog.map(x => {
+  const ref = String(x.item?.stock_ref || "").trim();
+  return ref ? norm(x.group?.brand) + "|" + ref : "";
+}).filter(Boolean));
 const duplicateInternalSourceRows = internalOnlySourceRows.filter(({ row }) =>
   Boolean(String(row?.publicItem?.stock_ref || "").trim()) &&
-  liveStockRefs.has(String(row.publicItem.stock_ref).trim())
+  liveStockRefs.has(norm(row?.group?.brand) + "|" + String(row.publicItem.stock_ref).trim())
 );
 const liveLoosePhotoKeys = new Set(catalog.map(x => {
   const photo = publicPhotoFingerprint(x.item);
