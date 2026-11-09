@@ -1,0 +1,46 @@
+name: Validar miniaturas Imarat sem publicar
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/test-imarat-mini-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run-imarat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Baixar código da branch
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxe
+        run: node --check scripts/sync-catalog.mjs
+      - name: Executar sincronização Imarat em dry-run
+        run: node scripts/sync-catalog.mjs
+        env:
+          SYNC_DRY_RUN: "1"
+          SYNC_DANDE_ONLY: "0"
+          ADD_IMARAT_NEW: "1"
+          ADD_BRAND_NEW: "1"
+          ADD_ROUPAS: "0"
+          ADD_FRANNY: "0"
+          ADD_ACESSORIOS: "0"
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
