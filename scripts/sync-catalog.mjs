@@ -1855,8 +1855,8 @@ async function main() {
   }
   console.log(`Duplicatas integralmente idênticas removidas: ${exactDuplicatesRemoved}`);
 
-  const indexNormal = new Set();
-  const indexNameVolume = new Set();
+  const indexNormal = new Map();
+  const indexNameVolume = new Map();
   const indexMiniByBase = new Map();
   const indexMiniNameVolume = new Map();
   for (const line of Object.keys(DATA)) {
@@ -1864,8 +1864,12 @@ async function main() {
       for (const it of g.items || []) {
         const volumeKey = volumeMatch(it.volume, it.nome);
         const nomeKey = limparParaComparacao(it.nome);
-        indexNormal.add(normalProductKey(it.nome, it.volume, g.brand));
-        indexNameVolume.add(normalProductNameVolumeKey(it.nome, it.volume));
+        const normalKey = normalProductKey(it.nome, it.volume, g.brand);
+        if (!indexNormal.has(normalKey)) indexNormal.set(normalKey, []);
+        indexNormal.get(normalKey).push({ id_origem: it.id_origem ?? it.id ?? it.slug ?? "" });
+        const nameVolumeKey = normalProductNameVolumeKey(it.nome, it.volume);
+        if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
+        indexNameVolume.get(nameVolumeKey).push({ id_origem: it.id_origem ?? it.id ?? it.slug ?? "" });
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const baseKey = miniIdentityBaseKey(it, g.brand);
           if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
@@ -1925,8 +1929,14 @@ async function main() {
       } else {
         // Perfumes: marca + nome exato normalizado + volume.
         // Nomes iguais em marcas diferentes coexistem; marca ausente usa fallback conservador.
-        duplicado = indexNormal.has(normalProductKey(nome, volume, brand))
-          || (!marcaConhecida && indexNameVolume.has(normalProductNameVolumeKey(nome, volume)));
+        const normalCandidates = indexNormal.get(normalProductKey(nome, volume, brand)) || [];
+        const nameVolumeCandidates = indexNameVolume.get(normalProductNameVolumeKey(nome, volume)) || [];
+        const candidateId = p.id ?? p.productId ?? p.slug ?? "";
+        if (!marcaConhecida) {
+          duplicado = isDuplicateMiniSource(nameVolumeCandidates, candidateId);
+        } else if (normalCandidates.length) {
+          duplicado = isDuplicateMiniSource(normalCandidates, candidateId);
+        }
         if (!duplicado) console.log('NOVO PERFUME CANDIDATO: ' + JSON.stringify({ nome, marca: brand, volume }));
       }
       if (duplicado) continue;
@@ -1956,10 +1966,12 @@ async function main() {
           id_origem: String(p.id ?? p.productId ?? ''),
       }, true));
       
-      const nomeKey = limparParaComparacao(nome);
-      const volumeKey = volumeMatch(volume, nome);
-      indexNormal.add(normalProductKey(nome, volume, brand));
-      indexNameVolume.add(normalProductNameVolumeKey(nome, volume));
+      const normalKey = normalProductKey(nome, volume, brand);
+      if (!indexNormal.has(normalKey)) indexNormal.set(normalKey, []);
+      indexNormal.get(normalKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
+      const nameVolumeKey = normalProductNameVolumeKey(nome, volume);
+      if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
+      indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
       if (ehMini) {
         const actualMini = { nome, volume, varejo: prices.varejo, atacado: prices.atacado, foto, fotos: imgsNew };
         const baseKey = miniIdentityBaseKey(actualMini, brand);
@@ -2018,7 +2030,10 @@ async function main() {
   if (ADD_BRAND_NEW) {
     for (const p of brandAllowed) {
       const nome = p.nome || ''; if (!nome) continue; let session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session && norm(nome).includes('tubete')) session = 'TUBETES BRAND'; if (!session) continue;
-      const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${norm(session)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`); if (duplicado) continue;
+      const volume = volumeFrom(null, nome);
+      const brandKey = normalProductKey(nome, volume, session);
+      const brandCandidates = indexNormal.get(brandKey) || [];
+      if (isDuplicateMiniSource(brandCandidates, p.id ?? p.productId ?? p.slug ?? "")) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
@@ -2032,11 +2047,13 @@ async function main() {
           notas: notas.slice(0, 500), 
           foto,
           fonte: 'brand',
+          id_origem: String(p.id ?? p.productId ?? p.slug ?? ""),
       }, true));
-      const nomeKey = limparParaComparacao(nome);
-      const volumeKey = volumeMatch(volume, nome);
-      indexNormal.add(`${norm(session)}|${nomeKey}|${volumeKey}`);
-      indexNameVolume.add(`${nomeKey}|${volumeKey}`);
+      if (!indexNormal.has(brandKey)) indexNormal.set(brandKey, []);
+      indexNormal.get(brandKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
+      const nameVolumeKey = normalProductNameVolumeKey(nome, volume);
+      if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
+      indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
       addedBrand++;
     }
   }
