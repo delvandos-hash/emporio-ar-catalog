@@ -1,0 +1,28 @@
+name: Aplicar reconciliação aditiva do catálogo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/apply-additive-reconciliation.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  apply-additive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Baixar main
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxe
+        run: node --check scripts/apply-additive-reconciliation.mjs
+      - name: Publicar somente itens novos com origem confirmada
+        run: node scripts/apply-additive-reconciliation.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
