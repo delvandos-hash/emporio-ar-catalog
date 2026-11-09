@@ -58,7 +58,7 @@ function mergePublicFields(target, publicItem) {
   }
   if (!target.stock_ref && publicItem.stock_ref) target.stock_ref = publicItem.stock_ref;
   if (!target.stock_route && publicItem.stock_route) target.stock_route = publicItem.stock_route;
-  if (!target.public_id && publicItem.public_id) target.public_id = publicItem.public_id;
+  if (publicItem.public_id) target.public_id = publicItem.public_id;
 }
 function legacyFromPublic(item) {
   return {
