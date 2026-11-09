@@ -16,27 +16,11 @@ on:
       - "scripts/additive-reconciliation.test.mjs"
       - "js/app.js"
       - ".github/workflows/full-reconcile-dry-run.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "scripts/sync-catalog.mjs"
-      - "scripts/audit-imarat-all-products.mjs"
-      - "scripts/restore-gist-only-legacy.mjs"
-      - "scripts/apply-additive-reconciliation.mjs"
-      - "scripts/public-catalog.mjs"
-      - "scripts/public-catalog.test.mjs"
-      - "scripts/catalog-identity.mjs"
-      - "scripts/catalog-identity.test.mjs"
-      - "scripts/imarat-source-guard.test.mjs"
-      - "scripts/additive-reconciliation.test.mjs"
-      - "js/app.js"
-      - ".github/workflows/full-reconcile-dry-run.yml"
-
 permissions:
   contents: write
 
 concurrency:
-  group: full-reconcile-dry-run-${{ github.event.pull_request.number || github.ref }}
+  group: full-reconcile-dry-run-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
