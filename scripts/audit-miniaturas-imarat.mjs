@@ -135,7 +135,15 @@ function sourceMatch(item, group) {
   const matches = imaratList.filter(p => norm(p.name) === name);
   if (!matches.length) return null;
   const brand = norm(group?.brand);
-  return matches.find(p => norm(p.brand) === brand || !brand || norm(p.brand).includes(brand) || brand.includes(norm(p.brand))) || matches[0];
+  const strict = matches.find(p => {
+    const sourceBrand = norm(p.brand);
+    return Boolean(brand && sourceBrand && (
+      sourceBrand === brand || sourceBrand.includes(brand) || brand.includes(sourceBrand)
+    ));
+  });
+  if (strict) return strict;
+  if (["outros", "outra"].includes(brand)) return matches.find(p => !norm(p.brand)) || null;
+  return null;
 }
 
 const records = [];
@@ -203,7 +211,8 @@ if (priceRuleDifferences.length) {
   for (const item of priceRuleDifferences) console.log(JSON.stringify(item));
 }
 for (const [key, items] of duplicates) {
-  console.log("\\nPOSSÍVEL DUPLICIDADE: " + key);
+  console.log("");
+  console.log("POSSÍVEL DUPLICIDADE: " + key);
   for (const item of items) {
     console.log(JSON.stringify({
       linha: item.line, marca: item.brand, categoria: item.category,
