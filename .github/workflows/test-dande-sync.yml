@@ -31,11 +31,3 @@ jobs:
           SYNC_DRY_RUN: "1"
           SYNC_DANDE_ONLY: "1"
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
-      - name: Guardar snapshot de validação (artefato privado da execução)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dande-sync-dry-run-data
-          path: js/data.js
-          if-no-files-found: ignore
-          retention-days: 1
