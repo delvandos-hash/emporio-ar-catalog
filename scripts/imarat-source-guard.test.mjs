@@ -195,3 +195,10 @@ test("preserva a referência canônica de estoque do Gist mesmo quando a base in
   assert.match(source, /liveItem\.stock_ref && item\.stock_ref !== liveItem\.stock_ref/);
   assert.match(source, /liveItem\.stock_route && item\.stock_route !== liveItem\.stock_route/);
 });
+
+test("mesmo origin_ref pode aparecer em categorias distintas sem virar ambiguidade, mas exige a mesma marca", () => {
+  assert.match(source, /liveByOriginRef\.get\(String\(item\.origin_ref\)\)\.push\(\{ item, group, line \}\)/);
+  assert.match(source, /sameBrandOrigins = origins\.filter\(row => norm\(row\.group\?\.brand\) === norm\(group\?\.brand\)\)/);
+  assert.match(source, /sameBrandOrigins\[0\]\.item/);
+  assert.match(source, /IDs\/origens de marcas diferentes nunca são cruzados/);
+});
