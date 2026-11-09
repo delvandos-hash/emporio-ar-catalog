@@ -54,7 +54,7 @@ test("normaliza o prefixo Óleo somente na comparação de títulos da categoria
 });
 
 test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompatível", () => {
-  assert.ok(auditSource.includes('raw += "ml";'));
+    assert.ok(auditSource.includes(`.replace(/['’]s\\b/gi, "")`));
   assert.ok(auditSource.includes('const explicit = raw.match'));
   assert.match(source, /itemVolume === sourceVolume/);
 });
@@ -89,4 +89,12 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
   assert.match(source, /const imaratPorId = new Map\(\)/);
   assert.match(source, /DUPLICATA IMARAT CONSOLIDADA POR ID DA ORIGEM/);
   assert.match(source, /if \(norm\(item\.fonte\) === 'imarat' && item\.id_origem\)/);
+});
+
+
+test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
+  assert.ok(source.includes(".replace(/['’]s"));
+  assert.ok(auditAllSource.includes(".replace(/['’]s"));
+  assert.ok(auditSource.includes(".replace(/['’]s"));
+  assert.ok(auditMiniSource.includes(".replace(/['’]s"));
 });

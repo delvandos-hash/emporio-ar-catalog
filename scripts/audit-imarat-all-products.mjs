@@ -8,7 +8,7 @@ if (!GIST_TOKEN) throw new Error("GIST_TOKEN não configurado.");
 
 const norm = (s) => String(s || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-  .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+  .replace(/['’]s\b/gi, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 
 // Espelha literalmente as funções de comparação do sync-catalog.mjs.
 function limparParaComparacao(s) {
