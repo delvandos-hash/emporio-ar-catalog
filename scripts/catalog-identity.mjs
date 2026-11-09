@@ -85,5 +85,11 @@ export function exactCatalogFingerprint(item, brand, source) {
     normalizedPrice(item?.varejo),
     normalizedPrice(item?.atacado),
     normalizedImages(item),
+    String(item?.precoManual ?? ""),
+    String(item?.disponivel ?? ""),
+    String(item?.notas ?? ""),
+    String(item?.badge ?? ""),
+    String(item?.novoDesde ?? ""),
+    JSON.stringify(item?.variacoes || []),
   ].join("|");
 }
