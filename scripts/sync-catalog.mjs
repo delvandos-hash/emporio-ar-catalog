@@ -863,6 +863,21 @@ function upgradeDandeImg(u) {
   return s;
 }
 
+function mergeDandeImages(...groups) {
+  const result = [];
+  const seen = new Set();
+  for (const group of groups) {
+    const values = Array.isArray(group) ? group : [group];
+    for (const value of values) {
+      const url = upgradeDandeImg(value);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      result.push(url);
+    }
+  }
+  return result;
+}
+
 async function fetchDandeCategoryPage(path, page = 1) {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -890,7 +905,10 @@ function parseDandeListProducts(html) {
   while ((im = idRe.exec(html))) {
     if (!ids.includes(im[1])) ids.push(im[1]);
   }
-  for (const id of ids) {
+  // Só considera IDs que tenham nome de produto correspondente na listagem.
+  // Evita capturar IDs de widgets, recomendações e blocos auxiliares do HTML.
+  const productIds = ids.filter((id) => Object.prototype.hasOwnProperty.call(names, id));
+  for (const id of productIds) {
     const pos = html.indexOf(`data-product-id="${id}"`);
     if (pos < 0) continue;
     const chunk = html.slice(pos, pos + 8000);
@@ -982,13 +1000,30 @@ async function fetchDandeAcessorios(existingGroups = []) {
   const byId = new Map();
   for (const cat of DANDE_CATEGORIES) {
     console.log(`  Dande cat ${cat.nome}`);
+    const seenCategoryIds = new Set();
+    const seenPageSignatures = new Set();
     for (let page = 1; page <= 15; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page);
         const list = parseDandeListProducts(html);
         if (!list.length) break;
+
+        const pageSignature = list.map((p) => p.id).sort().join('|');
+        if (!pageSignature || seenPageSignatures.has(pageSignature)) {
+          console.log(`    p${page}: página repetida; encerrando categoria`);
+          break;
+        }
+        seenPageSignatures.add(pageSignature);
+
+        const newProducts = list.filter((p) => !seenCategoryIds.has(p.id));
+        if (!newProducts.length) {
+          console.log(`    p${page}: nenhum ID novo; encerrando categoria`);
+          break;
+        }
+        for (const p of newProducts) seenCategoryIds.add(p.id);
+
         let added = 0;
-        for (const p of list) {
+        for (const p of newProducts) {
           if (byId.has(p.id)) continue;
           let variants = p.variants || [];
           let desc = '';
@@ -1008,7 +1043,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
               if (det) {
                 if (det.variants?.length) variants = det.variants;
                 desc = det.desc || '';
-                if (det.imgs?.length) imgs = det.imgs;
+                if (det.imgs?.length) imgs = mergeDandeImages(det.imgs, imgs, prev?.fotos, prev?.foto);
               }
               await sleep(250);
             } catch (_) {}
@@ -1039,7 +1074,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
             variacoes = [];
             totalEstoque = 0;
           }
-          if (!imgs.length && prev) imgs = prev.fotos || (prev.foto ? [prev.foto] : []);
+          imgs = mergeDandeImages(imgs, prev?.fotos, prev?.foto);
           const foto = imgs[0] || (prev && prev.foto) || '';
           let nome = nomeList || (prev && prev.nome) || '';
           if (!nome || nome.toLowerCase() === 'produto') {
