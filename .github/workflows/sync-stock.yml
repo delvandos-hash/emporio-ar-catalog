@@ -1,6 +1,10 @@
 name: Sync catálogo (estoque + novos produtos)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-stock.yml"
   schedule:
     # 08:00 e 20:00 horário de Brasília (UTC-3) → 11:00 e 23:00 UTC
     - cron: '0 11 * * *'
@@ -12,6 +16,7 @@ permissions:
 
 jobs:
   sync:
+    if: github.event_name != 'push' || startsWith(github.event.head_commit.message, 'ops: one-time Imarat recovery')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +51,7 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+          SYNC_IMARAT_ONLY: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops: one-time Imarat recovery') && '1' || '0' }}
       - name: Persistir data.js após sincronização bem-sucedida
         run: |
           if git diff --quiet -- js/data.js; then
