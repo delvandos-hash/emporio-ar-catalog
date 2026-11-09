@@ -79,8 +79,8 @@ function publicFingerprint(item) {
 }
 
 function publicPhotoFingerprint(item) {
-  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
-  return JSON.stringify([...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort());
+  const primary = String(item?.foto || (Array.isArray(item?.fotos) ? item.fotos[0] : "") || "").trim();
+  return primary ? JSON.stringify(primary) : "[]";
 }
 
 function collectKeys(DATA) {
@@ -123,7 +123,7 @@ function dedupeExactLiveVariants(DATA) {
 
 function looseIdentity(line, group, item) {
   const name = String(item?.nome || "").replace(/\d+(?:[.,]\d+)?\s*(?:ml|g)\b/gi, " ");
-  return [norm(line), norm(group?.brand), norm(name)].join("|");
+  return [norm(group?.brand), norm(name)].join("|");
 }
 
 function collectInternalIndex(DATA) {
