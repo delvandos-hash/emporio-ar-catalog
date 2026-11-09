@@ -878,6 +878,14 @@ function mergeDandeImages(...groups) {
   return result;
 }
 
+function hasDandeNextPage(html, page) {
+  const next = page + 1;
+  const escapedNext = String(next).replace(/[.*+?^${}()|[\]\\]/g, '\\async function fetchDandeCategoryPage(path, page = 1) {');
+  const queryPage = new RegExp(`href=["'][^"']*[?&]page=${escapedNext}(?:[&#"']|$)`, 'i');
+  const pathPage = new RegExp(`href=["'][^"']*/page/${escapedNext}/?(?:[?#"']|$)`, 'i');
+  return /rel=["']next["']/i.test(html) || queryPage.test(html) || pathPage.test(html);
+}
+
 async function fetchDandeCategoryPage(path, page = 1) {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -1007,6 +1015,10 @@ async function fetchDandeAcessorios(existingGroups = []) {
         const html = await fetchDandeCategoryPage(cat.path, page);
         const list = parseDandeListProducts(html);
         if (!list.length) break;
+        if (!hasDandeNextPage(html, page)) {
+          console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+          break;
+        }
 
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
