@@ -881,7 +881,7 @@ function mergeDandeImages(...groups) {
 function hasDandeNextPage(html, page) {
   const next = page + 1;
   const queryPage = new RegExp(`href=["'][^"']*[?&]page=${next}(?:[&#"']|$)`, 'i');
-  const pathPage = new RegExp(`href=["'][^"']*/page/${escapedNext}/?(?:[?#"']|$)`, 'i');
+  const pathPage = new RegExp(`href=["'][^"']*/page/${next}/?(?:[?#"']|$)`, 'i');
   return /rel=["']next["']/i.test(html) || queryPage.test(html) || pathPage.test(html);
 }
 
