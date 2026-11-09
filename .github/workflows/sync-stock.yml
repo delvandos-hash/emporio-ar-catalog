@@ -1,6 +1,7 @@
 name: Sync catálogo (estoque + novos produtos)
 
 on:
+  # Gatilho temporário: publica a correção após o merge desta PR.
   push:
     branches: [main]
     paths:
