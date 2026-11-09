@@ -140,6 +140,7 @@ function sourceMatch(item, group) {
 
 const records = [];
 let sourceMatches = 0, automaticPriceDifferences = 0;
+const priceRuleDifferences = [];
 for (const [line, groups] of Object.entries(DATA)) {
   if (!Array.isArray(groups)) continue;
   for (const group of groups) {
@@ -155,7 +156,16 @@ for (const [line, groups] of Object.entries(DATA)) {
         const wholesaleOriginal = source.atacado?.precoCents != null
           ? Number(source.atacado.precoCents) / 100 : Math.max(retailOriginal - 30, 0);
         expected = automaticMiniPrice(item.nome, group.brand, group.cat, retailOriginal, wholesaleOriginal);
-        if (String(item.varejo) !== expected.varejo || String(item.atacado) !== expected.atacado) automaticPriceDifferences++;
+        if (String(item.varejo) !== expected.varejo || String(item.atacado) !== expected.atacado) {
+          automaticPriceDifferences++;
+          priceRuleDifferences.push({
+            line, brand: String(group.brand || "Sem marca"), name: String(item.nome || ""),
+            volume: volumeOf(item), currentRetail: item.varejo ?? "não informado",
+            currentWholesale: item.atacado ?? "não informado",
+            expectedRetail: expected.varejo, expectedWholesale: expected.atacado,
+            sourceBrand: source.brand || "marca não informada",
+          });
+        }
       }
       records.push({
         line, brand: String(group.brand || "Sem marca"),
@@ -163,11 +173,11 @@ for (const [line, groups] of Object.entries(DATA)) {
         name: String(item.nome || ""), volume: volumeOf(item),
         varejo: item.varejo ?? "não informado",
         atacado: item.atacado ?? "não informado",
-        sourceBrand: source?.brand || "sem correspondência",
+        sourceBrand: source ? (source.brand || "marca não informada") : "sem correspondência",
         sourcePrice: source?.priceCents != null ? fmtBRL(Number(source.priceCents) / 100) : "—",
         expectedRetail: expected?.varejo || "sem correspondência",
         expectedWholesale: expected?.atacado || "sem correspondência",
-        key: name + "|" + volumeOf(item),
+        key: norm(line) + "|" + name + "|" + volumeOf(item),
       });
     }
   }
@@ -188,6 +198,10 @@ console.log(`Registros diferentes da fórmula automática: ${automaticPriceDiffe
 console.log(`Grupos com possível duplicidade (nome normalizado + volume): ${duplicates.length}`);
 console.log(`Grupos com preços varejo/atacado diferentes: ${priceConflicts.length}`);
 console.log("Nenhum preço foi recalculado. Nenhum produto foi removido. Nenhuma gravação foi feita no Gist.");
+if (priceRuleDifferences.length) {
+  console.log("DIVERGÊNCIAS DA FÓRMULA AUTOMÁTICA (conferir precoManual antes de qualquer ajuste):");
+  for (const item of priceRuleDifferences) console.log(JSON.stringify(item));
+}
 for (const [key, items] of duplicates) {
   console.log("\\nPOSSÍVEL DUPLICIDADE: " + key);
   for (const item of items) {
