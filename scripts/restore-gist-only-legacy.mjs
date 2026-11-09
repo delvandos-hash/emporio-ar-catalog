@@ -25,6 +25,40 @@ function identity(line, group, item) {
   return [norm(line), norm(group?.brand), norm(group?.cat), norm(item?.nome), volumeMatch(item?.volume, item?.nome)].join("|");
 }
 
+function publicFingerprint(item) {
+  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
+  return JSON.stringify({
+    nome: norm(item?.nome),
+    volume: volumeMatch(item?.volume, item?.nome),
+    varejo: String(item?.varejo ?? "").trim(),
+    atacado: String(item?.atacado ?? "").trim(),
+    foto: String(item?.foto ?? "").trim(),
+    fotos: [...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort(),
+    notas: String(item?.notas ?? ""),
+    badge: String(item?.badge ?? ""),
+    novoDesde: String(item?.novoDesde ?? ""),
+    disponivel: String(item?.disponivel ?? ""),
+    variacoes: item?.variacoes || [],
+    stock_ref: String(item?.stock_ref ?? ""),
+    stock_route: String(item?.stock_route ?? ""),
+    fonte: String(item?.fonte ?? "")
+  });
+}
+
+function buildPublicFingerprintIndex(DATA) {
+  const index = new Map();
+  for (const [line, groups] of Object.entries(DATA || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const key = identity(line, group, item);
+        if (!index.has(key)) index.set(key, new Set());
+        index.get(key).add(publicFingerprint(item));
+      }
+    }
+  }
+  return index;
+}
+
 async function fetchGist(token) {
   const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
     headers: {
@@ -71,14 +105,7 @@ async function main() {
   // Só restauramos os seis registros legados de roupas ainda presentes no Gist,
   // que não retornaram em nenhuma das fontes atuais.
   const currentPublic = toPublicCatalog(DATA);
-  const currentPublicIds = new Set();
-  const currentIdentities = new Set();
-  for (const [line, groups] of Object.entries(currentPublic)) for (const group of groups || []) {
-    for (const item of group.items || []) {
-      if (item.public_id) currentPublicIds.add(item.public_id);
-      currentIdentities.add(identity(line, group, item));
-    }
-  }
+  const currentFingerprints = buildPublicFingerprintIndex(currentPublic);
 
   const restored = [];
   for (const [line, groups] of Object.entries(liveDATA)) {
@@ -86,7 +113,9 @@ async function main() {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group.items) ? group.items : []) {
         const key = identity(line, group, item);
-        if ((item.public_id && currentPublicIds.has(item.public_id)) || currentIdentities.has(key)) continue;
+        const fingerprint = publicFingerprint(item);
+        const existingFingerprints = currentFingerprints.get(key);
+        if (existingFingerprints?.has(fingerprint)) continue;
 
         const cat = String(group.cat || "Roupas");
         if (!Array.isArray(DATA[line])) DATA[line] = [];
@@ -115,26 +144,20 @@ async function main() {
           fonte: "legacy-gist"
         };
         target.items.push(legacy);
-        currentIdentities.add(key);
-        restored.push({ nome: legacy.nome, marca: group.brand, categoria: cat });
+        if (!currentFingerprints.has(key)) currentFingerprints.set(key, new Set());
+        currentFingerprints.get(key).add(publicFingerprint(item));
+        restored.push({ nome: legacy.nome, marca: group.brand, categoria: cat, public_id: item.public_id || "" });
       }
     }
   }
 
   const checkPublic = toPublicCatalog(DATA);
-  const checkIds = new Set();
-  const checkIdentities = new Set();
-  for (const [line, groups] of Object.entries(checkPublic)) for (const group of groups || []) {
-    for (const item of group.items || []) {
-      if (item.public_id) checkIds.add(item.public_id);
-      checkIdentities.add(identity(line, group, item));
-    }
-  }
+  const checkFingerprints = buildPublicFingerprintIndex(checkPublic);
   const missing = [];
   for (const [line, groups] of Object.entries(liveDATA)) for (const group of groups || []) {
     for (const item of group.items || []) {
       const key = identity(line, group, item);
-      if ((item.public_id && !checkIds.has(item.public_id)) || !checkIdentities.has(key)) {
+      if (!checkFingerprints.get(key)?.has(publicFingerprint(item))) {
         missing.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, public_id: item.public_id, stock_ref: item.stock_ref || "" });
       }
     }
@@ -143,7 +166,7 @@ async function main() {
     console.log("GIST_PUBLIC_ID_AINDA_AUSENTE " + JSON.stringify(missing));
     throw new Error(`Restaram ${missing.length} public_id do Gist sem representação interna; nada foi salvo.`);
   }
-  if (restored.length > 50) throw new Error(`Restauração legada excedeu o limite seguro de 50 itens (${restored.length}); nada foi salvo.`);
+  if (restored.length > 80) throw new Error(`Restauração legada excedeu o limite seguro de 80 itens (${restored.length}); nada foi salvo.`);
 
   const out = "/** Empório A.R — recuperação aditiva de legado Gist " + new Date().toISOString() + " */\n" +
     "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
