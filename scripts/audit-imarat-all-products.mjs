@@ -4,12 +4,12 @@ const IMARAT_API = process.env.IMARAT_API_URL;
 if (!IMARAT_API) throw new Error("IMARAT_API_URL não configurado.");
 
 const norm = (s) => String(s || "").toLowerCase()
-  .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
-  .replace(/[^a-z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 
 // Espelha literalmente as funções de comparação do sync-catalog.mjs.
 function limparParaComparacao(s) {
-  return norm(s).replace(/\\s*\\d+\\s*(ml|g)\\b/gi, "").replace(/\\s+/g, " ").trim();
+  return norm(s).replace(/\s*\d+\s*(ml|g)\b/gi, "").replace(/\s+/g, " ").trim();
 }
 const PREFIXOS_MINI_IMARAT = ["mini armaf", "miniatura armaf", "miniatura", "mini"];
 const MARCAS_NO_NOME_MINI = [
@@ -43,9 +43,9 @@ function isOleo(nome) {
 }
 function volumeFrom(sizeMl,nome) {
   if (sizeMl) return String(sizeMl)+"ml";
-  const m=String(nome||"").toUpperCase().match(/(\\d+(?:[.,]\\d+)?)\\s*ML\\b/);
+  const m=String(nome||"").toUpperCase().match(/(\d+(?:[.,]\d+)?)\s*ML\b/);
   if(m) return m[1].replace(",",".")+"ml";
-  const g=String(nome||"").toUpperCase().match(/(\\d+)\\s*G\\b/);
+  const g=String(nome||"").toUpperCase().match(/(\d+)\s*G\b/);
   if(g) return g[1]+"g";
   return "—";
 }
@@ -68,7 +68,7 @@ function parseInternalData() {
   const source=readFileSync(new URL("../js/data.js",import.meta.url),"utf8");
   const marker="export const DATA = ";
   const start=source.indexOf(marker);
-  const end=source.indexOf(";\\nexport const WHATSAPP",start);
+  const end=source.indexOf(";\nexport const WHATSAPP",start);
   if(start<0||end<0) throw new Error("Não foi possível extrair DATA de js/data.js.");
   return JSON.parse(source.slice(start+marker.length,end));
 }
