@@ -1377,8 +1377,8 @@ async function main() {
 
         // A marca vem do campo próprio da origem; move apenas este item se o grupo antigo
         // estiver com uma marca abreviada/genérica, sem reclassificar os demais itens.
-        const marcaApi = limparTexto(hit.brand || g.brand || 'Outros');
-        const marcaPublica = norm(marcaApi) === 'imarat' ? 'Empório A.R' : marcaApi.toUpperCase();
+        const marcaApi = limparTexto(hit.brand || g.brand || 'Outros').trim();
+        const marcaPublica = norm(marcaApi) === 'imarat' ? 'Empório A.R' : marcaApi.trim().toUpperCase();
         if (norm(marcaPublica) !== norm(g.brand)) {
           const grupoDestino = ensureBrandGroup(DATA, line, marcaPublica, g.cat);
           if (grupoDestino !== g) {
@@ -1516,7 +1516,7 @@ async function main() {
   if (ADD_IMARAT_NEW) {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
-      const marcaOrigem = limparTexto(p.brand || 'Outros');
+      const marcaOrigem = limparTexto(p.brand || 'Outros').trim();
       const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
