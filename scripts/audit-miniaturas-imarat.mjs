@@ -185,9 +185,16 @@ console.log('AFEER — TÍTULOS RELACIONADOS A ATHERRI NO GIST: ' + JSON.stringi
 const arabiyatRoot = imaratList.filter(p => norm(p.brand).includes('arabiyat prestige') && /(noire|prestige)/.test(norm(p.name)));
 console.log('ARABIYAT PRESTIGE — TÍTULOS NOIRE/PRESTIGE NA ORIGEM: ' + JSON.stringify(arabiyatRoot.map(p => ({ name: p.name, brand: p.brand, slug: p.slug }))));
 const arabiyatCatalog = Object.entries(DATA).flatMap(([line, groups]) =>
-  (groups || []).filter(g => /(arabiyat|prestige)/.test(norm(g.brand)))
-    .flatMap(g => (g.items || []).filter(item => /(noire|prestige)/.test(norm(item.nome)))
-      .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, volume: item.volume || null, retail: item.varejo ?? null, wholesale: item.atacado ?? null, fonte: item.fonte || null, id: item.id || null, id_origem: item.id_origem || null })))
+  (groups || []).flatMap((g, groupIndex) => norm(g.brand).includes('arabiyat') && norm(g.cat) === 'perfumes'
+    ? (g.items || []).filter(item => /(noire|prestige)/.test(norm(item.nome))).map(item => {
+        const internalGroup = (INTERNAL_DATA[line] || []).find(x => norm(x.brand) === norm(g.brand) && norm(x.cat) === norm(g.cat));
+        const internalItem = (internalGroup?.items || []).find(x => norm(x.nome) === norm(item.nome));
+        return { line, groupIndex, brand: g.brand, category: g.cat, name: item.nome, volume: item.volume || null,
+          retail: item.varejo ?? null, wholesale: item.atacado ?? null, fonteGist: item.fonte || null,
+          fonteInterna: internalItem?.fonte || null, precoManual: internalItem?.precoManual ?? null,
+          id: item.id || null, id_origem: item.id_origem || null };
+      })
+    : [])
 );
 console.log('ARABIYAT PRESTIGE — TÍTULOS NOIRE/PRESTIGE NO GIST: ' + JSON.stringify(arabiyatCatalog));
 
