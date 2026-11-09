@@ -262,9 +262,12 @@ async function main() {
   const internalKeys = new Set(internalIndex.keys());
   const missingFromInternal = [...liveKeys].filter(key => !internalKeys.has(key));
   const liveStockRefs = new Set();
-  for (const groups of Object.values(liveDATA)) for (const group of groups || []) for (const item of group.items || []) {
+  const liveLoosePhotoKeys = new Set();
+  for (const [line, groups] of Object.entries(liveDATA)) for (const group of groups || []) for (const item of group.items || []) {
     const ref = String(item?.stock_ref || "").trim();
     if (ref) liveStockRefs.add(ref);
+    const photo = publicPhotoFingerprint(item);
+    if (photo) liveLoosePhotoKeys.add(looseIdentity(line, group, item) + "|" + photo);
   }
   const duplicateSourceKeys = new Set();
   const additions = [...internalKeys].filter(key => {
@@ -272,6 +275,14 @@ async function main() {
     const row = (internalIndex.get(key) || [])[0];
     const stockRef = String(row?.publicItem?.stock_ref || "").trim();
     if (stockRef && liveStockRefs.has(stockRef)) {
+      duplicateSourceKeys.add(key);
+      return false;
+    }
+    const rowCategory = norm(row?.publicGroup?.cat);
+    const rowSource = norm(row?.item?.fonte);
+    const photo = publicPhotoFingerprint(row?.publicItem);
+    if (!rowSource && rowCategory.includes("brand") && photo &&
+        liveLoosePhotoKeys.has(looseIdentity(row.publicLine, row.publicGroup, row.publicItem) + "|" + photo)) {
       duplicateSourceKeys.add(key);
       return false;
     }
