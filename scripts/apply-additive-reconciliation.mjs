@@ -129,7 +129,6 @@ async function main() {
     }
   }
 
-  const sanitizedInternal = toPublicCatalog(internalDATA);
   const mergedPublic = structuredClone(liveDATA);
   const mergedKeys = new Set(liveKeys);
   let appended = 0;
