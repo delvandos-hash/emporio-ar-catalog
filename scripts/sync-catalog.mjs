@@ -105,7 +105,17 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (publicItem.origin_ref) {
           const origins = (liveByOriginRef.get(String(publicItem.origin_ref)) || []).filter(x => !used.has(x));
           if (origins.length === 1) liveItem = origins[0];
-          else if (origins.length > 1) ambiguous++;
+          else if (origins.length > 1) {
+            ambiguous++;
+            console.log("LIVE_PUBLIC_AMBIGUOUS_ORIGIN " + JSON.stringify({
+              line, brand: group?.brand, category: group?.cat, name: item?.nome,
+              origin_ref: publicItem.origin_ref,
+              candidates: origins.slice(0, 12).map(x => ({
+                public_id: x.public_id, stock_ref: x.stock_ref, varejo: x.varejo, atacado: x.atacado,
+                foto: x.foto, fotos: Array.isArray(x.fotos) ? x.fotos.slice(0, 3) : []
+              }))
+            }));
+          }
         }
         if (!liveItem && item.public_id) {
           const publicMatches = (liveByPublicId.get(String(item.public_id)) || []).filter(x => !used.has(x));
@@ -122,7 +132,18 @@ function preserveLivePublicFields(DATA, liveDATA) {
           else if (candidates.length > 1) {
             const exact = candidates.filter(x => publicVariantMatch(publicItem, x));
             if (exact.length === 1) liveItem = exact[0];
-            else ambiguous++;
+            else {
+              ambiguous++;
+              console.log("LIVE_PUBLIC_AMBIGUOUS_BASE " + JSON.stringify({
+                line, brand: group?.brand, category: group?.cat, name: item?.nome, volume: item?.volume,
+                candidates: candidates.slice(0, 12).map(x => ({
+                  public_id: x.public_id, stock_ref: x.stock_ref, origin_ref: x.origin_ref,
+                  varejo: x.varejo, atacado: x.atacado, foto: x.foto,
+                  fotos: Array.isArray(x.fotos) ? x.fotos.slice(0, 3) : []
+                })),
+                exactMatches: exact.length
+              }));
+            }
           }
         }
         if (!liveItem) continue;
