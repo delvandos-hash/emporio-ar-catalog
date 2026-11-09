@@ -102,8 +102,12 @@ function removerMarcaDoNome(s) {
 }
 
 // Mini Marshmellow === Mini Armaf Marshmellow → "marshmellow"
-function chaveComparacaoMini(nome) {
-  return removerMarcaDoNome(removerPrefixosMini(limparParaComparacao(nome)));
+function chaveComparacaoMini(nome, volume) {
+  const nomeBase = removerMarcaDoNome(removerPrefixosMini(limparParaComparacao(nome)));
+  // Volume e linha fazem parte da identidade: 25ml não pode bloquear 30ml,
+  // nem um registro auxiliar de outra linha definir a categoria do produto.
+  const volumeKey = norm(volume && volume !== '—' ? volume : volumeFrom(null, nome)) || 'sem-volume';
+  return `${nomeBase}|${volumeKey}`;
 }
 
 function isOleo(nome) {
@@ -1312,14 +1316,14 @@ async function main() {
     for (const g of DATA[line]) {
       for (const it of g.items) {
         const nomeNormalizado = limparParaComparacao(it.nome);
-        // A chave sem marca é intencional: a Imarat pode cadastrar o mesmo perfume
-        // com marcas/grupos diferentes. A checagem global evita reimportá-lo.
         indexNormal.add(`${nomeNormalizado}|${norm(g.brand)}`);
         indexNormal.add(nomeNormalizado);
-        if (isMiniatura(it.nome, it.volume, g.cat)) {
-          const chaveMini = chaveComparacaoMini(it.nome);
-          indexMiniImarat.add(chaveMini);
-          indexMiniImarat.add(`${chaveMini}|${norm(g.brand)}`);
+        if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
+          const chaveMini = `${norm(line)}|${chaveComparacaoMini(it.nome, it.volume)}`;
+          // Miniaturas: mesma linha + nome + volume. Marca ou preço idêntico
+          // permitem bloquear duplicatas sem colapsar regras comerciais distintas.
+          indexMiniImarat.add(`${chaveMini}|brand:${norm(g.brand)}`);
+          indexMiniImarat.add(`${chaveMini}|price:${String(it.varejo)}|${String(it.atacado)}`);
         }
       }
     }
@@ -1333,15 +1337,16 @@ async function main() {
       const categoria = p.categoria_nome || p.categoria || '';
       const ehOleo = isOleo(nome);
       const ehMini = isMiniatura(nome, volume, categoria) && !ehOleo;
+      const line = genderLine(p.gender);
+      const precoVarejoOrig = (p.priceCents || 0) / 100;
+      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
+      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       let duplicado;
       if (ehMini) {
-        const chave = chaveComparacaoMini(nome);
-        duplicado =
-          indexMiniImarat.has(chave) ||
-          indexMiniImarat.has(`${chave}|${norm(brand)}`) ||
-          indexMiniImarat.has(`${chave}|armaf`) ||
-          indexMiniImarat.has(`${chave}|outros`) ||
-          indexMiniImarat.has(`${chave}|outra`);
+        const chave = `${norm(line)}|${chaveComparacaoMini(nome, volume)}`;
+        const mesmaMarca = indexMiniImarat.has(`${chave}|brand:${norm(brand)}`);
+        const mesmoPreco = indexMiniImarat.has(`${chave}|price:${prices.varejo}|${prices.atacado}`);
+        duplicado = mesmaMarca || mesmoPreco;
       } else {
         duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(brand)}`) || indexNormal.has(limparParaComparacao(nome));
       }
@@ -1357,11 +1362,7 @@ async function main() {
       const imgsNew = imaratImagesFrom(p, detail);
       const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : '');
       
-      const precoVarejoOrig = (p.priceCents || 0) / 100; 
-      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
-      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-      
-      const line = genderLine(p.gender); 
+
       const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : ''); 
       const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
       
@@ -1383,9 +1384,9 @@ async function main() {
       indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
       indexNormal.add(limparParaComparacao(nome));
       if (ehMini) {
-        const chave = chaveComparacaoMini(nome);
-        indexMiniImarat.add(chave);
-        indexMiniImarat.add(`${chave}|${norm(brand)}`);
+        const chave = `${norm(line)}|${chaveComparacaoMini(nome, volume)}`;
+        indexMiniImarat.add(`${chave}|brand:${norm(brand)}`);
+        indexMiniImarat.add(`${chave}|price:${prices.varejo}|${prices.atacado}`);
       }
       addedImarat++;
     }
