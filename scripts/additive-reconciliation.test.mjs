@@ -120,3 +120,11 @@ test("preserva o public_id canônico do Gist e confirma grupos Brand permitidos"
   assert.match(audit, /effectiveAdditiveSource\(row\)/);
   assert.match(apply, /effectiveAdditiveSource\(rows\[0\]\)/);
 });
+
+test("reidentificação flexível tolera categoria ou volume legado divergente sem misturar marcas", () => {
+  assert.match(apply, /internalByLooseIdentity/);
+  assert.match(apply, /byLoosePhoto\.length === 1/);
+  assert.match(audit, /byLooseIdentity/);
+  assert.match(audit, /byLoosePhoto\.length===1/);
+  assert.match(apply, /function looseIdentity/);
+});
