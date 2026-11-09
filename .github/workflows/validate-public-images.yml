@@ -8,12 +8,6 @@ on:
       - ".github/workflows/validate-public-images.yml"
       - "netlify/functions/product-image.mjs"
       - "scripts/public-image-url.mjs"
-  workflow_dispatch:
-    inputs:
-      preview_url:
-        description: "URL do Deploy Preview do projeto catalogoemporio"
-        required: true
-        type: string
 
 jobs:
   validate-images:
@@ -25,11 +19,24 @@ jobs:
           node-version: "22"
       - name: Testar regras locais de URL e proxy de imagens
         run: node --test scripts/public-image-url.test.mjs scripts/product-image-function.test.mjs
+      - name: Aguardar o Deploy Preview ficar disponível
+        env:
+          NETLIFY_PREVIEW_URL: ${{ format('https://deploy-preview-{0}--catalogoemporio.netlify.app', github.event.pull_request.number) }}
+        run: |
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error "$NETLIFY_PREVIEW_URL/" --output /dev/null; then
+              echo "Deploy Preview disponível: $NETLIFY_PREVIEW_URL"
+              exit 0
+            fi
+            echo "Prévia ainda indisponível (tentativa $attempt/12)."
+            sleep 15
+          done
+          echo "Deploy Preview não ficou disponível. Publique a prévia no Netlify e reexecute este job."
+          exit 1
       - name: Validar entrega de imagens do snapshot público na prévia
-        if: github.event_name == 'workflow_dispatch'
         run: node scripts/validate-public-images.mjs
         env:
-          NETLIFY_PREVIEW_URL: ${{ inputs.preview_url }}
+          NETLIFY_PREVIEW_URL: ${{ format('https://deploy-preview-{0}--catalogoemporio.netlify.app', github.event.pull_request.number) }}
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
