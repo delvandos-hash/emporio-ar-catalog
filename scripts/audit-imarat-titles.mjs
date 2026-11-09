@@ -39,8 +39,10 @@ function tokenSimilarity(a,b) {
   for(const token of left) if(right.has(token)) intersection++;
   return intersection/(left.size+right.size-intersection);
 }
-function titleKey(name, category) {
+function titleKey(name, category, brand) {
   let n=norm(name).replace(/\b\d+(?:[.,]\d+)?\s*(ml|g)\b/g," ").replace(/\s+/g," ").trim();
+  const b=norm(brand);
+  if(b && n.startsWith(b+" ")) n=n.slice(b.length).trim();
   if(norm(category).includes("mini")) {
     n=n.replace(/^(miniatura|mini)\s+/,"");
     n=n.replace(/\s+(afeer|only you|lattafa|armaf|meryam|orientica)$/,"");
@@ -95,23 +97,25 @@ for(const [line,groups] of Object.entries(DATA)) for(const group of groups||[]) 
     const name=String(item.nome||"").trim(); if(!name) continue;
     scanned++;
     const itemVol=volume(item.volume,name);
-    const key=titleKey(name,category);
+    const key=titleKey(name,category,group.brand);
     const scored=unique.filter(p=>{
       const sourceVol=volume(p.sizeMl,p.name);
       return !itemVol||!sourceVol||itemVol===sourceVol;
     }).map(p=>{
-      const sourceKey=titleKey(p.name,category);
+      const sourceKey=titleKey(p.name,category,p.brand);
       return {p,score:similarity(key,sourceKey),tokenScore:tokenSimilarity(key,sourceKey)};
     }).sort((a,b)=>b.score-a.score);
     const best=scored[0], second=scored[1];
     const exactHit=unique.find(p=>norm(p.name)===norm(name));
+    const exactAnyBrand=exactHit?null:api.find(p=>norm(p.name)===norm(name));
     const row={line,brand:group.brand||"",category,name,volume:itemVol||"—",
-      sourceTitle:exactHit?.name||best?.p?.name||"",
-      sourceBrand:exactHit?.brand||best?.p?.brand||"",
+      sourceTitle:exactHit?.name||best?.p?.name||exactAnyBrand?.name||"",
+      sourceBrand:exactHit?.brand||best?.p?.brand||exactAnyBrand?.brand||"",
       score:exactHit?1:Number((best?.score||0).toFixed(3)),
       tokenScore:exactHit?1:Number((best?.tokenScore||0).toFixed(3)),
       secondScore:Number((second?.score||0).toFixed(3)),
-      fonte:item.fonte||"não informada"};
+      fonte:item.fonte||"não informada",
+      exactNameOtherBrand:exactAnyBrand?String(exactAnyBrand.brand||"sem marca"):""};
     if(exactHit) exact.push(row);
     else if(best?.score>=0.86 && best?.tokenScore>=0.8 && (!second||best.score-second.score>=0.08)) likely.push(row);
     else if(best?.score>=0.68) ambiguous.push(row);
