@@ -900,7 +900,7 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
   if (expectedCategory) {
-    const titleMatch = html.match(/<h1\\b[^>]*>([\\s\\S]*?)<\\/h1>/i);
+    const titleMatch = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
     const actualTitle = titleMatch
       ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
       : '';
