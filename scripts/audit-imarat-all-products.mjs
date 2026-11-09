@@ -171,6 +171,14 @@ for(const [line,groups] of Object.entries(DATA)) {
     });
   }
 }
+const internalItemCount=[...internalIndex.values()].reduce((sum,items)=>sum+items.length,0);
+const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.name),volumeFrom(x.volume,x.name)].join("|")));
+const internalOnlyKeys=[...internalIndex.keys()].filter(key=>!liveKeySet.has(key));
+const liveOnlyKeys=[...liveKeySet].filter(key=>!internalIndex.has(key));
+console.log(`COMPARAÇÃO BASE INTERNA × GIST VIVO: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}`);
+for(const key of internalOnlyKeys.slice(0,30)) console.log("SÓ NO DATA.JS "+key);
+for(const key of liveOnlyKeys.slice(0,30)) console.log("SÓ NO GIST "+key);
+
 const {all:source,total,pages}=await fetchAllImarat();
 function volumeCompatible(left,right) {
   return left==="—" || right==="—" || !left || !right || left===right;
