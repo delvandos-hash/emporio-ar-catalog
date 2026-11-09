@@ -393,6 +393,8 @@ function miniIdentityKey(brand,name,volume) {
   return "mini|"+norm(brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volumeFrom(volume,name);
 }
 function apiDuplicateKey(p) {
+  const id=String(p.id||p.productId||p.slug||"").trim();
+  if(id) return "source-id|"+norm(p.brand||"outros")+"|"+id;
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
