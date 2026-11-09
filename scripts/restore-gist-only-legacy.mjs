@@ -72,22 +72,16 @@ async function main() {
   // que não retornaram em nenhuma das fontes atuais.
   const currentPublic = toPublicCatalog(DATA);
   const currentPublicIds = new Set();
-  const currentStockRefs = new Set();
   for (const groups of Object.values(currentPublic)) for (const group of groups || []) {
-    for (const item of group.items || []) {
-      if (item.public_id) currentPublicIds.add(item.public_id);
-      if (item.stock_ref) currentStockRefs.add(item.stock_ref);
-    }
+    for (const item of group.items || []) if (item.public_id) currentPublicIds.add(item.public_id);
   }
 
   const restored = [];
   for (const [line, groups] of Object.entries(liveDATA)) {
-    if (norm(line) !== "roupas") continue;
+    if (!["masculino", "feminino", "unissex", "roupas", "acessorios"].includes(norm(line))) continue;
     for (const group of Array.isArray(groups) ? groups : []) {
-      if (norm(group.brand) !== "emporio a r") continue;
       for (const item of Array.isArray(group.items) ? group.items : []) {
         if (item.public_id && currentPublicIds.has(item.public_id)) continue;
-        if (item.stock_ref && currentStockRefs.has(item.stock_ref)) continue;
 
         const cat = String(group.cat || "Roupas");
         if (!Array.isArray(DATA[line])) DATA[line] = [];
@@ -110,9 +104,7 @@ async function main() {
           ...(Array.isArray(item.variacoes) ? { variacoes: item.variacoes } : {}),
           disponivel: "Não",
           precoManual: true,
-          fonte: "legacy-gist",
-          ...(item.stock_ref ? { stock_ref: item.stock_ref } : {}),
-          ...(item.stock_route ? { stock_route: item.stock_route } : {})
+          fonte: "legacy-gist"
         };
         target.items.push(legacy);
         restored.push({ nome: legacy.nome, marca: group.brand, categoria: cat });
@@ -141,6 +133,7 @@ async function main() {
     console.log("GIST_PUBLIC_ID_AINDA_AUSENTE " + JSON.stringify(missing));
     throw new Error(`Restaram ${missing.length} public_id do Gist sem representação interna; nada foi salvo.`);
   }
+  if (restored.length > 50) throw new Error(`Restauração legada excedeu o limite seguro de 50 itens (${restored.length}); nada foi salvo.`);
 
   const out = "/** Empório A.R — recuperação aditiva de legado Gist " + new Date().toISOString() + " */\n" +
     "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
