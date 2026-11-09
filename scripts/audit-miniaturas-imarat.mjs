@@ -174,6 +174,14 @@ async function fetchImaratList() {
 }
 const imaratList = await fetchImaratList();
 console.log(`Produtos lidos da Imarat: ${imaratList.length}`);
+const afeersRoot = imaratList.filter(p => norm(p.brand).includes('afeer') && /(atherr|atheri)/.test(norm(p.name)));
+console.log('AFEER — TÍTULOS RELACIONADOS A ATHERRI NA ORIGEM: ' + JSON.stringify(afeersRoot.map(p => ({ name: p.name, brand: p.brand, volume: p.volume, slug: p.slug }))));
+const afeersCatalog = Object.entries(DATA).flatMap(([line, groups]) =>
+  (groups || []).filter(g => norm(g.cat).includes('miniatura') && norm(g.brand).includes('afeer'))
+    .flatMap(g => (g.items || []).filter(item => /(atherr|atheri)/.test(norm(item.nome)))
+      .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, fonte: item.fonte || null })))
+);
+console.log('AFEER — TÍTULOS RELACIONADOS A ATHERRI NO GIST: ' + JSON.stringify(afeersCatalog));
 
 function sourceMatch(item, group) {
   const name = norm(item?.nome);
