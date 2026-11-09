@@ -143,6 +143,10 @@ for(const p of source) {
 }
 const catalogDuplicateGroups=[...catalogByKey].filter(([,items])=>items.length>1);
 const apiDuplicateGroups=[...apiByKey].filter(([,items])=>items.length>1);
+const imaratKeys=new Set(apiByKey.keys());
+const imaratDuplicateGroups=catalogDuplicateGroups.filter(([key,items])=>
+  imaratKeys.has(key)||items.some(x=>x.source.toLowerCase()==="imarat"||x.originId)
+);
 // Simula, em memória, a ordem de importação da Imarat usando as mesmas chaves
 // e as mesmas atualizações de índice de sync-catalog.mjs. Não altera DATA/Gist.
 const normalIndex=new Set();
@@ -187,7 +191,6 @@ for(const p of source) {
 }
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
 console.log(`Produtos recebidos da API: ${source.length} | total informado: ${total||"não informado"} | páginas: ${pages}`);
-console.log(`Itens do catálogo cuja chave coincide com algum produto Imarat: ${linkedCatalog.length}`);
 console.log(`Grupos de colisão de chave no catálogo (2+ itens para chave Imarat): ${imaratDuplicateGroups.length}`);
 console.log(`Grupos duplicados na própria API Imarat: ${apiDuplicateGroups.length}`);
 
