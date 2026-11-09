@@ -324,6 +324,19 @@ console.log(`Itens com categoria diferente da categoria da origem: ${categoryMis
 console.log(`Grupos duplicados na própria API por identidade de produto: ${apiDuplicateGroups.length}`);
 
 console.log(`Simulação do sincronizador: ${simulatedNew.length} novos produtos únicos | ${blockedByCatalog.length} bloqueados pelo catálogo atual | ${blockedWithinImarat.length} bloqueados por repetição na própria lista Imarat`);
+
+const onlyYouProducts=source.filter(p=>norm(p.brand)==="only you");
+console.log(`VERIFICAÇÃO ESPECÍFICA ONLY YOU — origem: ${onlyYouProducts.length} produtos`);
+for(const p of onlyYouProducts) {
+  const identity=sourceIdentity(p);
+  const inCatalog=catalogBySourceIdentity.has(identity);
+  const volume=volumeFrom(p.sizeMl,p.name);
+  const inNew=simulatedNew.some(x=>norm(x.brand)==="only you"&&norm(x.name)===norm(p.name)&&x.volume===volume);
+  const inBlockedCatalog=blockedByCatalog.some(x=>norm(x.brand)==="only you"&&norm(x.name)===norm(p.name)&&x.volume===volume);
+  const inBlockedApi=blockedWithinImarat.some(x=>norm(x.brand)==="only you"&&norm(x.name)===norm(p.name)&&x.volume===volume);
+  const status=inCatalog?"PRESENTE NO CATÁLOGO":inNew?"SERÁ REIMPORTADO NA PRÓXIMA SINCRONIZAÇÃO":inBlockedCatalog?"BLOQUEADO POR COLISÃO COM ITEM DO CATÁLOGO":inBlockedApi?"REPETIDO NA PRÓPRIA API":"SEM CORRESPONDÊNCIA — REVISÃO NECESSÁRIA";
+  console.log("ONLY YOU "+JSON.stringify({id:p.id||p.productId||p.slug||"",nome:p.name,volume, categoria:p.categoria_nome||p.categoria||"",status}));
+}
 if(new Set(simulatedNew.map(x=>x.key)).size!==simulatedNew.length) throw new Error("Simulação detectou chave duplicada entre novos produtos: regra global falhou.");
 const imaratSourceCatalog=catalog.filter(x=>x.source.toLowerCase()==="imarat");
 const repeatedOriginIds=[...new Set(imaratSourceCatalog.filter(x=>x.originId).map(x=>x.originId))]
