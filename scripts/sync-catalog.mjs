@@ -1259,6 +1259,7 @@ async function main() {
   const relatorioImaratNomesRemovidos = [];
   const relatorioImaratNomesCorrigidos = [];
 
+  // Sincronização final pós-auditoria: a origem deve ser confirmada no item.
   // A categoria não comprova a origem: Perfumes, Miniaturas e Óleos podem
   // conter produtos de outros fornecedores. Só audita/exclui quando o próprio
   // registro traz fonte Imarat confirmada.
