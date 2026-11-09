@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
+import { normalProductKey, miniIdentityKey } from './catalog-identity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1293,26 +1294,19 @@ async function main() {
     }
   }
 
-  // Filtro de segurança (remove duplicatas exatas dentro do mesmo grupo)
-  for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
-        const vistos = new Set();
-        g.items = g.items.filter(item => {
-            const chave = limparParaComparacao(item.nome); 
-            if (vistos.has(chave)) return false;
-            vistos.add(chave);
-            return true;
-        });
-    }
-  }
+  // Não apagar registros existentes por nome aproximado ou por chave que descarte
+  // volume/marca/preço/fotos. A base homologada é preservada integralmente.
+  console.log('Deduplicação destrutiva desativada: registros existentes preservados para auditoria.');
 
   const indexNormal = new Set();
   const indexMiniImarat = new Set();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       for (const it of g.items) {
-        indexNormal.add(`${limparParaComparacao(it.nome)}|${norm(g.brand)}`);
-        if (isMiniatura(it.nome, it.volume, g.cat)) indexMiniImarat.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
+        indexNormal.add(normalProductKey(it.nome, it.volume));
+        if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
+          indexMiniImarat.add(miniIdentityKey(it, g.brand));
+        }
       }
     }
   }
@@ -1325,18 +1319,18 @@ async function main() {
       const categoria = p.categoria_nome || p.categoria || '';
       const ehOleo = isOleo(nome);
       const ehMini = isMiniatura(nome, volume, categoria) && !ehOleo;
-      let duplicado;
-      if (ehMini) {
-        const chave = chaveComparacaoMini(nome);
-        duplicado =
-          indexMiniImarat.has(chave) ||
-          indexMiniImarat.has(`${chave}|${norm(brand)}`) ||
-          indexMiniImarat.has(`${chave}|armaf`) ||
-          indexMiniImarat.has(`${chave}|outros`) ||
-          indexMiniImarat.has(`${chave}|outra`);
-      } else {
-        duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(brand)}`) || indexNormal.has(limparParaComparacao(nome));
-      }
+      const precoVarejoOrig = (p.priceCents || 0) / 100;
+      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
+      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+      const candidateImages = imaratImagesFrom(p, null);
+      const candidate = {
+        nome, volume, varejo: prices.varejo, atacado: prices.atacado,
+        foto: candidateImages[0] || '',
+        fotos: candidateImages,
+      };
+      const normalKey = normalProductKey(nome, volume);
+      const miniKey = miniIdentityKey(candidate, brand);
+      const duplicado = ehMini ? indexMiniImarat.has(miniKey) : indexNormal.has(normalKey);
       if (duplicado) continue;
 
       let notas = '';
@@ -1348,10 +1342,6 @@ async function main() {
       notas = sanitizarNotas(notas);
       const imgsNew = imaratImagesFrom(p, detail);
       const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : '');
-      
-      const precoVarejoOrig = (p.priceCents || 0) / 100; 
-      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
-      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       
       const line = genderLine(p.gender); 
       const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : ''); 
@@ -1370,12 +1360,8 @@ async function main() {
           fonte: 'imarat',
       }, true));
       
-      indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
-      if (ehMini) {
-        const chave = chaveComparacaoMini(nome);
-        indexMiniImarat.add(chave);
-        indexMiniImarat.add(`${chave}|${norm(brand)}`);
-      }
+      indexNormal.add(normalKey);
+      if (ehMini) indexMiniImarat.add(miniKey);
       addedImarat++;
     }
   }
