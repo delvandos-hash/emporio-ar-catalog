@@ -292,12 +292,12 @@ for(const p of source) {
     ? miniIndex.has(miniIdentity)
     : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
   if(duplicate) {
-    const entry={name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`};
+    const entry={name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${normalKey}`};
     const existedBefore=mini?initialMiniIndex.has(miniKey):initialNormalIndex.has(normalKey);
     (existedBefore?blockedByCatalog:blockedWithinImarat).push(entry);
     continue;
   }
-  simulatedNew.push({name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`});
+  simulatedNew.push({name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${normalKey}`});
   normalIndex.add(normalKey);
   normalIndex.add(`${normalKey}|${norm(brand)}`);
   if(mini) {
