@@ -56,8 +56,8 @@ function mergePublicFields(target, publicItem) {
   if (Array.isArray(publicItem.variacoes) && publicItem.variacoes.length) {
     target.variacoes = [...publicItem.variacoes];
   }
-  if (!target.stock_ref && publicItem.stock_ref) target.stock_ref = publicItem.stock_ref;
-  if (!target.stock_route && publicItem.stock_route) target.stock_route = publicItem.stock_route;
+  if (publicItem.stock_ref && target.stock_ref !== publicItem.stock_ref) target.stock_ref = publicItem.stock_ref;
+  if (publicItem.stock_route && target.stock_route !== publicItem.stock_route) target.stock_route = publicItem.stock_route;
   if (publicItem.public_id) target.public_id = publicItem.public_id;
 }
 function legacyFromPublic(item) {
