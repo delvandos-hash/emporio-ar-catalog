@@ -89,8 +89,14 @@ function publicPhotoFingerprint(item) {
   return JSON.stringify([...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort());
 }
 
+function looseIdentity(line, group, item) {
+  const name = String(item?.nome || "").replace(/\d+(?:[.,]\d+)?\s*(?:ml|g)\b/gi, " ");
+  return [norm(line), norm(group?.brand), norm(name)].join("|");
+}
+
 function rekeyLiveVariants(liveDATA, internalPublic) {
   const byBase = new Map();
+  const byLooseIdentity = new Map();
   const byOriginRef = new Map();
   const byPublicId = new Map();
   const byStockRef = new Map();
@@ -99,6 +105,9 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
       const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
       if(!byBase.has(key)) byBase.set(key,[]);
       byBase.get(key).push(item);
+      const looseKey=looseIdentity(line,group,item);
+      if(!byLooseIdentity.has(looseKey))byLooseIdentity.set(looseKey,[]);
+      byLooseIdentity.get(looseKey).push(item);
       const publicId=String(item.public_id||"").trim();
       if(publicId){if(!byPublicId.has(publicId))byPublicId.set(publicId,[]);byPublicId.get(publicId).push(item);}
       const stockRef=String(item.stock_ref||"").trim();
@@ -119,6 +128,9 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
       const byOrigin=String(item.origin_ref||"").trim()?((byOriginRef.get(String(item.origin_ref).trim())||[]).filter(candidate=>!used.has(candidate.public_id))):[];
       const photoFingerprint=publicPhotoFingerprint(item);
       const byPhoto=photoFingerprint!=="[]"?candidates.filter(candidate=>publicPhotoFingerprint(candidate)===photoFingerprint):[];
+      const looseKey=looseIdentity(line,group,item);
+      const byLoose=(byLooseIdentity.get(looseKey)||[]).filter(candidate=>!used.has(candidate.public_id));
+      const byLoosePhoto=photoFingerprint!=="[]"?byLoose.filter(candidate=>publicPhotoFingerprint(candidate)===photoFingerprint):[];
       const byExactContent=candidates.filter(candidate=>publicFingerprint(candidate)===fp);
       const match=byGlobalId.length===1?byGlobalId[0]
         :byStock.length===1?byStock[0]
@@ -126,8 +138,10 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
         :byOrigin.length===1?byOrigin[0]
         :byPhoto.length===1?byPhoto[0]
         :byExactContent.length===1?byExactContent[0]
-        :candidates.length===1?candidates[0]:null;
-      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,public_id_global:byGlobalId.length,stock_ref_global:byStock.length,candidatas:candidates.length,origin_ref:byOrigin.length,fotosCompativeis:byPhoto.length,conteudoExato:byExactContent.length}));continue;}
+        :candidates.length===1?candidates[0]
+        :byLoosePhoto.length===1?byLoosePhoto[0]
+        :byLoose.length===1?byLoose[0]:null;
+      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,public_id_global:byGlobalId.length,stock_ref_global:byStock.length,candidatas:candidates.length,origin_ref:byOrigin.length,fotosCompativeis:byPhoto.length,identidadeFlexivel:byLoose.length,fotoFlexivel:byLoosePhoto.length,conteudoExato:byExactContent.length}));continue;}
       used.add(match.public_id);
       if(item.public_id!==match.public_id){item.public_id=match.public_id;rekeyed++;}
     }
