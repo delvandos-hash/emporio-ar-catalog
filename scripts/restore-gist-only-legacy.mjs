@@ -232,6 +232,6 @@ async function main() {
   fs.writeFileSync(dataPath, out, "utf8");
   console.log(`LEGACY_GIST_RESTORED=${restored} LEGACY_GIST_MERGED=${merged}`);
   console.log("LEGACY_GIST_PRESERVATION_SCOPE=all-lines-all-brands-all-categories");
-  console.log("Todos os itens públicos Empório A.R de roupas e acessórios permanecem representados no data.js.");
+  console.log("Todos os itens públicos de todas as linhas, marcas e categorias permanecem representados no data.js.");
 }
 main().catch(error => { console.error(error); process.exit(1); });
