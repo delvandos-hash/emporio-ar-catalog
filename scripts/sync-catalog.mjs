@@ -28,6 +28,7 @@ const BRAND_ALLOWED_SESSIONS = [
 
 const SYNC_DRY_RUN = process.env.SYNC_DRY_RUN === '1';
 const SYNC_SKIP_DETAILS = process.env.SYNC_SKIP_DETAILS === '1';
+const SYNC_IMARAT_ONLY = process.env.SYNC_IMARAT_ONLY === '1';
 const SYNC_DANDE_ONLY = process.env.SYNC_DANDE_ONLY === '1';
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
@@ -1488,7 +1489,7 @@ async function main() {
   }
 
   console.log('Buscando Brand Collection...');
-  const brandList = await fetchBrandList();
+  const brandList = SYNC_IMARAT_ONLY ? [] : await fetchBrandList();
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
 
