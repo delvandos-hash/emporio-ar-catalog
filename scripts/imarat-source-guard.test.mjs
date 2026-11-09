@@ -49,3 +49,11 @@ test("corrige somente os dois títulos especiais com marca e volume compatíveis
 test("normaliza o prefixo Óleo somente na comparação de títulos da categoria Óleos", () => {
   assert.match(source, /if \(norm\(category\)\.includes\('oleo'\)\) value = value\.replace\(\/\^oleo\\s\+\//);
 });
+
+test("corrige os dois títulos de óleo somente com marca Ard Al Zaafaran e volume 20ml", () => {
+  assert.match(source, /b === 'ard al zaafaran' && n === 'oleo durrat al aroos'/);
+  assert.match(source, /norm\(p\.name\) === 'durrat al aroos' && norm\(p\.brand\) === 'ard al zaafaran'/);
+  assert.match(source, /b === 'ard al zaafaran' && n === 'oleo shagaf al ward'/);
+  assert.match(source, /norm\(p\.name\) === 'shagaf al ward' && norm\(p\.brand\) === 'ard al zaafaran'/);
+  assert.match(source, /volumeMatch\(it\.volume, it\.nome\) === '20ml'/);
+});
