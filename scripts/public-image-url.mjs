@@ -1,5 +1,5 @@
 const PROXY_ORIGIN = "https://catalogo-interno.invalid";
-const IMAGE_SOURCES = new Set(["a", "b", "p", "d"]);
+const IMAGE_SOURCES = new Set(["a", "b", "p", "d", "c"]);
 
 function safeBase(value) {
   if (!value) return null;
@@ -30,14 +30,12 @@ export function sanitizePublicImageUrl(value, options = {}) {
   const secondary = safeBase(options.cdnFallbackBase ?? process.env.CDN_IMAGE_FALLBACK_BASE_URL ?? "");
   const product = safeBase(options.productBase ?? process.env.IMARAT_ORIGIN_URL ?? "");
   const dande = safeBase(options.dandeBase ?? process.env.DANDE_BASE_URL ?? "");
+  const dandeCdn = safeBase(options.dandeCdnBase ?? process.env.DANDE_CDN_BASE_URL ?? "");
   try {
     const raw = value.trim();
     const existing = new URL(raw, PROXY_ORIGIN);
     if (existing.origin === PROXY_ORIGIN && existing.pathname === "/api/product-image") {
       const path = normalizePublicImagePath(existing.searchParams.get("path") || "");
-      // Compatibilidade com o formato anterior do Preview #5/#4:
-      // naquela versão, somente imagens da Imarat passavam pelo proxy
-      // e a rota não carregava o parâmetro "source".
       const requestedSource = existing.searchParams.get("source") || "";
       const source = requestedSource || (path.startsWith("/uploads/products/") ? "p" : "");
       if (!IMAGE_SOURCES.has(source) || !path || (source === "p" && !path.startsWith("/uploads/products/"))) return "";
@@ -49,7 +47,7 @@ export function sanitizePublicImageUrl(value, options = {}) {
     else if (primary) url = new URL(raw, primary);
     else return "";
     if (url.protocol !== "https:" || url.username || url.password || url.hash) return "";
-    for (const [source, base] of [["p", product], ["d", dande], ["a", primary], ["b", secondary]]) {
+    for (const [source, base] of [["p", product], ["d", dande], ["c", dandeCdn], ["a", primary], ["b", secondary]]) {
       if (!base || url.origin !== base.origin) continue;
       const path = normalizePublicImagePath(url.pathname);
       if (!path || (source === "p" && !path.startsWith("/uploads/products/"))) return "";
