@@ -50,6 +50,10 @@ jobs:
           node --check scripts/catalog-identity.mjs
           node --check js/app.js
           node --test scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs scripts/catalog-identity.test.mjs scripts/public-catalog.test.mjs
+      - name: Restaurar Gist legado antes do sincronizador (append-only)
+        run: node scripts/restore-gist-only-legacy.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Gerar snapshot interno e atualizar somente Imarat
         run: node scripts/sync-catalog.mjs
         env:
