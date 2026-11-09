@@ -77,6 +77,11 @@ function publicFingerprint(item) {
   });
 }
 
+function publicPhotoFingerprint(item) {
+  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
+  return JSON.stringify([...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort());
+}
+
 function collectKeys(DATA) {
   const keys = new Set();
   for (const [line, groups] of Object.entries(DATA || {})) {
@@ -167,15 +172,19 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
         const byExistingId = item.public_id
           ? candidates.filter(row => row.publicItem.public_id === item.public_id)
           : [];
+        const photoFingerprint = publicPhotoFingerprint(item);
+        const byPhoto = photoFingerprint !== "[]" ? candidates.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
         const byExactContent = candidates.filter(row => publicFingerprint(row.publicItem) === fingerprint);
         const match = byExistingId.length === 1
           ? byExistingId[0]
-          : candidates.length === 1
-            ? candidates[0]
+          : byPhoto.length === 1
+            ? byPhoto[0]
             : byExactContent.length === 1
               ? byExactContent[0]
-              : null;
-        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (candidatas=${candidates.length}, conteúdoExato=${byExactContent.length})`);
+              : candidates.length === 1
+                ? candidates[0]
+                : null;
+        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (candidatas=${candidates.length}, fotosCompatíveis=${byPhoto.length}, conteúdoExato=${byExactContent.length})`);
         used.add(match.publicItem.public_id);
         if (item.public_id !== match.publicItem.public_id) {
           item.public_id = match.publicItem.public_id;
