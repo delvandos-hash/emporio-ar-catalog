@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("./sync-catalog.mjs", import.meta.url), "utf8");
+const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
 
 test("limpeza de títulos só pode excluir produto com procedência Imarat explícita", () => {
   assert.match(source, /const fonteImarat = norm\(item\.fonte\) === 'imarat';/);
@@ -50,10 +51,7 @@ test("normaliza o prefixo Óleo somente na comparação de títulos da categoria
   assert.match(source, /if \(norm\(category\)\.includes\('oleo'\)\) value = value\.replace\(\/\^oleo\\s\+\//);
 });
 
-test("corrige os dois títulos de óleo somente com marca Ard Al Zaafaran e volume 20ml", () => {
-  assert.match(source, /b === 'ard al zaafaran' && n === 'oleo durrat al aroos'/);
-  assert.match(source, /norm\(p\.name\) === 'durrat al aroos' && norm\(p\.brand\) === 'ard al zaafaran'/);
-  assert.match(source, /b === 'ard al zaafaran' && n === 'oleo shagaf al ward'/);
-  assert.match(source, /norm\(p\.name\) === 'shagaf al ward' && norm\(p\.brand\) === 'ard al zaafaran'/);
-  assert.match(source, /volumeMatch\(it\.volume, it\.nome\) === '20ml'/);
+test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompatível", () => {
+  assert.match(auditSource, /if \(raw && \^\\d\+\(\?:\[.,\]\\d\+\)\?\$\/.test\(raw\)\) raw \+= "ml"/);
+  assert.match(source, /itemVolume === sourceVolume/);
 });
