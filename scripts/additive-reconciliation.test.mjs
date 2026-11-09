@@ -82,7 +82,7 @@ test("variantes com mesmo nome são reidentificadas por foto sem depender de pre
   assert.match(apply, /publicPhotoFingerprint/);
   assert.match(apply, /byPhoto\.length === 1/);
   assert.match(apply, /fotosCompatíveis/);
-  assert.match(sync, /photos\(item\) !== ""/);
+  assert.match(sync, /publicPhotoFingerprint\(item\)/);
   assert.doesNotMatch(sync, /publicPriceNumber\(item\?\.varejo\)[\s\S]*?publicPriceNumber\(publicItem\?\.atacado\)/);
 });
 
