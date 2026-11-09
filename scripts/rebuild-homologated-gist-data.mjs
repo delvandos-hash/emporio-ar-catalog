@@ -24,7 +24,7 @@ const report = {
   productsWithPhoto: products.filter(p => p.foto || (p.fotos || []).length).length,
   productsWithoutPhoto: products.filter(p => !p.foto && !(p.fotos || []).length).length,
   photoUrlCount: photos.length,
-  invalidPhotoUrlCount: photos.filter(u => !/^\\/api\\/product-image\\?source=[abp]&path=/.test(u)).length,
+  invalidPhotoUrlCount: photos.filter(u => !(u.startsWith("/api/product-image?source=a&path=") || u.startsWith("/api/product-image?source=b&path=") || u.startsWith("/api/product-image?source=p&path="))).length,
   metadata: { WHATSAPP: payload.WHATSAPP, BRAND: payload.BRAND, ultimaAtualizacao: payload.ultimaAtualizacao },
   imageOptions
 };
