@@ -16,6 +16,18 @@ const IMARAT_API = process.env.IMARAT_API_URL;
 const IMARAT_ORIGIN = process.env.IMARAT_ORIGIN_URL;
 const BRAND_BASE = process.env.BRAND_BASE_URL;
 const CDN_IMAGE_BASE = process.env.CDN_IMAGE_BASE_URL;
+
+function resolveImaratImageUrl(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  if (/^https:\/\//i.test(raw)) return raw;
+  if (!IMARAT_ORIGIN) return '';
+  try {
+    const base = IMARAT_ORIGIN.endsWith('/') ? IMARAT_ORIGIN : IMARAT_ORIGIN + '/';
+    return new URL(raw, base).toString();
+  } catch { return ''; }
+}
 const BRAND_SELLER = 'darlanaugusto';
 
 const BRAND_ALLOWED_SESSIONS = [
@@ -282,7 +294,7 @@ function imaratImagesFrom(p, detail) {
     if (!u) return;
     let s = String(u.url || u.src || u || '').trim();
     if (!s) return;
-    if (!s.startsWith('http')) s = IMARAT_ORIGIN + (s.startsWith('/') ? s : '/' + s);
+    if (!s.startsWith('http')) s = resolveImaratImageUrl(s);
     if (!out.includes(s)) out.push(s);
   };
   if (detail && Array.isArray(detail.images)) detail.images.forEach(push);
@@ -1258,14 +1270,14 @@ async function main() {
       }
       notas = sanitizarNotas(notas);
       const imgsNew = imaratImagesFrom(p, detail);
-      const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : '');
+      const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image)) : '');
       
       const precoVarejoOrig = (p.priceCents || 0) / 100; 
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       
       const line = genderLine(p.gender); 
-      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : ''); 
+      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image)) : ''); 
       const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
       
       const group = ensureBrandGroup(DATA, line, brand, cat);
