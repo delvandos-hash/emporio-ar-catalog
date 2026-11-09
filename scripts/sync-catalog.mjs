@@ -1678,7 +1678,7 @@ async function main() {
   const indexNormal = new Set();
   const indexNameVolume = new Set();
   const indexMiniByBase = new Map();
-  const indexMiniNameVolume = new Set();
+  const indexMiniNameVolume = new Map();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
       for (const it of g.items || []) {
@@ -1690,7 +1690,9 @@ async function main() {
           const baseKey = miniIdentityBaseKey(it, g.brand);
           if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
           indexMiniByBase.get(baseKey).push({ id_origem: it.id_origem ?? "" });
-          indexMiniNameVolume.add(miniIdentityNameVolumeKey(it));
+          const nameVolumeKey = miniIdentityNameVolumeKey(it);
+          if (!indexMiniNameVolume.has(nameVolumeKey)) indexMiniNameVolume.set(nameVolumeKey, []);
+          indexMiniNameVolume.get(nameVolumeKey).push({ id_origem: it.id_origem ?? "" });
         }
       }
     }
@@ -1720,10 +1722,11 @@ async function main() {
         };
         const miniBaseKey = miniIdentityBaseKey(candidate, brand);
         const existing = indexMiniByBase.get(miniBaseKey);
-        if (!marcaConhecida && indexMiniNameVolume.has(miniIdentityNameVolumeKey(candidate))) {
-          // Marca ausente: não atribuir o produto a "Outros" se já há identidade
-          // exata no catálogo sob uma marca conhecida.
-          duplicado = true;
+        const nameVolumeCandidates = indexMiniNameVolume.get(miniIdentityNameVolumeKey(candidate)) || [];
+        if (!marcaConhecida && nameVolumeCandidates.length) {
+          // Marca ausente: compara ID de origem com qualquer marca já cadastrada;
+          // só usa nome/volume como fallback quando algum registro é legado sem ID.
+          duplicado = isDuplicateMiniSource(nameVolumeCandidates, p.id ?? p.productId ?? "");
         } else if (existing) {
           // ID de origem é a identidade primária. Se IDs forem diferentes, mantém
           // os dois registros; se faltar ID, usa marca + nome-base + volume.
@@ -1782,7 +1785,9 @@ async function main() {
         const baseKey = miniIdentityBaseKey(actualMini, brand);
         if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
         indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
-        indexMiniNameVolume.add(miniIdentityNameVolumeKey(actualMini));
+        const nameVolumeKey = miniIdentityNameVolumeKey(actualMini);
+        if (!indexMiniNameVolume.has(nameVolumeKey)) indexMiniNameVolume.set(nameVolumeKey, []);
+        indexMiniNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
       }
       addedImarat++;
     }
