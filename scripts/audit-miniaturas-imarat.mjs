@@ -63,6 +63,13 @@ function volumeOf(item) {
   const match = String(item?.nome || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
   return match ? norm(match[1].replace(",", ".") + match[2]) : "sem-volume";
 }
+function volumeFrom(value, name) {
+  let raw = String(value || "").trim();
+  if (raw && /^\d+(?:[.,]\d+)?$/.test(raw)) raw += "ml";
+  const match = raw.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i)
+    || String(name || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  return match ? norm(match[1].replace(",", ".") + match[2]) : "";
+}
 function isOleo(name) {
   const n = norm(name);
   return n.startsWith("oleo") || n.includes(" oleo ");
@@ -70,6 +77,7 @@ function isOleo(name) {
 function isMini(item, group) {
   const name = norm(item?.nome);
   const category = norm(group?.cat);
+  if (isOleo(item?.nome)) return false;
   const volume = volumeOf(item);
   const ml = Number.parseFloat(volume);
   return name.includes("mini ") || name.includes("miniatura") || name.includes("mini-")
@@ -177,7 +185,12 @@ console.log(`Produtos lidos da Imarat: ${imaratList.length}`);
 
 function sourceMatch(item, group) {
   const name = norm(item?.nome);
-  const matches = imaratList.filter(p => norm(p.name) === name);
+  const itemVolume = volumeOf(item);
+  const matches = imaratList.filter(p => {
+    if (norm(p.name) !== name) return false;
+    const sourceVolume = volumeFrom(p.sizeMl, p.name);
+    return !itemVolume || itemVolume === "sem-volume" || !sourceVolume || itemVolume === sourceVolume;
+  });
   if (!matches.length) return null;
   const brand = norm(group?.brand);
   const strict = matches.find(p => {
@@ -214,7 +227,8 @@ for (const [line, groups] of Object.entries(DATA)) {
         const retailOriginal = Number(source.priceCents || 0) / 100;
         const wholesaleOriginal = source.atacado?.precoCents != null
           ? Number(source.atacado.precoCents) / 100 : Math.max(retailOriginal - 30, 0);
-        expected = automaticMiniPrice(item.nome, group.brand, volumeOf(item), group.cat, retailOriginal, wholesaleOriginal);
+        const sourceCategory = String(source.categoria_nome || source.categoria || group.cat || "");
+        expected = automaticMiniPrice(item.nome, group.brand, volumeOf(item), sourceCategory, retailOriginal, wholesaleOriginal);
         if (internal?.precoManual === true || internal?.precoManual === "true" || internal?.precoManual === 1) {
           manualPriceProtected++;
         } else if (String(item.varejo) !== expected.varejo || String(item.atacado) !== expected.atacado) {
@@ -224,7 +238,10 @@ for (const [line, groups] of Object.entries(DATA)) {
             volume: volumeOf(item), currentRetail: item.varejo ?? "não informado",
             currentWholesale: item.atacado ?? "não informado",
             expectedRetail: expected.varejo, expectedWholesale: expected.atacado,
+            sourceName: source.name || "",
             sourceBrand: source.brand || "marca não informada",
+            sourceCategory: source.categoria_nome || source.categoria || "categoria não informada",
+            sourceVolume: volumeFrom(source.sizeMl, source.name) || "sem volume na origem",
             precoManual: internal?.precoManual ?? "não localizado no data.js",
           });
         }
@@ -235,7 +252,11 @@ for (const [line, groups] of Object.entries(DATA)) {
         name: String(item.nome || ""), volume: volumeOf(item),
         varejo: item.varejo ?? "não informado",
         atacado: item.atacado ?? "não informado",
+        sourceMatched: Boolean(source),
+        sourceName: source?.name || "",
         sourceBrand: source ? (source.brand || "marca não informada") : "sem correspondência",
+        sourceCategory: source ? (source.categoria_nome || source.categoria || "não informada") : "",
+        sourceVolume: source ? (volumeFrom(source.sizeMl, source.name) || "sem volume na origem") : "",
         precoManual: internal?.precoManual ?? "não localizado no data.js",
         fonteInterna: internal?.fonte ?? "não localizada",
         idOrigemInterno: internal?.id_origem ?? "não localizado",
@@ -253,9 +274,15 @@ for (const record of records) {
   buckets.get(record.key).push(record);
 }
 const duplicates = [...buckets.entries()].filter(([, items]) => items.length > 1);
-const priceConflicts = duplicates.filter(([, items]) =>
+const confirmedDuplicates = duplicates.filter(([, items]) => items.filter(x => x.sourceMatched).length > 1);
+const crossSourceCollisions = duplicates.filter(([, items]) => items.filter(x => x.sourceMatched).length === 1);
+const priceConflicts = confirmedDuplicates.filter(([, items]) =>
   new Set(items.map(x => String(x.varejo) + "|" + String(x.atacado))).size > 1
 );
+const collisionPriceConflicts = crossSourceCollisions.filter(([, items]) =>
+  new Set(items.map(x => String(x.varejo) + "|" + String(x.atacado))).size > 1
+);
+const categoryMismatches = records.filter(x => x.sourceMatched && norm(x.category) !== norm(x.sourceCategory));
 console.log("AUDITORIA SOMENTE LEITURA — MINIATURAS DO CATÁLOGO");
 console.log(`Miniaturas analisadas: ${records.length}`);
 console.log(`Registros com correspondência na Imarat: ${sourceMatches}`);
@@ -267,16 +294,19 @@ for (const [id, items] of duplicateOriginIds) {
   for (const item of items) console.log(JSON.stringify(item));
 }
 console.log(`Registros diferentes da fórmula automática: ${automaticPriceDifferences} (podem incluir precoManual)`);
-console.log(`Grupos com possível duplicidade (nome normalizado + volume): ${duplicates.length}`);
-console.log(`Grupos com preços varejo/atacado diferentes: ${priceConflicts.length}`);
+console.log(`Grupos com possível duplicidade confirmada por correspondência Imarat: ${confirmedDuplicates.length}`);
+console.log(`Colisões de nome/volume com apenas um item confirmado na Imarat: ${crossSourceCollisions.length}`);
+console.log(`Grupos confirmados com preços varejo/atacado diferentes: ${priceConflicts.length}`);
+console.log(`Colisões entre origens com preços diferentes (não são duplicatas confirmadas): ${collisionPriceConflicts.length}`);
+console.log(`Itens miniatura cuja categoria diverge da categoria da origem: ${categoryMismatches.length}`);
 console.log("Nenhum preço foi recalculado. Nenhum produto foi removido. Nenhuma gravação foi feita no Gist.");
 if (priceRuleDifferences.length) {
   console.log("DIVERGÊNCIAS DA FÓRMULA AUTOMÁTICA (conferir precoManual antes de qualquer ajuste):");
   for (const item of priceRuleDifferences) console.log(JSON.stringify(item));
 }
-for (const [key, items] of duplicates) {
+for (const [key, items] of confirmedDuplicates) {
   console.log("");
-  console.log("POSSÍVEL DUPLICIDADE: " + key);
+  console.log("POSSÍVEL DUPLICIDADE CONFIRMADA: " + key);
   for (const item of items) {
     console.log(JSON.stringify({
       linha: item.line, marca: item.brand, categoria: item.category,
@@ -288,4 +318,19 @@ for (const [key, items] of duplicates) {
     }));
   }
 }
-if (duplicates.length === 0) console.log("Nenhuma possível duplicidade encontrada com a chave conservadora.");
+for (const item of categoryMismatches) console.log("CATEGORIA DIVERGENTE " + JSON.stringify({
+  linha: item.line, marca: item.brand, nome: item.name, volume: item.volume,
+  categoriaCatalogo: item.category, categoriaOrigem: item.sourceCategory,
+  nomeOrigem: item.sourceName, marcaOrigem: item.sourceBrand, volumeOrigem: item.sourceVolume
+}));
+for (const [key, items] of crossSourceCollisions) {
+  console.log("");
+  console.log("COLISÃO DE NOME/VOLUME — NÃO CONFIRMADA COMO DUPLICATA: " + key);
+  for (const item of items) console.log(JSON.stringify({
+    linha: item.line, marca: item.brand, categoria: item.category, nome: item.name,
+    volume: item.volume, varejo: item.varejo, atacado: item.atacado,
+    correspondenciaImarat: item.sourceMatched, marcaOrigem: item.sourceBrand,
+    categoriaOrigem: item.sourceCategory
+  }));
+}
+if (confirmedDuplicates.length === 0) console.log("Nenhuma duplicidade confirmada pela correspondência com a Imarat.");
