@@ -69,10 +69,12 @@ function isMiniatura(nome,volume,categoria) {
   }
   return false;
 }
-function syncKey(nome,volume,categoria) {
+function syncKey(nome,volume,categoria,brand) {
   const mini=isMiniatura(nome,volume,categoria)&&!isOleo(nome);
-  const base=mini?chaveComparacaoMini(nome):limparParaComparacao(nome);
-  return (mini?"mini|":"normal|")+base;
+  const base=mini
+    ? `mini|${norm(brand||"outros")}|${chaveComparacaoMini(nome)}|${volumeMatch(volume,nome)}`
+    : `normal|${limparParaComparacao(nome)}|${volumeMatch(volume,nome)}`;
+  return base;
 }
 function parseInternalData() {
   const source=readFileSync(new URL("../js/data.js",import.meta.url),"utf8");
@@ -136,9 +138,9 @@ const checks=[
   [limparParaComparacao("Perfume Exemplo 100ml"),"perfume exemplo","normalização convencional"],
   [chaveComparacaoMini("Miniatura Lattafa Yara Candy 30ml"),"yara candy","chave miniatura com prefixo/marca"],
   [chaveComparacaoMini("Mini Yara Candy Only You 30ml"),"yara candy","chave miniatura com marca sufixada"],
-  [syncKey("Óleo Karseell Cabelo","50ml","Óleos"),"normal|oleo karseell cabelo","óleo não deve entrar na chave de miniatura"],
-  [syncKey("Perfume Alfa","100ml","Perfumes"),"normal|perfume alfa","produto convencional"],
-  [syncKey("Miniatura Alfa","30ml","Miniaturas"),"mini|alfa","produto miniatura"],
+  [syncKey("Óleo Karseell Cabelo","50ml","Óleos","Karseell"),"normal|oleo karseell cabelo|50ml","óleo não deve entrar na chave de miniatura"],
+  [syncKey("Perfume Alfa","100ml","Perfumes","Marca A"),"normal|perfume alfa|100ml","produto convencional"],
+  [syncKey("Miniatura Alfa","30ml","Miniaturas","Lattafa"),"mini|lattafa|alfa|30ml","produto miniatura"],
 ];
 for(const [actual,expected,label] of checks) {
   if(actual!==expected) throw new Error(`Falha no teste ${label}: esperado "${expected}", recebido "${actual}"`);
@@ -174,7 +176,7 @@ for(const [line,groups] of Object.entries(DATA)) {
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
       source:"",originId:"",manual:internal?.precoManual??false,
-      key:syncKey(name,volume,group.cat),item
+      key:syncKey(name,volume,group.cat,group.brand),item
     });
   }
 }
