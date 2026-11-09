@@ -187,7 +187,7 @@ console.log('ARABIYAT PRESTIGE — TÍTULOS NOIRE/PRESTIGE NA ORIGEM: ' + JSON.s
 const arabiyatCatalog = Object.entries(DATA).flatMap(([line, groups]) =>
   (groups || []).filter(g => /(arabiyat|prestige)/.test(norm(g.brand)))
     .flatMap(g => (g.items || []).filter(item => /(noire|prestige)/.test(norm(item.nome)))
-      .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, fonte: item.fonte || null })))
+      .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, volume: item.volume || null, retail: item.varejo ?? null, wholesale: item.atacado ?? null, fonte: item.fonte || null, id: item.id || null, id_origem: item.id_origem || null })))
 );
 console.log('ARABIYAT PRESTIGE — TÍTULOS NOIRE/PRESTIGE NO GIST: ' + JSON.stringify(arabiyatCatalog));
 
