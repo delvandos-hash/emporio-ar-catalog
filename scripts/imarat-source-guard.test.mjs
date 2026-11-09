@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("./sync-catalog.mjs", import.meta.url), "utf8");
+const auditMiniSource = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
+const auditAllSource = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
 
 test("limpeza de títulos só pode excluir produto com procedência Imarat explícita", () => {
@@ -55,4 +57,22 @@ test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompa
   assert.ok(auditSource.includes('raw += "ml";'));
   assert.ok(auditSource.includes('const explicit = raw.match'));
   assert.match(source, /itemVolume === sourceVolume/);
+});
+
+test("auditoria de miniaturas usa volume e categoria retornados pela Imarat", () => {
+  assert.match(auditMiniSource, /function volumeFrom\(value, name\)/);
+  assert.match(auditMiniSource, /const sourceCategory = String\(source\.categoria_nome \|\| source\.categoria \|\| ""\)/);
+  assert.match(auditMiniSource, /automaticMiniPrice\(item\.nome, group\.brand, volumeOf\(item\), sourceCategory/);
+  assert.match(auditMiniSource, /if \(isOleo\(item\?\.nome\)\) return false/);
+});
+
+test("auditoria global só confirma duplicidade após correspondência segura de marca e volume", () => {
+  assert.match(auditAllSource, /async function fetchLiveCatalog\(\)/);
+  assert.match(auditAllSource, /const GIST_TOKEN = process\.env\.GIST_TOKEN/);
+  assert.match(auditAllSource, /function sourceBrandMatches\(catalogBrand,sourceBrand\)/);
+  assert.match(auditAllSource, /function volumeCompatible\(left,right\)/);
+  assert.match(auditAllSource, /const confirmedNormalDuplicates=\[\.\.\.catalogBySourceIdentity\]/);
+  assert.match(auditAllSource, /const confirmedMiniDuplicates=\[\.\.\.miniGlobalGroups\]/);
+  assert.match(auditAllSource, /Boolean\(sourceCategory\) && norm\(x\.category\)!==norm\(sourceCategory\)/);
+  assert.match(auditAllSource, /COLISÃO DE NOME\/CHAVE SEM DUPLICIDADE CONFIRMADA/);
 });
