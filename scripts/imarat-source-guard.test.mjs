@@ -96,11 +96,11 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
 });
 
 
-test("bloqueia publicação quando a base interna diverge do Gist vivo", () => {
+test("baseline de publicação compara IDs públicos estáveis e bloqueia qualquer ID vivo ausente", () => {
   assert.match(source, /async function fetchLiveGistBaseline\(\)/);
-  assert.match(source, /function countCatalogIdentity\(DATA\)/);
-  assert.match(source, /if \(!SYNC_DRY_RUN && \(onlyLive > 25 \|\| onlyInternal > 25/);
-  assert.match(source, /SINCRONIZAÇÃO BLOQUEADA: data\.js interno diverge do Gist vivo/);
+  assert.match(source, /function countCatalogPublicIds\(DATA\)/);
+  assert.match(source, /if \(!SYNC_DRY_RUN && \(onlyLive > 0 \|\| onlyInternal > 80/);
+  assert.match(source, /IDs públicos do Gist sem representação interna/);
 });
 
 test("restauração Only You é append-only, respeita preço manual e valida antes de gravar", () => {
