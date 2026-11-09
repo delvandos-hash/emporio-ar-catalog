@@ -19,9 +19,8 @@ on:
       - ".github/workflows/audit-miniaturas-imarat.yml"
   workflow_dispatch:
   workflow_run:
-    workflows: ["Sync catálogo (estoque + novos produtos)"]
+    workflows: ["sync-stock.yml"]
     types: [completed]
-    branches: [main]
 
 permissions:
   contents: read
