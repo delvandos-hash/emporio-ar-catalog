@@ -26,6 +26,8 @@ const BRAND_ALLOWED_SESSIONS = [
   'FLACONETE  BRAND', 'SAPATINHO GOOD GIRL',
 ];
 
+const SYNC_DRY_RUN = process.env.SYNC_DRY_RUN === '1';
+const SYNC_DANDE_ONLY = process.env.SYNC_DANDE_ONLY === '1';
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
 const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura armaf', 'miniatura', 'mini'];
@@ -818,6 +820,7 @@ function dandePathOnly(value) {
   catch { return ''; }
 }
 
+const DANDE_SCRAPE_COUNTS = new Map();
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -826,11 +829,11 @@ const DANDE_CATEGORIES = [
   { path: '/colares/', nome: 'Colares' },
   { path: '/conjuntos/', nome: 'Conjuntos' },
   { path: '/lancamentos/', nome: 'Lançamentos' },
-  { path: '/masculinos/', nome: 'Masculinos' },
+  { path: '/masculino/', nome: 'Masculinos' },
   { path: '/prata-925/', nome: 'Prata 925' },
   { path: '/pulseiras/', nome: 'Pulseiras' },
   { path: '/semijoia-italiana/', nome: 'Semijoia Italiana' },
-  { path: '/tornozeleiras/', nome: 'Tornozeleiras' },
+  { path: '/tornozeleiras1/', nome: 'Tornozeleiras' },
 ];
 
 function calcPrecosAcessorios(precoBase) {
@@ -863,7 +866,29 @@ function upgradeDandeImg(u) {
   return s;
 }
 
-async function fetchDandeCategoryPage(path, page = 1) {
+function mergeDandeImages(...groups) {
+  const result = [];
+  const seen = new Set();
+  for (const group of groups) {
+    const values = Array.isArray(group) ? group : [group];
+    for (const value of values) {
+      const url = upgradeDandeImg(value);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      result.push(url);
+    }
+  }
+  return result;
+}
+
+function hasDandeNextPage(html, page) {
+  const next = page + 1;
+  const queryPage = new RegExp(`href=["'][^"']*[?&]page=${next}(?:[&#"']|$)`, 'i');
+  const pathPage = new RegExp(`href=["'][^"']*/page/${next}/?(?:[?#"']|$)`, 'i');
+  return /rel=["']next["']/i.test(html) || queryPage.test(html) || pathPage.test(html);
+}
+
+async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
   const url = page <= 1
@@ -873,7 +898,18 @@ async function fetchDandeCategoryPage(path, page = 1) {
     headers: { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'pt-BR,pt;q=0.9' },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.text();
+  const html = await res.text();
+  if (expectedCategory) {
+    const titleMatch = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+    const actualTitle = titleMatch
+      ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
+      : '';
+    const expectedTitle = norm(expectedCategory).replace(/s$/, '');
+    if (!actualTitle || actualTitle !== expectedTitle) {
+      throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}")`);
+    }
+  }
+  return html;
 }
 
 function parseDandeListProducts(html) {
@@ -890,7 +926,10 @@ function parseDandeListProducts(html) {
   while ((im = idRe.exec(html))) {
     if (!ids.includes(im[1])) ids.push(im[1]);
   }
-  for (const id of ids) {
+  // Só considera IDs que tenham nome de produto correspondente na listagem.
+  // Evita capturar IDs de widgets, recomendações e blocos auxiliares do HTML.
+  const productIds = ids.filter((id) => Object.prototype.hasOwnProperty.call(names, id));
+  for (const id of productIds) {
     const pos = html.indexOf(`data-product-id="${id}"`);
     if (pos < 0) continue;
     const chunk = html.slice(pos, pos + 8000);
@@ -982,13 +1021,30 @@ async function fetchDandeAcessorios(existingGroups = []) {
   const byId = new Map();
   for (const cat of DANDE_CATEGORIES) {
     console.log(`  Dande cat ${cat.nome}`);
+    const seenCategoryIds = new Set();
+    const seenPageSignatures = new Set();
+    let categoryAdded = 0;
     for (let page = 1; page <= 15; page++) {
       try {
-        const html = await fetchDandeCategoryPage(cat.path, page);
+        const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
         if (!list.length) break;
+        const pageSignature = list.map((p) => p.id).sort().join('|');
+        if (!pageSignature || seenPageSignatures.has(pageSignature)) {
+          console.log(`    p${page}: página repetida; encerrando categoria`);
+          break;
+        }
+        seenPageSignatures.add(pageSignature);
+
+        const newProducts = list.filter((p) => !seenCategoryIds.has(p.id));
+        if (!newProducts.length) {
+          console.log(`    p${page}: nenhum ID novo; encerrando categoria`);
+          break;
+        }
+        for (const p of newProducts) seenCategoryIds.add(p.id);
+
         let added = 0;
-        for (const p of list) {
+        for (const p of newProducts) {
           if (byId.has(p.id)) continue;
           let variants = p.variants || [];
           let desc = '';
@@ -1008,7 +1064,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
               if (det) {
                 if (det.variants?.length) variants = det.variants;
                 desc = det.desc || '';
-                if (det.imgs?.length) imgs = det.imgs;
+                if (det.imgs?.length) imgs = mergeDandeImages(det.imgs, imgs, prev?.fotos, prev?.foto);
               }
               await sleep(250);
             } catch (_) {}
@@ -1039,7 +1095,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
             variacoes = [];
             totalEstoque = 0;
           }
-          if (!imgs.length && prev) imgs = prev.fotos || (prev.foto ? [prev.foto] : []);
+          imgs = mergeDandeImages(imgs, prev?.fotos, prev?.foto);
           const foto = imgs[0] || (prev && prev.foto) || '';
           let nome = nomeList || (prev && prev.nome) || '';
           if (!nome || nome.toLowerCase() === 'produto') {
@@ -1073,15 +1129,23 @@ async function fetchDandeAcessorios(existingGroups = []) {
             cat: cat.nome,
           }, !prev, prev));
           added++;
+          categoryAdded++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
-        if (list.length < 8) break;
+
+        // Processa a página atual antes de decidir se existe uma próxima.
+        // Sem link de paginação, encerra somente DEPOIS de salvar os itens desta página.
+        if (!hasDandeNextPage(html, page)) {
+          console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+          break;
+        }
         await sleep(400);
       } catch (e) {
         console.log(`    Dande erro ${cat.nome} p${page}: ${e.message}`);
         break;
       }
     }
+    DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
   }
 
   const byCat = new Map();
@@ -1120,7 +1184,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
 
 
 async function main() {
-  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
+  const requiredSources = SYNC_DANDE_ONLY ? ['DANDE_BASE_URL'] : ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
   const missingSources = requiredSources.filter((key) => !process.env[key]);
   if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Carregando data.js...');
@@ -1130,6 +1194,30 @@ async function main() {
   const DATA = JSON.parse(m[1]);
 
   console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW} ADD_ROUPAS=${ADD_ROUPAS}`);
+
+  if (SYNC_DANDE_ONLY) {
+    if (!SYNC_DRY_RUN) throw new Error('SYNC_DANDE_ONLY exige SYNC_DRY_RUN=1 para impedir publicação.');
+    console.log('Modo exclusivo Dande: nenhuma outra fonte será sincronizada.');
+    const prevAcc = Array.isArray(DATA.acessorios) ? DATA.acessorios : [];
+    const groups = await fetchDandeAcessorios(prevAcc);
+    const hairCount = DANDE_SCRAPE_COUNTS.get('Acessórios de Cabelo') || 0;
+    const hair = groups.find((g) => g.cat === 'Acessórios de Cabelo');
+    const hairItems = hair?.items || [];
+    const missingImages = hairItems.filter((item) => !(item.foto || (Array.isArray(item.fotos) && item.fotos.length))).length;
+    const masculineCount = DANDE_SCRAPE_COUNTS.get('Masculinos') || 0;
+    const ankleCount = DANDE_SCRAPE_COUNTS.get('Tornozeleiras') || 0;
+    const masculineItems = groups.find((g) => g.cat === 'Masculinos')?.items || [];
+    const ankleItems = groups.find((g) => g.cat === 'Tornozeleiras')?.items || [];
+    const wrongMasculine = masculineItems.filter((item) => !/masculin/i.test(item.nome || '')).length;
+    const wrongAnkle = ankleItems.filter((item) => !/tornoz/i.test(item.nome || '')).length;
+    console.log(`VALIDAÇÃO DANDE: Acessórios de Cabelo origem=${hairCount}; itens=${hairItems.length}; sem imagem=${missingImages}; Masculinos origem=${masculineCount}; Tornozeleiras origem=${ankleCount}; itens sem nome compatível=${wrongMasculine + wrongAnkle}`);
+    if (hairCount < 1) throw new Error('Dande não retornou produtos para Acessórios de Cabelo.');
+    if (!hairItems.length || missingImages > 0) throw new Error('Validação de Acessórios de Cabelo falhou: itens ou imagens ausentes.');
+    if (masculineCount < 1 || ankleCount < 1) throw new Error('Dande não retornou produtos em Masculinos e/ou Tornozeleiras; confira os caminhos das categorias.');
+    if (wrongMasculine > 0 || wrongAnkle > 0) throw new Error('Produtos de Masculinos/Tornozeleiras não correspondem ao nome esperado.');
+    console.log('SYNC_DRY_RUN=1 — nenhuma alteração foi enviada ao Gist.');
+    return;
+  }
 
   console.log('Buscando Imarat...');
   const imaratList = await fetchImaratList();
@@ -1479,6 +1567,11 @@ async function main() {
   console.log(`Estoque alterado: ${stockChanged}`);
   console.log(`Preços alterados: ${priceChanged}`);
   console.log('data.js atualizado localmente (com correção forçada).');
+
+  if (SYNC_DRY_RUN) {
+    console.log('SYNC_DRY_RUN=1 — execução de validação concluída; Gist de produção NÃO foi alterado.');
+    return;
+  }
 
   console.log('Enviando dados para o GitHub Gist...');
   try {

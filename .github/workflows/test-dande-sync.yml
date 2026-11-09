@@ -1,0 +1,33 @@
+name: Validacao isolada do sync (sem publicar catálogo)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/test-dande-sync.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run-sync:
+    name: Sincronização real sem publicar no Gist
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Baixar código da branch
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxe do sincronizador
+        run: node --check scripts/sync-catalog.mjs
+      - name: Executar sincronização em modo isolado
+        run: node scripts/sync-catalog.mjs
+        env:
+          SYNC_DRY_RUN: "1"
+          SYNC_DANDE_ONLY: "1"
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
