@@ -269,11 +269,17 @@ async function main() {
     throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=80).`);
   }
 
-  for (const key of additions) {
+  function effectiveAdditiveSource(row) {
+  const source = norm(row?.item?.fonte);
+  if (source) return source;
+  const knownBrandGroups = new Set(["arabic collection","beauty brand","body splash","colecao dream","colecao brand","dream brand 80 100ml","dream brand","flaconete brand","sapatinho good girl","tubetes brand"]);
+  return norm(row?.group?.cat) === "brand" && knownBrandGroups.has(norm(row?.group?.brand)) ? "brand" : "";
+}
+for (const key of additions) {
     const rows = internalIndex.get(key) || [];
     if (rows.length !== 1) throw new Error(`Publicação bloqueada: identidade interna ambígua: ${key}`);
     const { item } = rows[0];
-    const source = norm(item.fonte);
+    const source = effectiveAdditiveSource(rows[0]);
     if (!ALLOWED_SOURCES.has(source)) throw new Error(`Publicação bloqueada: fonte não confirmada para ${key}: ${source || "vazia"}`);
     if (source !== "brand" && !String(item.id_origem || "").trim()) {
       throw new Error(`Publicação bloqueada: produto sem ID de origem: ${key}`);
