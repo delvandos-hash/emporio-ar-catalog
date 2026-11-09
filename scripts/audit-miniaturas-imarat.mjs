@@ -227,7 +227,7 @@ for (const [line, groups] of Object.entries(DATA)) {
         const retailOriginal = Number(source.priceCents || 0) / 100;
         const wholesaleOriginal = source.atacado?.precoCents != null
           ? Number(source.atacado.precoCents) / 100 : Math.max(retailOriginal - 30, 0);
-        const sourceCategory = String(source.categoria_nome || source.categoria || group.cat || "");
+        const sourceCategory = String(source.categoria_nome || source.categoria || "");
         expected = automaticMiniPrice(item.nome, group.brand, volumeOf(item), sourceCategory, retailOriginal, wholesaleOriginal);
         if (internal?.precoManual === true || internal?.precoManual === "true" || internal?.precoManual === 1) {
           manualPriceProtected++;
@@ -282,7 +282,8 @@ const priceConflicts = confirmedDuplicates.filter(([, items]) =>
 const collisionPriceConflicts = crossSourceCollisions.filter(([, items]) =>
   new Set(items.map(x => String(x.varejo) + "|" + String(x.atacado))).size > 1
 );
-const categoryMismatches = records.filter(x => x.sourceMatched && norm(x.category) !== norm(x.sourceCategory));
+const categoryMismatches = records.filter(x => x.sourceMatched && x.sourceCategory &&
+  x.sourceCategory !== "não informada" && norm(x.category) !== norm(x.sourceCategory));
 console.log("AUDITORIA SOMENTE LEITURA — MINIATURAS DO CATÁLOGO");
 console.log(`Miniaturas analisadas: ${records.length}`);
 console.log(`Registros com correspondência na Imarat: ${sourceMatches}`);
