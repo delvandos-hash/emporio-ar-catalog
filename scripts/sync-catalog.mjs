@@ -1770,11 +1770,27 @@ async function main() {
     }
   }
 
+  // Para produtos sem marca confiável, o fallback também consulta o Gist vivo.
+  // Isso evita importar como OUTROS/SEM MARCA uma cópia de item já publicado
+  // sob uma marca conhecida (ex.: miniaturas Only You / Lattafa).
+  for (const groups of Object.values(LIVE_GIST_DATA || {})) {
+    for (const g of Array.isArray(groups) ? groups : []) {
+      for (const it of Array.isArray(g.items) ? g.items : []) {
+        const volumeKey = volumeMatch(it.volume, it.nome);
+        const nomeKey = limparParaComparacao(it.nome);
+        indexNameVolume.add(`${nomeKey}|${volumeKey}`);
+        if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
+          indexMiniNameVolume.add(`${chaveComparacaoMini(it.nome)}|${volumeKey}`);
+        }
+      }
+    }
+  }
+
   if (ADD_IMARAT_NEW) {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
       const marcaOrigem = limparTexto(p.brand || 'Outros').trim();
-      const marcaConhecida = Boolean(String(p.brand || '').trim()) && !['outros', 'outra'].includes(norm(marcaOrigem));
+      const marcaConhecida = Boolean(String(p.brand || '').trim()) && !['outros', 'outra', 'sem marca', 'sem marca definida', 'nao informado', 'n/a'].includes(norm(marcaOrigem));
       const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
