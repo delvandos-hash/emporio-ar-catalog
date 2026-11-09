@@ -1293,23 +1293,15 @@ async function main() {
         // Regra comercial vigente: marca "Imarat" na origem é exibida como Empório A.R.
         if (norm(hit.brand) === 'imarat') g.brand = 'Empório A.R'; 
         
-        let notas = '';
-        if (hit.slug) { 
-            const detail = await fetchImaratDetail(hit.slug); 
-            if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400); 
-        }
-        if (notas) it.notas = notas;
-
-        // Galeria: busca imagens extras no detalhe da Imarat
+        // Uma única consulta ao detalhe alimenta notas e galeria, evitando
+        // duas requisições idênticas por produto durante a sincronização.
         let detailImgs = null;
+        let notas = '';
         if (hit.slug) {
-          const detail2 = await fetchImaratDetail(hit.slug);
-          if (detail2) {
-            if (!notas) {
-              const n2 = notesToText(detail2.notes) || (detail2.shortDesc || detail2.description || '').slice(0, 400);
-              if (n2) it.notas = sanitizarNotas(n2);
-            }
-            detailImgs = detail2;
+          detailImgs = await fetchImaratDetail(hit.slug);
+          if (detailImgs) {
+            notas = notesToText(detailImgs.notes) || (detailImgs.shortDesc || detailImgs.description || '').slice(0, 400);
+            if (notas) it.notas = sanitizarNotas(notas);
           }
         }
         const imgs = imaratImagesFrom(hit, detailImgs);
