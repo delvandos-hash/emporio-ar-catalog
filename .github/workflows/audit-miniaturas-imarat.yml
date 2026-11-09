@@ -34,6 +34,7 @@ jobs:
           node-version: "20"
       - name: Auditar duplicidades de todos os produtos Imarat (somente leitura)
         env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
         run: node scripts/audit-imarat-all-products.mjs
       - name: Comparar títulos do catálogo com o site raiz Imarat (somente leitura)
