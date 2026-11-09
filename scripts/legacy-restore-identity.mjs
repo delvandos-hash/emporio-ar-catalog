@@ -3,10 +3,11 @@ export function legacyPhotoFingerprint(item) {
   return [...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort().join("~");
 }
 
-export function resolveLegacyStockMatch(stockMatches, identityMatches, publicItem) {
+export function resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches = []) {
   const publicId = String(publicItem?.public_id || "").trim();
   if (publicId) {
-    const byPublicId = stockMatches.filter(row => String(row?.publicItem?.public_id || "").trim() === publicId);
+    const byPublicId = [...new Set([...stockMatches, ...identityMatches, ...publicIdMatches])]
+      .filter(row => String(row?.publicItem?.public_id || "").trim() === publicId);
     if (byPublicId.length === 1) return byPublicId[0];
   }
   const identitySet = new Set(identityMatches);
