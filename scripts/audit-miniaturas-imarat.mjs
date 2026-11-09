@@ -36,7 +36,7 @@ if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("E
 
 const norm = (value) => String(value || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-  .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+  .replace(/['’]s\b/gi, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 const fmtBRL = (value) => Number(value).toFixed(2).replace(".", ",");
 const brandsInName = [
   "armaf", "lattafa", "orientica", "afeer", "clive dorris",
