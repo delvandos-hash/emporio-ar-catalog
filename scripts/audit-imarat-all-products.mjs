@@ -84,6 +84,11 @@ function publicFingerprint(item) {
   });
 }
 
+function publicPhotoFingerprint(item) {
+  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
+  return JSON.stringify([...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort());
+}
+
 function rekeyLiveVariants(liveDATA, internalPublic) {
   const byBase = new Map();
   for (const [line,groups] of Object.entries(internalPublic || {})) for (const group of groups || []) {
@@ -100,11 +105,14 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
       const fp=publicFingerprint(item);
       const candidates=(byBase.get(key)||[]).filter(candidate=>!used.has(candidate.public_id));
       const byExistingId=item.public_id?candidates.filter(candidate=>candidate.public_id===item.public_id):[];
+      const photoFingerprint=publicPhotoFingerprint(item);
+      const byPhoto=photoFingerprint!=="[]"?candidates.filter(candidate=>publicPhotoFingerprint(candidate)===photoFingerprint):[];
       const byExactContent=candidates.filter(candidate=>publicFingerprint(candidate)===fp);
       const match=byExistingId.length===1?byExistingId[0]
-        :candidates.length===1?candidates[0]
-        :byExactContent.length===1?byExactContent[0]:null;
-      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,candidatas:candidates.length,conteudoExato:byExactContent.length}));continue;}
+        :byPhoto.length===1?byPhoto[0]
+        :byExactContent.length===1?byExactContent[0]
+        :candidates.length===1?candidates[0]:null;
+      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,candidatas:candidates.length,fotosCompativeis:byPhoto.length,conteudoExato:byExactContent.length}));continue;}
       used.add(match.public_id);
       if(item.public_id!==match.public_id){item.public_id=match.public_id;rekeyed++;}
     }
