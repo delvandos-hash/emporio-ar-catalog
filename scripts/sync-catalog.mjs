@@ -1333,7 +1333,13 @@ async function main() {
           nomeNormalizado.includes('atheri afeer');
         if (!fonteImarat && !legadoArabiyatPrestige && !legadoMiniaturaAfeer) return true;
 
+        const volumeItem = volumeMatch(item.volume, item.nome);
+        const volumeCompativel = p => {
+          const volumeOrigem = volumeMatch(p.sizeMl, p.name);
+          return !volumeItem || !volumeOrigem || volumeItem === volumeOrigem;
+        };
         let hit = imaratList.find(p =>
+          volumeCompativel(p) &&
           norm(p.name) === nomeNormalizado &&
           (!marcaArabiyatPrestige || norm(p.brand).includes('arabiyat prestige'))
         );
@@ -1342,6 +1348,7 @@ async function main() {
         if (!hit && legadoArabiyatPrestige && nomeNormalizado.startsWith('prestige ')) {
           const nomeSemPrefixo = nomeNormalizado.slice('prestige '.length);
           hit = imaratList.find(p =>
+            volumeCompativel(p) &&
             norm(p.name) === nomeSemPrefixo && norm(p.brand).includes('arabiyat prestige')
           );
         }
@@ -1349,6 +1356,7 @@ async function main() {
         // Grafia antiga da miniatura Afeer: só corrige com confirmação da origem.
         if (!hit && legadoMiniaturaAfeer) {
           hit = imaratList.find(p =>
+            volumeCompativel(p) &&
             norm(p.name) === 'miniatura atherri afeer' && norm(p.brand).includes('afeer')
           );
         }
@@ -1363,6 +1371,7 @@ async function main() {
             titulosImaratCorrigidosPeloSiteRaiz++;
           }
           item.fonte = 'imarat';
+          if (hit.id != null) item.id_origem = String(hit.id);
 
           // Revisão final: marca e produto permanecem em campos separados.
           // Marca e produto são campos separados: move apenas os itens confirmados
@@ -1419,7 +1428,12 @@ async function main() {
 
         const n = norm(it.nome); const b = norm(g.brand);
         const nomeSemPrefixoPrestige = n.replace(/^prestige\s+/, '');
-        const candidatosNomeExato = imaratList.filter(p => norm(p.name) === n);
+        const volumeItem = volumeMatch(it.volume, it.nome);
+        const volumeCompativel = p => {
+          const volumeOrigem = volumeMatch(p.sizeMl, p.name);
+          return !volumeItem || !volumeOrigem || volumeItem === volumeOrigem;
+        };
+        const candidatosNomeExato = imaratList.filter(p => norm(p.name) === n && volumeCompativel(p));
         // Primeiro exige coincidência de marca, considerando Imarat → Empório A.R.
         let hit = candidatosNomeExato.find(p => norm(marcaPublicaImarat(p.brand)) === b);
         // Exceção histórica comprovada: Arabiyat Prestige era agrupada como ARABIYAT.
@@ -1427,7 +1441,7 @@ async function main() {
           hit = candidatosNomeExato.find(p => norm(p.brand).includes('arabiyat prestige'));
         }
         // Em grupos genéricos, só aceita associação se o nome for único em toda a API.
-        if (!hit && ['outros', 'outra', 'emporio a r'].includes(b) && candidatosNomeExato.length === 1) {
+        if (!hit && ['outros', 'outra'].includes(b) && candidatosNomeExato.length === 1) {
           hit = candidatosNomeExato[0];
         }
         // Correções pontuais validadas no catálogo: transposição em Tharwah
@@ -1448,7 +1462,7 @@ async function main() {
         }
         // Corrige títulos legados somente com marca compatível, volume compatível
         // e correspondência textual forte e sem ambiguidade.
-        if (!hit && !['outros', 'outra', 'emporio a r'].includes(b)) {
+        if (!hit && !['outros', 'outra'].includes(b)) {
           const fuzzyCandidates = imaratList.filter(p =>
             norm(marcaPublicaImarat(p.brand)) === b ||
             (b === 'arabiyat' && norm(p.brand).includes('arabiyat prestige'))
@@ -1471,6 +1485,7 @@ async function main() {
         // Prefixo histórico de Arabiyat Prestige: comparar sem a palavra da marca.
         if (!hit && b === 'arabiyat') {
           hit = imaratList.find(p =>
+            volumeCompativel(p) &&
             norm(p.brand).includes('arabiyat prestige') && norm(p.name) === nomeSemPrefixoPrestige
           );
         }
@@ -1485,6 +1500,7 @@ async function main() {
           }));
         }
         it.fonte = 'imarat';
+        if (hit.id != null) it.id_origem = String(hit.id);
         it.nome = hit.name;
 
         // A marca vem do campo próprio da origem; move apenas este item se o grupo antigo
@@ -1678,6 +1694,7 @@ async function main() {
           foto,
           fotos: imgsNew.length ? imgsNew : (foto ? [foto] : []),
           fonte: 'imarat',
+          id_origem: String(p.id ?? p.productId ?? ''),
       }, true));
       
       indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
