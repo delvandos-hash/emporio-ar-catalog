@@ -73,7 +73,7 @@ function syncKey(nome,volume,categoria,brand) {
   const mini=isMiniatura(nome,volume,categoria)&&!isOleo(nome);
   const base=mini
     ? `mini|${norm(brand||"outros")}|${chaveComparacaoMini(nome)}|${volumeMatch(volume,nome)}`
-    : `normal|${limparParaComparacao(nome)}|${volumeMatch(volume,nome)}`;
+    : `normal|${norm(brand||"outros")}|${limparParaComparacao(nome)}|${volumeMatch(volume,nome)}`;
   return base;
 }
 function parseInternalData() {
