@@ -11,7 +11,7 @@ const safe = toPublicCatalog(DATA, imageOptions);
 const groups = Object.values(safe).flat();
 const products = groups.flatMap(g => Array.isArray(g.items) ? g.items : []);
 const report = {
-  sourceCommit: process.env.GITHUB_SHA,
+  sourceCommit: "471dcd18817239069df7311418548a3b6909b8ee",
   groupCount: groups.length,
   productCount: products.length,
   productsWithPhoto: products.filter(p => p.foto || (p.fotos || []).length).length,
