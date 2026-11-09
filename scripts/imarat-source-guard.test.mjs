@@ -44,3 +44,8 @@ test("corrige somente os dois títulos especiais com marca e volume compatíveis
   assert.match(source, /norm\(p\.name\) === 'miniatura sapatinho good girl'/);
   assert.match(source, /volumeMatch\(it\.volume, it\.nome\) === volumeMatch\(p\.sizeMl, p\.name\)/);
 });
+
+
+test("normaliza o prefixo Óleo somente na comparação de títulos da categoria Óleos", () => {
+  assert.match(source, /if \(norm\(category\)\.includes\('oleo'\)\) value = value\.replace\(\/\^oleo\\s\+\//);
+});
