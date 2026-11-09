@@ -179,7 +179,7 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
     }
   }
   const used = new Set();
-  let rekeyed = 0;
+  let rekeyed = 0, unmatched = 0;
   for (const [line, groups] of Object.entries(liveDATA || {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
@@ -232,7 +232,7 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
       }
     }
   }
-  return rekeyed;
+  return { rekeyed, unmatched };
 }
 
 function addSafePublicItem(merged, publicLine, publicGroup, publicItem) {
@@ -257,7 +257,7 @@ async function main() {
   const originalLiveContentKeys = collectContentKeys(liveDATA);
   const exactLiveDuplicatesRemoved = dedupeExactLiveVariants(liveDATA);
   const internalIndex = collectInternalIndex(internalDATA);
-  const rekeyedVariants = rekeyLiveVariants(liveDATA, internalIndex);
+  const { rekeyed: rekeyedVariants, unmatched: unmatchedLiveVariants } = rekeyLiveVariants(liveDATA, internalIndex);
   const liveKeys = collectKeys(liveDATA);
   const internalKeys = new Set(internalIndex.keys());
   const missingFromInternal = [...liveKeys].filter(key => !internalKeys.has(key));
@@ -333,7 +333,7 @@ for (const key of additions) {
 
   console.log(`GIST_EXISTING_PRESERVED=${originalLiveContentKeys.size}`);
   console.log(`GIST_EXACT_DUPLICATES_REMOVED=${exactLiveDuplicatesRemoved}`);
-  console.log(`GIST_VARIANTS_REKEYED=${rekeyedVariants}`);
+  console.log(`GIST_VARIANTS_REKEYED=${rekeyedVariants} GIST_VARIANTS_PRESERVED_WITHOUT_REKEY=${unmatchedLiveVariants}`);
   console.log(`SOURCE_CONFIRMED_ADDITIONS=${appended}`);
   console.log(`DUPLICATE_SOURCE_REPRESENTATIONS_SKIPPED=${duplicateSourceKeys.size}`);
   console.log("GIST mantém todos os conteúdos existentes; apenas IDs de variantes são separados e novos itens confirmados são adicionados.");
