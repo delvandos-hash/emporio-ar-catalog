@@ -1,0 +1,55 @@
+name: Exportar snapshot público do catálogo (somente leitura)
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/export-live-gist-snapshot.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Baixar snapshot vivo do Gist sem gravar
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const id = '11918b7196b3ee6a0d8a91739167b312';
+          const headers = {
+            Authorization: `Bearer ${process.env.GIST_TOKEN}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'EmporioAR-read-only-snapshot-export'
+          };
+          const response = await fetch(`https://api.github.com/gists/${id}`, { headers });
+          if (!response.ok) throw new Error(`Gist HTTP ${response.status}`);
+          const gist = await response.json();
+          const file = gist.files?.['catalogo.json'];
+          if (!file) throw new Error('catalogo.json não encontrado no Gist');
+          let raw = file.content;
+          if (file.truncated || !raw) {
+            if (!file.raw_url) throw new Error('Snapshot truncado sem raw_url');
+            const full = await fetch(file.raw_url, { headers });
+            if (!full.ok) throw new Error(`Snapshot raw HTTP ${full.status}`);
+            raw = await full.text();
+          }
+          if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+          const parsed = JSON.parse(raw);
+          const DATA = parsed.DATA || parsed;
+          const count = Object.values(DATA).flatMap(groups => Array.isArray(groups) ? groups : [])
+            .reduce((n, group) => n + (Array.isArray(group.items) ? group.items.length : 0), 0);
+          writeFileSync('live-catalogo.json', JSON.stringify(parsed));
+          console.log(`Snapshot exportado somente para artefato: ${count} itens`);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-catalogo-snapshot
+          path: live-catalogo.json
+          retention-days: 2
