@@ -62,7 +62,7 @@ test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompa
 });
 
 test("auditoria de miniaturas usa volume e categoria retornados pela Imarat", () => {
-  assert.match(auditMiniSource, /function volumeFrom\(value, name\)/);
+  assert.match(auditMiniSource, /norm\(line\) \+ "\\|" \+ norm\(group\.brand\) \+ "\\|" \+ name \+ "\\|" \+ volumeOf\(item\)/);
   assert.match(auditMiniSource, /const sourceCategory = String\(source\.categoria_nome \|\| source\.categoria \|\| ""\)/);
   assert.match(auditMiniSource, /automaticMiniPrice\(item\.nome, group\.brand, volumeOf\(item\), sourceCategory/);
   assert.match(auditMiniSource, /if \(isOleo\(item\?\.nome\)\) return false/);
