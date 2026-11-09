@@ -15,14 +15,17 @@ test("identidade pública inclui linha, marca, categoria, nome e volume", () => 
 });
 
 test("restauração legada evita duplicar public_id ou identidade exata", () => {
-  assert.match(restore, /currentPublicIds\.has\(item\.public_id\).*currentIdentities\.has\(key\)/s);
-  assert.match(restore, /currentIdentities\.add\(key\)/);
+  assert.match(restore, /const matches = index\.get\(key\) \|\| \[\]/);
+  assert.match(restore, /if \(matches\.length > 1\)/);
+  assert.match(restore, /mergePublicFields\(matches\[0\], item\)/);
+  assert.match(restore, /index\.set\(key, \[legacy\]\)/);
 });
 
 test("restauração legada preserva disponibilidade e referências de estoque", () => {
   assert.match(restore, /disponivel: item\.disponivel \|\| "Não"/);
   assert.match(restore, /stock_ref: item\.stock_ref/);
   assert.match(restore, /stock_route: item\.stock_route/);
+  assert.match(restore, /target\.precoManual = true/);
 });
 
 test("publicação aditiva não remove nem sobrescreve registros atuais do Gist", () => {
