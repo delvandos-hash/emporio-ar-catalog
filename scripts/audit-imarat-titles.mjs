@@ -31,6 +31,14 @@ function similarity(a,b) {
   if(!a||!b) return 0;
   return 1-editDistance(a,b)/Math.max(a.length,b.length);
 }
+function tokenSimilarity(a,b) {
+  const left=new Set(a.split(" ").filter(Boolean));
+  const right=new Set(b.split(" ").filter(Boolean));
+  if(!left.size||!right.size) return 0;
+  let intersection=0;
+  for(const token of left) if(right.has(token)) intersection++;
+  return intersection/(left.size+right.size-intersection);
+}
 function titleKey(name, category) {
   let n=norm(name).replace(/\b\d+(?:[.,]\d+)?\s*(ml|g)\b/g," ").replace(/\s+/g," ").trim();
   if(norm(category).includes("mini")) {
@@ -91,18 +99,21 @@ for(const [line,groups] of Object.entries(DATA)) for(const group of groups||[]) 
     const scored=unique.filter(p=>{
       const sourceVol=volume(p.sizeMl,p.name);
       return !itemVol||!sourceVol||itemVol===sourceVol;
-    }).map(p=>({p,score:similarity(key,titleKey(p.name,category))}))
-      .sort((a,b)=>b.score-a.score);
+    }).map(p=>{
+      const sourceKey=titleKey(p.name,category);
+      return {p,score:similarity(key,sourceKey),tokenScore:tokenSimilarity(key,sourceKey)};
+    }).sort((a,b)=>b.score-a.score);
     const best=scored[0], second=scored[1];
     const exactHit=unique.find(p=>norm(p.name)===norm(name));
     const row={line,brand:group.brand||"",category,name,volume:itemVol||"—",
       sourceTitle:exactHit?.name||best?.p?.name||"",
       sourceBrand:exactHit?.brand||best?.p?.brand||"",
       score:exactHit?1:Number((best?.score||0).toFixed(3)),
+      tokenScore:exactHit?1:Number((best?.tokenScore||0).toFixed(3)),
       secondScore:Number((second?.score||0).toFixed(3)),
       fonte:item.fonte||"não informada"};
     if(exactHit) exact.push(row);
-    else if(best?.score>=0.86 && (!second||best.score-second.score>=0.08)) likely.push(row);
+    else if(best?.score>=0.86 && best?.tokenScore>=0.8 && (!second||best.score-second.score>=0.08)) likely.push(row);
     else if(best?.score>=0.68) ambiguous.push(row);
     else noCandidate.push(row);
   }
