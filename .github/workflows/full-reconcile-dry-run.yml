@@ -2,7 +2,7 @@ name: Reconciliação completa em dry-run (sem publicar)
 
 on:
   push:
-    branches: [fix/reconciliation-mainline-identity-safe-20261109]
+    branches: [fix/reconciliation-mainline-identity-safe-20261109, main]
     paths:
       - "scripts/sync-catalog.mjs"
       - "scripts/audit-imarat-all-products.mjs"
@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   reconcile:
-    if: github.head_ref == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'fix/reconciliation-mainline-identity-safe-20261109'
+    if: github.head_ref == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
