@@ -32,3 +32,5 @@ jobs:
         run: node scripts/publish-homologated-gist.mjs
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+
+# Rebuild uses only homologated data and publishes only after artifact generation.
