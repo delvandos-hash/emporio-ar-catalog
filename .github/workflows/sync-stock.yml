@@ -1,11 +1,6 @@
 name: Sync catálogo (estoque + novos produtos)
 
 on:
-  # Gatilho temporário para aplicar a normalização possessiva no catálogo de produção.
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/sync-stock.yml"
   schedule:
     # 08:00 e 20:00 horário de Brasília (UTC-3) → 11:00 e 23:00 UTC
     - cron: '0 11 * * *'
