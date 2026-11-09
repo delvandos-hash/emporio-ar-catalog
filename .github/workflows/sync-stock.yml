@@ -32,7 +32,6 @@ jobs:
           BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
-          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
           SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
@@ -47,3 +46,4 @@ jobs:
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
           BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
