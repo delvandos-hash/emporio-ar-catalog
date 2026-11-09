@@ -32,13 +32,9 @@ test("correções aproximadas exigem marca, volume compatível e alta confiança
   assert.match(source, /!\['outros', 'outra', 'emporio a r'\]\.includes\(b\)/);
 });
 
-test("remove somente quatro miniaturas legadas confirmadas sem correspondência na origem", () => {
-  assert.match(source, /miniaturas\|emporio a r\|mini elysia\|50ml/);
-  assert.match(source, /miniaturas\|emporio a r\|mini vulcan bale\|30ml/);
-  assert.match(source, /miniaturas\|emporio a r\|mini vulcan sable\|30ml/);
-  assert.match(source, /miniaturas\|outros\|mini vulcan sable 30ml\|30ml/);
-  assert.match(source, /const existeNaOrigem = imaratList\.some\(p =>/);
-  assert.match(source, /if \(!itensLegadosForaDoSite\.has\(key\)\) return true/);
+test("não remove produtos sem procedência Imarat explícita", () => {
+  assert.doesNotMatch(source, /const itensLegadosForaDoSite = new Set/);
+  assert.match(source, /if \(!fonteImarat && !legadoArabiyatPrestige && !legadoMiniaturaAfeer\) return true/);
 });
 
 test("corrige somente os dois títulos especiais com marca e volume compatíveis", () => {
