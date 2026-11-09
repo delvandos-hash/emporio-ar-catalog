@@ -1377,6 +1377,7 @@ async function main() {
 
         // A marca vem do campo próprio da origem; move apenas este item se o grupo antigo
         // estiver com uma marca abreviada/genérica, sem reclassificar os demais itens.
+        // Última publicação: marca sempre sem espaços externos.
         const marcaApi = limparTexto(hit.brand || g.brand || 'Outros').trim();
         const marcaPublica = norm(marcaApi) === 'imarat' ? 'Empório A.R' : marcaApi.trim().toUpperCase();
         if (norm(marcaPublica) !== norm(g.brand)) {
