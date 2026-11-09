@@ -1402,7 +1402,8 @@ async function main() {
   if (ADD_IMARAT_NEW) {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
-      const brand = marcaPublicaImarat(p.brand || 'Outros').toUpperCase();
+      const marcaOrigem = limparTexto(p.brand || 'Outros');
+      const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
       const ehOleo = isOleo(nome);
