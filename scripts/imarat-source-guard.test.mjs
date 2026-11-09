@@ -141,9 +141,10 @@ test("sincronização não remove produtos já existentes automaticamente", () =
 });
 
 test("auditorias distinguem miniaturas por marca e ID de origem", () => {
-  assert.match(auditMiniSource, /key: source[\\s\\S]*norm\(group\.brand\)[\\s\\S]*source\.id/);
-  assert.match(auditMiniSource, /norm\(group\.brand\) \+ "\\|" \+ name \+ "\\|" \+ volumeOf\(item\)/);
-  assert.match(auditAllSource, /mini\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{chaveComparacaoMini\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
+  assert.ok(auditMiniSource.includes("key: source"));
+  assert.ok(auditMiniSource.includes('norm(group.brand) + "|source|" + String(source.id || source.productId || source.slug || "")'));
+  assert.ok(auditMiniSource.includes('norm(group.brand) + "|" + name + "|" + volumeOf(item)'));
+  assert.ok(auditAllSource.includes('mini|\u0024{norm(brand||"outros")}|\u0024{chaveComparacaoMini(nome)}|\u0024{volumeMatch(volume,nome)}'));
 });
 
 test("perfumes de marcas diferentes com nome e volume iguais não são deduplicados", () => {
