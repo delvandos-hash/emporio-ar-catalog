@@ -130,9 +130,10 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
 });
 
 test("perfumes exigem marca, nome exato e volume; semelhanças entre marcas são preservadas", () => {
-  assert.ok(source.includes("indexNormal.add(normalProductKey(it.nome, it.volume, g.brand))"));
-  assert.ok(source.includes("duplicado = indexNormal.has(normalProductKey(nome, volume, brand))"));
-  assert.ok(source.includes("!marcaConhecida && indexNameVolume.has(normalProductNameVolumeKey(nome, volume))"));
+  assert.ok(source.includes("const indexNormal = new Map()"));
+  assert.ok(source.includes("indexNormal.get(normalKey).push({ id_origem: it.id_origem ?? it.id ?? \"\" })"));
+  assert.ok(source.includes("duplicado = isDuplicateMiniSource(normalCandidates, candidateId)"));
+  assert.ok(source.includes("duplicado = isDuplicateMiniSource(nameVolumeCandidates, candidateId)"));
   assert.ok(source.includes("Nomes iguais em marcas diferentes coexistem"));
 });
 
@@ -152,7 +153,8 @@ test("auditorias distinguem miniaturas por marca e ID de origem", () => {
 
 test("perfumes de marcas diferentes com nome e volume iguais não são deduplicados", () => {
   assert.match(source, /normalProductKey\(nome, volume, brand\)/);
-  assert.match(source, /!marcaConhecida && indexNameVolume\.has\(normalProductNameVolumeKey\(nome, volume\)\)/);
+  assert.match(source, /isDuplicateMiniSource\(normalCandidates, candidateId\)/);
+  assert.match(source, /isDuplicateMiniSource\(nameVolumeCandidates, candidateId\)/);
   assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
 });
 
