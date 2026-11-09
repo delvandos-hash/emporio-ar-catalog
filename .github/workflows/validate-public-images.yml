@@ -25,15 +25,11 @@ jobs:
           node-version: "22"
       - name: Testar regras locais de URL e proxy de imagens
         run: node --test scripts/public-image-url.test.mjs scripts/product-image-function.test.mjs
-        env:
-          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
-          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
-          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
-          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
       - name: Validar entrega de imagens do snapshot público na prévia
+        if: github.event_name == 'workflow_dispatch'
         run: node scripts/validate-public-images.mjs
         env:
-          NETLIFY_PREVIEW_URL: ${{ github.event_name == 'pull_request' && format('https://deploy-preview-{0}--catalogoemporio.netlify.app', github.event.pull_request.number) || inputs.preview_url }}
+          NETLIFY_PREVIEW_URL: ${{ inputs.preview_url }}
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
