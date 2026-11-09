@@ -245,7 +245,22 @@ async function main() {
   const liveKeys = collectKeys(liveDATA);
   const internalKeys = new Set(internalIndex.keys());
   const missingFromInternal = [...liveKeys].filter(key => !internalKeys.has(key));
-  const additions = [...internalKeys].filter(key => !liveKeys.has(key));
+  const liveStockRefs = new Set();
+  for (const groups of Object.values(liveDATA)) for (const group of groups || []) for (const item of group.items || []) {
+    const ref = String(item?.stock_ref || "").trim();
+    if (ref) liveStockRefs.add(ref);
+  }
+  const duplicateSourceKeys = new Set();
+  const additions = [...internalKeys].filter(key => {
+    if (liveKeys.has(key)) return false;
+    const row = (internalIndex.get(key) || [])[0];
+    const stockRef = String(row?.publicItem?.stock_ref || "").trim();
+    if (stockRef && liveStockRefs.has(stockRef)) {
+      duplicateSourceKeys.add(key);
+      return false;
+    }
+    return true;
+  });
 
   if (missingFromInternal.length) {
     throw new Error(`Publicação bloqueada: ${missingFromInternal.length} IDs atuais do Gist ainda não estão representados na base. Nenhum dado foi enviado.`);
@@ -286,7 +301,9 @@ async function main() {
   if (lostContent.length) {
     throw new Error(`Itens atuais do Gist seriam perdidos: ${lostContent.length}. Nenhum dado foi enviado.`);
   }
-  for (const key of internalKeys) if (!mergedKeys.has(key)) throw new Error(`Item interno não foi incluído: ${key}`);
+  for (const key of internalKeys) {
+    if (!mergedKeys.has(key) && !duplicateSourceKeys.has(key)) throw new Error(`Item interno não foi incluído: ${key}`);
+  }
 
   const nextSnapshot = snapshot.DATA
     ? { ...snapshot, DATA: mergedPublic, ultimaAtualizacao: new Date().toISOString() }
@@ -296,6 +313,7 @@ async function main() {
   console.log(`GIST_EXACT_DUPLICATES_REMOVED=${exactLiveDuplicatesRemoved}`);
   console.log(`GIST_VARIANTS_REKEYED=${rekeyedVariants}`);
   console.log(`SOURCE_CONFIRMED_ADDITIONS=${appended}`);
+  console.log(`DUPLICATE_SOURCE_REPRESENTATIONS_SKIPPED=${duplicateSourceKeys.size}`);
   console.log("GIST mantém todos os conteúdos existentes; apenas IDs de variantes são separados e novos itens confirmados são adicionados.");
 
   if (process.env.APPLY_ADDITIVE_RECONCILIATION !== "1") {
