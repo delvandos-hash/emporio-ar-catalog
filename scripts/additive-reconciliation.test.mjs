@@ -81,3 +81,10 @@ test("variantes com mesmo nome são reidentificadas por foto sem depender de pre
   assert.match(sync, /photos\(item\) !== ""/);
   assert.doesNotMatch(sync, /publicPriceNumber\(item\?\.varejo\)[\s\S]*?publicPriceNumber\(publicItem\?\.atacado\)/);
 });
+
+test("reidentificação preserva public_id legado mesmo após correção de título/categoria", () => {
+  assert.match(apply, /internalByPublicId/);
+  assert.match(apply, /byGlobalId\.length === 1/);
+  assert.match(audit, /byPublicId/);
+  assert.match(audit, /byGlobalId\.length===1/);
+});
