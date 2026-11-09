@@ -139,7 +139,7 @@ const checks=[
   [chaveComparacaoMini("Miniatura Lattafa Yara Candy 30ml"),"yara candy","chave miniatura com prefixo/marca"],
   [chaveComparacaoMini("Mini Yara Candy Only You 30ml"),"yara candy","chave miniatura com marca sufixada"],
   [syncKey("Óleo Karseell Cabelo","50ml","Óleos","Karseell"),"normal|karseell|oleo karseell cabelo|50ml","óleo não deve entrar na chave de miniatura"],
-  [syncKey("Perfume Alfa","100ml","Perfumes","Marca A"),"normal|perfume alfa|100ml","produto convencional"],
+  [syncKey("Perfume Alfa","100ml","Perfumes","Marca A"),"normal|marca a|perfume alfa|100ml","produto convencional"],
   [syncKey("Miniatura Alfa","30ml","Miniaturas","Lattafa"),"mini|lattafa|alfa|30ml","produto miniatura"],
 ];
 for(const [actual,expected,label] of checks) {
