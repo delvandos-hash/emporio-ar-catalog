@@ -302,7 +302,7 @@ for(const p of source) {
     : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
   if(duplicate) {
     const entry={name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${normalKey}`};
-    const existedBefore=mini?initialMiniIndex.has(miniKey):initialNormalIndex.has(normalKey);
+    const existedBefore=mini?initialMiniIndex.has(miniIdentity):initialNormalIndex.has(normalKey);
     (existedBefore?blockedByCatalog:blockedWithinImarat).push(entry);
     continue;
   }
@@ -310,7 +310,7 @@ for(const p of source) {
   normalIndex.add(normalKey);
   normalIndex.add(`${normalKey}|${norm(brand)}`);
   if(mini) {
-    miniIndex.add([norm(brand),miniKey,volume].join("|"));
+    miniIndex.add(miniIdentityKey(brand,name,volume));
   }
 }
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
