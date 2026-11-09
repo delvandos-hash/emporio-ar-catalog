@@ -165,3 +165,11 @@ test("preços de produtos existentes são preservados quando divergem da regra e
   assert.match(source, /it\.precoManual = true/);
   assert.match(source, /existingPricesProtectedWithoutMatch\+\+/);
 });
+
+test("fallback de marca ausente consulta também o Gist vivo para não importar cópia de outra marca", () => {
+  assert.match(source, /Para produtos sem marca confiável, o fallback também consulta o Gist vivo/);
+  assert.match(source, /Object\.values\(LIVE_GIST_DATA \|\| \{\}\)/);
+  assert.match(source, /!marcaConhecida && indexMiniNameVolume\.has/);
+  assert.match(source, /'sem marca', 'sem marca definida'/);
+  assert.match(audit, /"sem marca","sem marca definida"/);
+});
