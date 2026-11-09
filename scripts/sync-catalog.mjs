@@ -282,8 +282,8 @@ async function fetchImaratList() {
         // O site raiz separa marca e nome comercial. Na linha Arabiyat Prestige,
         // "Prestige" não integra o nome Noiré Absolu: remover apenas quando vier
         // como prefixo redundante e a marca confirmar Arabiyat Prestige.
-        if (norm(p.brand).includes('arabiyat prestige') && /^prestige\\s+/i.test(String(p.name || ''))) {
-          p.name = String(p.name).replace(/^prestige\\s+/i, '').trim();
+        if (norm(p.brand).includes('arabiyat prestige') && /^prestige\s+/i.test(String(p.name || ''))) {
+          p.name = String(p.name).replace(/^prestige\s+/i, '').trim();
           prefixosMarcaRemovidos++;
         }
         if (p.shortDesc) p.shortDesc = limparTexto(p.shortDesc);
@@ -1245,6 +1245,23 @@ async function main() {
   const imaratList = await fetchImaratList();
   console.log(`Imarat: ${imaratList.length} produtos`);
 
+  const imaratNomesAtuais = new Set(imaratList.map(p => norm(p.name)).filter(Boolean));
+  let produtosImaratForaDoSiteRaizRemovidos = 0;
+  // Remove somente registros já identificados como origem Imarat cujo nome deixou
+  // de existir na listagem completa do site raiz. Nunca toca em outras fontes.
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      const antes = (g.items || []).length;
+      g.items = (g.items || []).filter(item => {
+        if (String(item.fonte || '').toLowerCase() !== 'imarat') return true;
+        if (imaratNomesAtuais.has(norm(item.nome))) return true;
+        produtosImaratForaDoSiteRaizRemovidos++;
+        return false;
+      });
+    }
+  }
+  console.log(\`Produtos Imarat removidos por nome ausente no site raiz: \${produtosImaratForaDoSiteRaizRemovidos}\`);
+
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
   for (const line of Object.keys(DATA)) {
@@ -1258,7 +1275,7 @@ async function main() {
         const n = norm(it.nome); const b = norm(g.brand);
         // Compatibilidade para registros antigos com o prefixo redundante "Prestige"
         // no nome, quando a marca do grupo confirma Arabiyat Prestige.
-        const nomeSemPrefixoPrestige = b.includes('arabiyat prestige') ? n.replace(/^prestige\\s+/, '') : n;
+        const nomeSemPrefixoPrestige = b.includes('arabiyat prestige') ? n.replace(/^prestige\s+/, '') : n;
         const hit = imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige);
         if (!hit) continue;
 
