@@ -280,3 +280,22 @@ test("marcas ONLY YOU e MAIS YOU permanecem separadas mesmo com nomes semelhante
   const ids = out.feminino.map(group => group.items[0].public_id);
   assert.equal(new Set(ids).size, 2);
 });
+
+test("stock_ref e origin_ref não colapsam IDs iguais de marcas diferentes", () => {
+  const DATA = {
+    acessorios: [
+      { brand: "Marca A", cat: "Colares", items: [
+        { nome: "Colar Básico", id_origem: "123", fonte: "acessorios" }
+      ] },
+      { brand: "Marca B", cat: "Colares", items: [
+        { nome: "Colar Básico", id_origem: "123", fonte: "acessorios" }
+      ] }
+    ]
+  };
+  const out = toPublicCatalog(DATA);
+  const items = out.acessorios.flatMap(g => g.items);
+  assert.equal(items.length, 2);
+  assert.equal(new Set(items.map(i => i.stock_ref)).size, 2);
+  assert.equal(new Set(items.map(i => i.origin_ref)).size, 2);
+  assert.equal(new Set(items.map(i => i.public_id)).size, 2);
+});
