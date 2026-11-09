@@ -284,7 +284,7 @@ function imaratImagesFrom(p, detail) {
     if (!u) return;
     let s = String(u.url || u.src || u || '').trim();
     if (!s) return;
-    if (!s.startsWith('http')) s = resolveImaratImageUrl(s);
+    if (!s.startsWith('http')) s = resolveImaratImageUrl(s, IMARAT_ORIGIN);
     if (!out.includes(s)) out.push(s);
   };
   if (detail && Array.isArray(detail.images)) detail.images.forEach(push);
@@ -1260,14 +1260,14 @@ async function main() {
       }
       notas = sanitizarNotas(notas);
       const imgsNew = imaratImagesFrom(p, detail);
-      const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image)) : '');
+      const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : '');
       
       const precoVarejoOrig = (p.priceCents || 0) / 100; 
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       
       const line = genderLine(p.gender); 
-      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image)) : ''); 
+      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : ''); 
       const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
       
       const group = ensureBrandGroup(DATA, line, brand, cat);
