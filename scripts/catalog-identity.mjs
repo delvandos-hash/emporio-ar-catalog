@@ -13,9 +13,12 @@ export function normalizeIdentity(value) {
 function normalizedVolume(value) {
   return String(value ?? "").toLowerCase().replace(/\s+/g, "").replace(",", ".");
 }
-export function normalProductKey(nome, volume) {
+export function normalProductNameVolumeKey(nome, volume) {
   const name = normalizeIdentity(nome).replace(/\s*\d+(?:[.,]\d+)?\s*(?:ml|g)\b/g, "").trim();
   return [name, normalizedVolume(volume)].join("|");
+}
+export function normalProductKey(nome, volume, brand) {
+  return [normalizeIdentity(brand), normalProductNameVolumeKey(nome, volume)].join("|");
 }
 function miniBaseName(nome, brand) {
   let name = normalizeIdentity(nome)
