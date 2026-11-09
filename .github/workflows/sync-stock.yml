@@ -34,6 +34,17 @@ jobs:
         run: node scripts/restore-gist-only-legacy.mjs
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+      - name: Validar reconciliação aditiva antes da publicação
+        run: |
+          node scripts/audit-imarat-all-products.mjs | tee /tmp/preflight-audit.log
+          grep -q 'ADDITIVE_RECONCILIATION_SAFE=true' /tmp/preflight-audit.log
+          node scripts/apply-additive-reconciliation.mjs | tee /tmp/preflight-apply.log
+          grep -q 'ADDITIVE_RECONCILIATION_DRY_RUN=true' /tmp/preflight-apply.log
+          echo "ALLOW_SAFE_ADDITIVE_BASELINE=1" >> "$GITHUB_ENV"
+          echo "Preflight aprovado: reconciliação aditiva simulada sem gravar no Gist." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
