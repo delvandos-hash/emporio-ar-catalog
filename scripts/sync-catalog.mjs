@@ -1314,7 +1314,7 @@ async function main() {
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
       g.items = (g.items || []).filter(item => {
-        if (!isMiniatura(item.nome, item.volume, g.cat) || isOleo(item.nome)) return true;
+        if (String(item.fonte || '').toLowerCase() !== 'imarat' || !isMiniatura(item.nome, item.volume, g.cat) || isOleo(item.nome)) return true;
         const chave = chaveComparacaoMini(item.nome);
         if (!chave) return true;
         if (miniaturasGlobaisVistas.has(chave)) {
