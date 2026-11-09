@@ -78,10 +78,12 @@ jobs:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
       - name: Simular publicação aditiva sem gravar no Gist
+        continue-on-error: true
         run: node scripts/apply-additive-reconciliation.mjs
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Guardar snapshot para revisão
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: full-reconcile-data-js-${{ github.run_id }}
