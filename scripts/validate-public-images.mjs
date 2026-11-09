@@ -40,8 +40,11 @@ const gist = await gistResponse.json();
 const file = gist.files?.["catalogo.json"];
 assert.ok(file, "O Gist público não contém catalogo.json");
 
+// O GitHub pode truncar file.content em Gists grandes. Nessa situação,
+// é obrigatório buscar o arquivo completo pelo raw_url antes do JSON.parse.
 let snapshot = file.content;
-if (!snapshot && file.raw_url) {
+if (file.truncated || !snapshot) {
+  assert.ok(file.raw_url, "O Gist sinalizou conteúdo truncado, mas não forneceu raw_url");
   const rawResponse = await fetch(file.raw_url, {
     headers: { "User-Agent": "EmporioAR-Image-Validation/1.0" },
   });
