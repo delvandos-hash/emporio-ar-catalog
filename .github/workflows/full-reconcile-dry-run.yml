@@ -62,7 +62,7 @@ jobs:
           node --check scripts/catalog-identity.mjs
           node --check js/app.js
           node --test scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs scripts/catalog-identity.test.mjs scripts/public-catalog.test.mjs
-      - name: Gerar snapshot interno completo sem publicar
+      - name: Gerar snapshot interno e atualizar somente Imarat
         run: node scripts/sync-catalog.mjs
         env:
           SYNC_DRY_RUN: "1"
