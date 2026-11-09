@@ -26,7 +26,7 @@ for (const [key, source] of Object.entries(SOURCES)) {
   assert.equal(origin.password, "", `${source.env} não pode conter credenciais`);
   assert.equal(origin.search, "", `${source.env} não pode conter query string`);
   assert.equal(origin.hash, "", `${source.env} não pode conter fragmento`);
-  console.log(`Origem configurada: source=${key} (${source.label}) → ${origin.hostname}`);
+  console.log(`Configuração validada: source=${key} (${source.label}); HTTPS e formato seguros.`);
 }
 
 const gistResponse = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
@@ -114,14 +114,14 @@ for (const [source, paths] of pathsBySource) {
       checked++;
       console.log(
         `${valid ? "OK" : "FALHA"} source=${source} status=${response.status} ` +
-        `type=${contentType || "n/a"} path=${path}`
+        `type=${contentType || "n/a"}`
       );
       if (!valid) failures++;
       await response.body?.cancel();
     } catch (error) {
       checked++;
       failures++;
-      console.log(`FALHA source=${source} path=${path}: ${error.message}`);
+      console.log(`FALHA source=${source}: ${error.message}`);
     }
   }
 }
