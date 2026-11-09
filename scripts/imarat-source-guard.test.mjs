@@ -96,13 +96,16 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
 });
 
 
-test("baseline de publicação compara IDs públicos estáveis e bloqueia qualquer ID vivo ausente", () => {
+test("baseline só aceita um ID legado quando o preflight aditivo foi aprovado", () => {
   assert.match(source, /async function fetchLiveGistBaseline\(\)/);
   assert.match(source, /function countCatalogPublicIds\(DATA, alreadyPublic = false\)/);
   assert.match(source, /countCatalogPublicIds\(liveDATA, true\)/);
   assert.match(source, /return \{ count: keys\.size, items, missingIds, keys \}/);
-  assert.match(source, /if \(!SYNC_DRY_RUN && \(liveBaseline\.missingIds > 0 \|\| onlyLive > 0 \|\| onlyInternal > 80/);
-  assert.match(source, /IDs públicos do Gist sem representação interna/);
+  assert.match(source, /ALLOW_SAFE_ADDITIVE_BASELINE/);
+  assert.match(source, /const allowedLiveOnly = safeAdditiveBaseline \? 1 : 0/);
+  assert.match(source, /onlyLive > allowedLiveOnly/);
+  assert.match(source, /preSyncPreservation\.ambiguous > 0/);
+  assert.match(source, /SAFE_ADDITIVE_BASELINE_OVERRIDE=true/);
 });
 
 test("restauração Only You é append-only, respeita preço manual e valida antes de gravar", () => {
