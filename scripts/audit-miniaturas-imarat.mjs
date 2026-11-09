@@ -242,6 +242,8 @@ for (const [line, groups] of Object.entries(DATA)) {
             sourceBrand: source.brand || "marca não informada",
             sourceCategory: source.categoria_nome || source.categoria || "categoria não informada",
             sourceVolume: volumeFrom(source.sizeMl, source.name) || "sem volume na origem",
+            sourceRetailOriginal: fmtBRL(retailOriginal),
+            sourceWholesaleOriginal: fmtBRL(wholesaleOriginal),
             precoManual: internal?.precoManual ?? "não localizado no data.js",
           });
         }
