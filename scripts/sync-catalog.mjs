@@ -1341,6 +1341,33 @@ function priceNumber(value) {
   return Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw);
 }
 
+function preserveLegacyClothingFromGist(DATA, liveDATA) {
+  const existing = countCatalogIdentity(DATA).keys;
+  let restored = 0;
+  for (const [line, groups] of Object.entries(liveDATA || {})) {
+    if (norm(line) !== 'roupas') continue;
+    for (const group of Array.isArray(groups) ? groups : []) {
+      if (norm(group?.brand) !== 'emporio a r') continue;
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        if (!item?.nome) continue;
+        const key = [norm(line), norm(group.brand), norm(item.nome), volumeMatch(item.volume, item.nome)].join('|');
+        if (existing.has(key)) continue;
+        const legacy = {
+          ...item,
+          ...(Array.isArray(item.fotos) ? { fotos: [...item.fotos] } : {}),
+          fonte: 'legacy-gist',
+          ...(item.varejo != null && item.atacado != null ? { precoManual: true } : {}),
+        };
+        ensureBrandGroup(DATA, line, group.brand, group.cat || 'Outros').items.push(legacy);
+        existing.add(key);
+        restored++;
+      }
+    }
+  }
+  if (restored) console.log(`Roupas Empório A.R preservadas do Gist como legado: ${restored}`);
+  return restored;
+}
+
 async function main() {
   const requiredSources = SYNC_DANDE_ONLY ? ['DANDE_BASE_URL'] : ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
   const missingSources = requiredSources.filter((key) => !process.env[key]);
@@ -1356,9 +1383,10 @@ async function main() {
       throw new Error("GIST_TOKEN ausente; sincronização de produção bloqueada antes de qualquer publicação.");
     }
     if (process.env.GIST_TOKEN) {
-      const internalBaseline = countCatalogIdentity(DATA);
       const liveDATA = await fetchLiveGistBaseline();
       LIVE_GIST_DATA = liveDATA;
+      preserveLegacyClothingFromGist(DATA, liveDATA);
+      const internalBaseline = countCatalogIdentity(DATA);
       const liveBaseline = countCatalogIdentity(liveDATA);
       const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
       const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
