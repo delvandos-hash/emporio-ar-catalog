@@ -142,3 +142,12 @@ test("marca ausente não pode criar duplicata ambígua em outra marca", () => {
   assert.match(audit, /!brandKnown&&normalNameVolumeIndex\.has/);
   assert.match(audit, /!brandKnown&&miniNameVolumeIndex\.has/);
 });
+
+test("restauração do Imarat preserva preços públicos divergentes e mídia existente", () => {
+  assert.match(source, /function findPublicCatalogMatch\(/);
+  assert.match(source, /LIVE_GIST_DATA = liveDATA/);
+  assert.match(source, /const publicMatch = findPublicCatalogMatch\(LIVE_GIST_DATA/);
+  assert.match(source, /const publicPriceDiffers = publicHasPrices/);
+  assert.match(source, /precoManual: true/);
+  assert.match(source, /publicMatch\?\.fotos/);
+});
