@@ -144,3 +144,9 @@ test("auditorias não classificam miniaturas de marcas diferentes como duplicata
   assert.match(auditMiniSource, /key: norm\(line\) \+ "\|" \+ norm\(group\.brand\) \+ "\|" \+ name/);
   assert.match(auditAllSource, /mini\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{chaveComparacaoMini\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
 });
+
+test("perfumes de marcas diferentes com nome e volume iguais não são deduplicados", () => {
+  assert.match(source, /normalProductKey\(nome, volume, brand\)/);
+  assert.match(source, /!marcaConhecida && indexNameVolume\.has\(normalProductNameVolumeKey\(nome, volume\)\)/);
+  assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}/);
+});
