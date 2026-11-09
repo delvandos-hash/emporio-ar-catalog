@@ -142,12 +142,11 @@ function preserveLivePublicFields(DATA, liveDATA) {
           .map(sanitizePublicImageUrl).filter(Boolean))];
         if (mergedPhotos.length > existingPhotos.filter(Boolean).length) photos++;
         if (mergedPhotos.length) item.fotos = mergedPhotos;
-        if (!item.foto && liveItem.foto) item.foto = sanitizePublicImageUrl(liveItem.foto) || item.foto;
-        if (!item.notas && liveItem.notas) item.notas = liveItem.notas;
-        if (!item.badge && liveItem.badge) item.badge = liveItem.badge;
-        if (!item.novoDesde && liveItem.novoDesde) item.novoDesde = liveItem.novoDesde;
-        if ((!Array.isArray(item.variacoes) || !item.variacoes.length) &&
-            Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
+        if (liveItem.foto) item.foto = sanitizePublicImageUrl(liveItem.foto) || item.foto;
+        if (liveItem.notas) item.notas = liveItem.notas;
+        if (liveItem.badge) item.badge = liveItem.badge;
+        if (liveItem.novoDesde) item.novoDesde = liveItem.novoDesde;
+        if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
         if (!item.stock_ref && liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
         if (!item.stock_route && liveItem.stock_route) item.stock_route = liveItem.stock_route;
         if (!item.public_id && liveItem.public_id) item.public_id = liveItem.public_id;
