@@ -1310,6 +1310,8 @@ async function main() {
   const relatorioImaratNomesRemovidos = [];
   const relatorioImaratNomesCorrigidos = [];
 
+  // A remoção é feita somente abaixo, quando a origem Imarat está confirmada no próprio item.
+
   // Sincronização final pós-auditoria: a origem deve ser confirmada no item.
   // A categoria não comprova a origem: Perfumes, Miniaturas e Óleos podem
   // conter produtos de outros fornecedores. Só audita/exclui quando o próprio
@@ -1424,6 +1426,22 @@ async function main() {
         // Em grupos genéricos, só aceita associação se o nome for único em toda a API.
         if (!hit && ['outros', 'outra', 'emporio a r'].includes(b) && candidatosNomeExato.length === 1) {
           hit = candidatosNomeExato[0];
+        }
+        // Correções pontuais validadas no catálogo: transposição em Tharwah
+        // e sufixo GOOD GIRL omitido no nome da miniatura Only You.
+        if (!hit && b === 'lattafa' && n === 'kit thawrah') {
+          hit = imaratList.find(p =>
+            norm(p.name) === 'kit tharwah' && norm(p.brand) === 'lattafa' &&
+            (!volumeMatch(it.volume, it.nome) || !volumeMatch(p.sizeMl, p.name) ||
+              volumeMatch(it.volume, it.nome) === volumeMatch(p.sizeMl, p.name))
+          );
+        }
+        if (!hit && b === 'only you' && n === 'miniatura sapatinho') {
+          hit = imaratList.find(p =>
+            norm(p.name) === 'miniatura sapatinho good girl' && norm(p.brand).includes('only you') &&
+            (!volumeMatch(it.volume, it.nome) || !volumeMatch(p.sizeMl, p.name) ||
+              volumeMatch(it.volume, it.nome) === volumeMatch(p.sizeMl, p.name))
+          );
         }
         // Corrige títulos legados somente com marca compatível, volume compatível
         // e correspondência textual forte e sem ambiguidade.

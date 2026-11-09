@@ -2,7 +2,7 @@ name: Auditoria somente leitura — todos os produtos Imarat
 
 on:
   push:
-    branches: [fix/imarat-global-duplicate-prevention]
+    branches: [fix/imarat-global-duplicate-prevention, fix/imarat-final-name-cleanup]
     paths:
       - "scripts/audit-miniaturas-imarat.mjs"
       - "scripts/audit-imarat-all-products.mjs"

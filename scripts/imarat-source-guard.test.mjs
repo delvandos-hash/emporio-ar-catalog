@@ -31,3 +31,16 @@ test("correções aproximadas exigem marca, volume compatível e alta confiança
   assert.match(source, /best\.score - second\.score >= 0\.08/);
   assert.match(source, /!\['outros', 'outra', 'emporio a r'\]\.includes\(b\)/);
 });
+
+test("não remove miniaturas de outras origens apenas por não constarem na Imarat", () => {
+  assert.doesNotMatch(source, /const itensLegadosForaDoSite = new Set/);
+  assert.match(source, /if \(!fonteImarat && !legadoArabiyatPrestige && !legadoMiniaturaAfeer\) return true/);
+});
+
+test("corrige somente os dois títulos especiais com marca e volume compatíveis", () => {
+  assert.match(source, /b === 'lattafa' && n === 'kit thawrah'/);
+  assert.match(source, /norm\(p\.name\) === 'kit tharwah'/);
+  assert.match(source, /b === 'only you' && n === 'miniatura sapatinho'/);
+  assert.match(source, /norm\(p\.name\) === 'miniatura sapatinho good girl'/);
+  assert.match(source, /volumeMatch\(it\.volume, it\.nome\) === volumeMatch\(p\.sizeMl, p\.name\)/);
+});
