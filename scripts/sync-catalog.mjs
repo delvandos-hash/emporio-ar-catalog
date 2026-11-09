@@ -1310,32 +1310,7 @@ async function main() {
   const relatorioImaratNomesRemovidos = [];
   const relatorioImaratNomesCorrigidos = [];
 
-  // Auditoria final confirmou que estes três registros do grupo público Imarat
-  // (Empório A.R) não existem na lista integral da origem. Remove também a cópia
-  // idêntica de "Mini Vulcan sable" em OUTROS, que era duplicata do mesmo item.
-  const itensLegadosForaDoSite = new Set([
-    'miniaturas|emporio a r|mini elysia|50ml',
-    'miniaturas|emporio a r|mini vulcan bale|30ml',
-    'miniaturas|emporio a r|mini vulcan sable|30ml',
-    'miniaturas|outros|mini vulcan sable 30ml|30ml',
-  ]);
-  for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line] || []) {
-      g.items = (g.items || []).filter(item => {
-        const key = [
-          norm(g.cat), norm(g.brand), norm(item.nome),
-          volumeMatch(item.volume, item.nome)
-        ].join('|');
-        if (!itensLegadosForaDoSite.has(key)) return true;
-        produtosImaratForaDoSiteRaizRemovidos++;
-        relatorioImaratNomesRemovidos.push({
-          linha: line, marca: g.brand, categoria: g.cat,
-          nome: item.nome, fonte: item.fonte || 'registro legado sem correspondência na origem Imarat'
-        });
-        return false;
-      });
-    }
-  }
+  // A remoção é feita somente abaixo, quando a origem Imarat está confirmada no próprio item.
 
   // Sincronização final pós-auditoria: a origem deve ser confirmada no item.
   // A categoria não comprova a origem: Perfumes, Miniaturas e Óleos podem
