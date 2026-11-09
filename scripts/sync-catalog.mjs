@@ -1899,6 +1899,12 @@ async function main() {
       const vistos = new Map();
       const itensUnicos = [];
       for (const item of g.items || []) {
+        // Produtos com ID confirmado são deduplicados globalmente pelo ID abaixo.
+        // Não usar apenas nome/marca aqui: dois IDs distintos podem compartilhar título.
+        if (norm(item.fonte) === 'imarat' && item.id_origem) {
+          itensUnicos.push(item);
+          continue;
+        }
         const nomeKey = norm(item.nome);
         const volumeKey = volumeProduto(item);
         const origemExiste = imaratList.some(p => norm(p.name) === nomeKey && (
@@ -1967,7 +1973,7 @@ async function main() {
   let conflitosGeneroImaratPorId = 0;
   let conflitosPrecoImaratPorId = 0;
   let gruposImaratPorIdConsolidados = 0;
-  const normalizarVolumeId = value => String(value || '').toLowerCase().replace(/\\s+/g, '').replace(',', '.');
+  const normalizarVolumeId = value => String(value || '').toLowerCase().replace(/\s+/g, '').replace(',', '.');
   const chavePrecoId = item => String(item.varejo ?? '').trim() + '|' + String(item.atacado ?? '').trim();
   const completudeItem = item => Object.values(item || {}).filter(value =>
     value !== null && value !== undefined && value !== '' && value !== '—'
