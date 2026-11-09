@@ -11,23 +11,15 @@ test("preserva somente proxy válido e caminho permitido", () => {
   assert.equal(sanitizePublicImageUrl("/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fc.webp", options), "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fc.webp");
   assert.equal(sanitizePublicImageUrl("/api/product-image?source=p&path=%2Fetc%2Fpasswd", options), "");
 });
-
 test("migra rota legada do Preview #5 para alias privado da Imarat", () => {
-  assert.equal(
-    sanitizePublicImageUrl("/api/product-image?path=%2Fuploads%2Fproducts%2Fc.webp", options),
-    "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fc.webp"
-  );
-  assert.equal(
-    sanitizePublicImageUrl("/api/product-image?path=%2Fprivate%2Fsecret.webp", options),
-    ""
-  );
+  assert.equal(sanitizePublicImageUrl("/api/product-image?path=%2Fuploads%2Fproducts%2Fc.webp", options), "/api/product-image?source=p&path=%2Fuploads%2Fproducts%2Fc.webp");
+  assert.equal(sanitizePublicImageUrl("/api/product-image?path=%2Fprivate%2Fsecret.webp", options), "");
 });
 test("bloqueia caminhos protocol-relative diretos e codificados", () => {
   assert.equal(normalizePublicImagePath("//evil.example/image.webp"), "");
   assert.equal(normalizePublicImagePath("/%2Fevil.example/image.webp"), "");
   assert.equal(normalizePublicImagePath("/%2f%2fevil.example/image.webp"), "");
 });
-
 test("bloqueia traversal literal, codificado e duplamente codificado", () => {
   assert.equal(normalizeProductImagePath("/uploads/products/../private.txt"), "");
   assert.equal(normalizeProductImagePath("/uploads/products/%2e%2e/private.txt"), "");
@@ -42,15 +34,14 @@ test("resolve nome relativo e rejeita host, protocolo e credenciais não autoriz
   assert.equal(sanitizePublicImageUrl("https://user:pass@images-primary.example/a.webp", options), "");
   assert.equal(sanitizePublicImageUrl("javascript:alert(1)", options), "");
 });
-
 test("converte imagens da Dande para alias privado autorizado", () => {
   const dandeOptions = { ...options, dandeBase: "https://dandejoias.com/" };
-  assert.equal(
-    sanitizePublicImageUrl("https://dandejoias.com/products/anel.webp", dandeOptions),
-    "/api/product-image?source=d&path=%2Fproducts%2Fanel.webp"
-  );
-  assert.equal(
-    sanitizePublicImageUrl("/api/product-image?source=d&path=%2Fproducts%2Fanel.webp", dandeOptions),
-    "/api/product-image?source=d&path=%2Fproducts%2Fanel.webp"
-  );
+  assert.equal(sanitizePublicImageUrl("https://dandejoias.com/products/anel.webp", dandeOptions), "/api/product-image?source=d&path=%2Fproducts%2Fanel.webp");
+  assert.equal(sanitizePublicImageUrl("/api/product-image?source=d&path=%2Fproducts%2Fanel.webp", dandeOptions), "/api/product-image?source=d&path=%2Fproducts%2Fanel.webp");
+});
+test("converte CloudFront da galeria Dande para alias isolado source=c", () => {
+  const dandeCdnOptions = { ...options, dandeCdnBase: "https://d26lpennugtm8s.cloudfront.net/" };
+  assert.equal(sanitizePublicImageUrl("https://d26lpennugtm8s.cloudfront.net/stores/123/products/anel-1024-1024.webp", dandeCdnOptions), "/api/product-image?source=c&path=%2Fstores%2F123%2Fproducts%2Fanel-1024-1024.webp");
+  assert.equal(sanitizePublicImageUrl("https://other.cloudfront.net/stores/123/products/anel.webp", dandeCdnOptions), "");
+  assert.equal(sanitizePublicImageUrl("/api/product-image?source=c&path=%2Fstores%2F123%2Fproducts%2Fanel.webp", dandeCdnOptions), "/api/product-image?source=c&path=%2Fstores%2F123%2Fproducts%2Fanel.webp");
 });
