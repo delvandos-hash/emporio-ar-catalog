@@ -47,6 +47,7 @@ function titleKey(name, category, brand) {
     n=n.replace(/^(miniatura|mini)\s+/,"");
     n=n.replace(/\s+(afeer|only you|lattafa|armaf|meryam|orientica)$/,"");
   }
+  if(norm(category).includes("oleo")) n=n.replace(/^oleo\s+/,"");
   return n;
 }
 async function fetchAllImarat() {
