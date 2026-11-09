@@ -49,8 +49,7 @@ function publicVariantMatch(item, publicItem) {
   };
   return norm(item?.nome) === norm(publicItem?.nome) &&
     volumeMatch(item?.volume, item?.nome) === volumeMatch(publicItem?.volume, publicItem?.nome) &&
-    publicPriceNumber(item?.varejo) === publicPriceNumber(publicItem?.varejo) &&
-    publicPriceNumber(item?.atacado) === publicPriceNumber(publicItem?.atacado) &&
+    photos(item) !== "" &&
     photos(item) === photos(publicItem);
 }
 function preserveLivePublicFields(DATA, liveDATA) {
