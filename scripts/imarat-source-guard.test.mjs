@@ -114,9 +114,9 @@ test("restauração Only You é append-only, respeita preço manual e valida ant
 
 test("miniaturas usam ID de origem e fallback conservador por marca, nome e volume", () => {
   assert.ok(source.includes("miniIdentityBaseKey(it, g.brand)"));
-  assert.ok(source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? \"\" )") || source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? \"\""));
-  assert.ok(source.includes("!marcaConhecida && indexMiniNameVolume.has(miniIdentityNameVolumeKey(candidate))"));
-  assert.ok(source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\" ) })") || source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\""));
+  assert.ok(source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? \"\""));
+  assert.ok(source.includes("!marcaConhecida && nameVolumeCandidates.length"));
+  assert.ok(source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\""));
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
 });
 
