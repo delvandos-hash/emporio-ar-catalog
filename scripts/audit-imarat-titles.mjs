@@ -10,7 +10,9 @@ const norm = value => String(value || "").toLowerCase()
   .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 const publicBrand = value => norm(value) === "imarat" ? "emporio a r" : norm(value);
 function volume(value, name) {
-  const explicit = String(value || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  let raw = String(value || "").trim();
+  if (raw && /^\d+(?:[.,]\d+)?$/.test(raw)) raw += "ml";
+  const explicit = raw.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
   const fromName = String(name || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
   const m = explicit || fromName;
   return m ? String(Number(m[1].replace(",", "."))) + m[2].toLowerCase() : "";
@@ -47,6 +49,7 @@ function titleKey(name, category, brand) {
     n=n.replace(/^(miniatura|mini)\s+/,"");
     n=n.replace(/\s+(afeer|only you|lattafa|armaf|meryam|orientica)$/,"");
   }
+  if(norm(category).includes("oleo")) n=n.replace(/^oleo\s+/,"");
   return n;
 }
 async function fetchAllImarat() {

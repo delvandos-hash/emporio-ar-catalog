@@ -90,6 +90,9 @@ function titleMatchKey(name, category, brand) {
     value = value.replace(/^(miniatura|mini)\s+/, '');
     value = value.replace(/\s+(afeer|only you|lattafa|armaf|meryam|orientica)$/, '');
   }
+  // "Óleo" identifica a categoria em alguns títulos legados, mas não integra
+  // o nome comercial quando a API raiz publica somente a fragrância.
+  if (norm(category).includes('oleo')) value = value.replace(/^oleo\s+/, '');
   return value;
 }
 
