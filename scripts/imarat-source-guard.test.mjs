@@ -150,5 +150,5 @@ test("auditorias distinguem miniaturas por marca e ID de origem", () => {
 test("perfumes de marcas diferentes com nome e volume iguais não são deduplicados", () => {
   assert.match(source, /normalProductKey\(nome, volume, brand\)/);
   assert.match(source, /!marcaConhecida && indexNameVolume\.has\(normalProductNameVolumeKey\(nome, volume\)\)/);
-  assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}/);
+  assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
 });
