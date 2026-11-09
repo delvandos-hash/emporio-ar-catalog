@@ -5,25 +5,25 @@ export function normalizeIdentity(value) {
   return String(value ?? "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
-    .replace(/\\s+/g, " ");
+    .replace(/\s+/g, " ");
 }
 
 function normalizedVolume(value) {
-  return String(value ?? "").toLowerCase().replace(/\\s+/g, "").replace(",", ".");
+  return String(value ?? "").toLowerCase().replace(/\s+/g, "").replace(",", ".");
 }
 
 export function normalProductKey(nome, volume) {
-  const name = normalizeIdentity(nome).replace(/\\s*\\d+(?:[.,]\\d+)?\\s*(?:ml|g)\\b/g, "").trim();
+  const name = normalizeIdentity(nome).replace(/\s*\d+(?:[.,]\d+)?\s*(?:ml|g)\b/g, "").trim();
   return [name, normalizedVolume(volume)].join("|");
 }
 
 function miniBaseName(nome, brand) {
   let name = normalizeIdentity(nome)
-    .replace(/\\s*\\d+(?:[.,]\\d+)?\\s*(?:ml|g)\\b/g, "")
-    .replace(/\\s+/g, " ")
+    .replace(/\s*\d+(?:[.,]\d+)?\s*(?:ml|g)\b/g, "")
+    .replace(/\s+/g, " ")
     .trim();
   for (const prefix of ["miniatura armaf", "mini armaf", "miniatura", "mini"]) {
     if (name.startsWith(prefix + " ")) {
