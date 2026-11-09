@@ -195,3 +195,8 @@ test("reconciliação aditiva preserva todos os itens públicos e só publica fo
   assert.match(additivePublish, /GIST será atualizado somente com itens novos/);
   assert.match(additivePublish, /GIST_RECONCILIATION_VERIFIED=true/);
 });
+
+test("publicação aditiva só grava no Gist com autorização explícita de execução", () => {
+  assert.match(additivePublish, /APPLY_ADDITIVE_RECONCILIATION !== "1"/);
+  assert.match(additivePublish, /ADDITIVE_RECONCILIATION_DRY_RUN=true/);
+});
