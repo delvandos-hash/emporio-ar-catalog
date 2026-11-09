@@ -7,9 +7,11 @@ on:
       - "scripts/sync-catalog.mjs"
       - "scripts/audit-imarat-all-products.mjs"
       - "scripts/restore-gist-only-legacy.mjs"
+      - "scripts/legacy-restore-identity.mjs"
+      - "scripts/legacy-restore-identity.test.mjs"
       - "scripts/apply-additive-reconciliation.mjs"
       - "scripts/public-catalog.mjs"
-      - "scripts/public-catalog.test.mjs"
+      - "scripts/public-catalog.test.mjs scripts/legacy-restore-identity.test.mjs"
       - "scripts/catalog-identity.mjs"
       - "scripts/catalog-identity.test.mjs"
       - "scripts/imarat-source-guard.test.mjs"
@@ -41,6 +43,7 @@ jobs:
         run: |
           node --check scripts/sync-catalog.mjs
           node --check scripts/restore-gist-only-legacy.mjs
+          node --check scripts/legacy-restore-identity.mjs
           node --check scripts/apply-additive-reconciliation.mjs
           node --check scripts/public-catalog.mjs
           node --check scripts/catalog-identity.mjs
