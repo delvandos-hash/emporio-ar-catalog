@@ -1260,7 +1260,7 @@ async function main() {
       });
     }
   }
-  console.log(\`Produtos Imarat removidos por nome ausente no site raiz: \${produtosImaratForaDoSiteRaizRemovidos}\`);
+  console.log(`Produtos Imarat removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
