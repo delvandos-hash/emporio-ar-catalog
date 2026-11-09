@@ -51,5 +51,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: live-catalogo-snapshot
-          path: live-catalogo.json
+          path: |
+            live-catalogo.json
+            js/data.js
           retention-days: 2
