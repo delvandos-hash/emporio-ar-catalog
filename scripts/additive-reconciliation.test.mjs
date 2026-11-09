@@ -88,3 +88,14 @@ test("reidentificação preserva public_id legado mesmo após correção de tít
   assert.match(audit, /byPublicId/);
   assert.match(audit, /byGlobalId\.length===1/);
 });
+
+test("auditoria e reconciliação usam stock_ref global para acessórios fora da categoria-base", () => {
+  assert.match(audit, /byStockRef/);
+  assert.match(audit, /byStock\.length===1/);
+  assert.match(apply, /internalByStockRef/);
+  assert.match(apply, /byStockRef\.length === 1/);
+});
+test("restauração aditiva também preserva itens legados da categoria Brand", () => {
+  assert.match(restoreLegacy, /isBrandLegacy/);
+  assert.match(restoreLegacy, /LEGACY_GIST_RESTORED/);
+});
