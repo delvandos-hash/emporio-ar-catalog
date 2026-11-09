@@ -1266,23 +1266,26 @@ async function main() {
     for (const g of DATA[line] || []) {
       g.items = (g.items || []).filter(item => {
         const fonteImarat = norm(item.fonte) === 'imarat';
-        if (!fonteImarat) return true;
-
         const nomeNormalizado = norm(item.nome);
+        const legadoArabiyatPrestige =
+          norm(g.brand).includes('arabiyat') && nomeNormalizado.startsWith('prestige ');
+        const legadoMiniaturaAfeer =
+          norm(g.cat) === 'miniaturas' && norm(g.brand).includes('afeer') &&
+          nomeNormalizado.includes('atheri afeer');
+        if (!fonteImarat && !legadoArabiyatPrestige && !legadoMiniaturaAfeer) return true;
+
         let hit = imaratList.find(p => norm(p.name) === nomeNormalizado);
 
-        // Compatibilidade histórica: "PRESTIGE Noiré Absolu" foi salvo com
-        // a marca no título; na origem, marca = Arabiyat Prestige e produto = Noiré Absolu.
-        if (!hit && norm(g.brand).includes('arabiyat') && nomeNormalizado.startsWith('prestige ')) {
+        // Compatibilidade histórica: a marca foi incluída indevidamente no título.
+        if (!hit && legadoArabiyatPrestige) {
           const nomeSemPrefixo = nomeNormalizado.slice('prestige '.length);
           hit = imaratList.find(p =>
             norm(p.name) === nomeSemPrefixo && norm(p.brand).includes('arabiyat prestige')
           );
         }
 
-        // Grafia antiga da miniatura Afeer: o título correto é Atherri.
-        if (!hit && norm(g.cat) === 'miniaturas' && norm(g.brand).includes('afeer') &&
-            nomeNormalizado.includes('atheri afeer')) {
+        // Grafia antiga da miniatura Afeer: só corrige com confirmação da origem.
+        if (!hit && legadoMiniaturaAfeer) {
           hit = imaratList.find(p =>
             norm(p.name) === 'miniatura atherri afeer' && norm(p.brand).includes('afeer')
           );
@@ -1297,9 +1300,12 @@ async function main() {
             item.nome = hit.name;
             titulosImaratCorrigidosPeloSiteRaiz++;
           }
-          item.fonte = 'imarat';
+          if (fonteImarat || legadoArabiyatPrestige || legadoMiniaturaAfeer) item.fonte = 'imarat';
           return true;
         }
+
+        // Registros sem procedência explícita nunca são excluídos por falha de correspondência.
+        if (!fonteImarat) return true;
 
         produtosImaratForaDoSiteRaizRemovidos++;
         relatorioImaratNomesRemovidos.push({
