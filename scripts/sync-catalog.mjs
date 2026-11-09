@@ -1675,11 +1675,11 @@ async function main() {
   // volume, ID de origem, preço, fotos ou metadados mantém os dois registros.
   let exactDuplicatesRemoved = 0;
   const exactSeen = new Set();
-  for (const groups of Object.values(DATA)) {
+  for (const [line, groups] of Object.entries(DATA)) {
     for (const group of Array.isArray(groups) ? groups : []) {
       const kept = [];
       for (const item of Array.isArray(group.items) ? group.items : []) {
-        const fingerprint = exactCatalogFingerprint(item, group.brand, item.fonte);
+        const fingerprint = exactCatalogFingerprint(item, group.brand, item.fonte, line, group.cat);
         if (exactSeen.has(fingerprint)) {
           exactDuplicatesRemoved++;
           console.log('CÓPIA EXATA REMOVIDA: ' + JSON.stringify({
