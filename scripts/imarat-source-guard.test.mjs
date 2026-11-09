@@ -67,6 +67,8 @@ test("auditoria de miniaturas usa volume e categoria retornados pela Imarat", ()
 });
 
 test("auditoria global só confirma duplicidade após correspondência segura de marca e volume", () => {
+  assert.match(auditAllSource, /async function fetchLiveCatalog\(\)/);
+  assert.match(auditAllSource, /const GIST_TOKEN = process\.env\.GIST_TOKEN/);
   assert.match(auditAllSource, /function sourceBrandMatches\(catalogBrand,sourceBrand\)/);
   assert.match(auditAllSource, /function volumeCompatible\(left,right\)/);
   assert.match(auditAllSource, /const confirmedNormalDuplicates=\[\.\.\.catalogBySourceIdentity\]/);
