@@ -213,7 +213,7 @@ function notesToText(notes) {
 
 // No catálogo público, a marca genérica "Imarat" deve ser apresentada como Empório A.R.
 function marcaPublicaImarat(brand) {
-  const valor = limparTexto(brand || 'Outros');
+  const valor = limparTexto(brand || 'Outros').trim();
   return norm(valor) === 'imarat' ? 'Empório A.R' : valor;
 }
 
@@ -1312,7 +1312,7 @@ async function main() {
           // Marca e produto são campos separados: move apenas os itens confirmados
           // pela origem para o grupo Arabiyat Prestige, sem renomear os demais.
           if (norm(hit.brand).includes('arabiyat prestige')) {
-            const marcaCorreta = marcaPublicaImarat(hit.brand).toUpperCase();
+            const marcaCorreta = marcaPublicaImarat(hit.brand).trim().toUpperCase();
             if (norm(g.brand) !== norm(marcaCorreta)) {
               const destino = ensureBrandGroup(DATA, line, marcaCorreta, g.cat);
               destino.items.push(item);
