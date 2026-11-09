@@ -116,7 +116,7 @@ test("restauração Only You é append-only, respeita preço manual e valida ant
 
 test("miniaturas usam ID de origem e fallback conservador por marca, nome e volume", () => {
   assert.ok(source.includes("miniIdentityBaseKey(it, g.brand)"));
-  assert.ok(source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? \"\""));
+  assert.ok(source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? p.slug ?? \"\""));
   assert.ok(source.includes("!marcaConhecida && nameVolumeCandidates.length"));
   assert.ok(source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\""));
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
@@ -131,7 +131,7 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
 
 test("perfumes exigem marca, nome exato e volume; semelhanças entre marcas são preservadas", () => {
   assert.ok(source.includes("const indexNormal = new Map()"));
-  assert.ok(source.includes("indexNormal.get(normalKey).push({ id_origem: it.id_origem ?? it.id ?? \"\" })"));
+  assert.ok(source.includes("indexNormal.get(normalKey).push({ id_origem: it.id_origem ?? it.id ?? it.slug ?? \"\" })"));
   assert.ok(source.includes("duplicado = isDuplicateMiniSource(normalCandidates, candidateId)"));
   assert.ok(source.includes("duplicado = isDuplicateMiniSource(nameVolumeCandidates, candidateId)"));
   assert.ok(source.includes("Nomes iguais em marcas diferentes coexistem"));
