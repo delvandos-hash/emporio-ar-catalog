@@ -85,13 +85,13 @@ function publicFingerprint(item) {
 }
 
 function publicPhotoFingerprint(item) {
-  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
-  return JSON.stringify([...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort());
+  const primary = String(item?.foto || (Array.isArray(item?.fotos) ? item.fotos[0] : "") || "").trim();
+  return primary ? JSON.stringify(primary) : "[]";
 }
 
 function looseIdentity(line, group, item) {
   const name = String(item?.nome || "").replace(/\d+(?:[.,]\d+)?\s*(?:ml|g)\b/gi, " ");
-  return [norm(line), norm(group?.brand), norm(name)].join("|");
+  return [norm(group?.brand), norm(name)].join("|");
 }
 
 function rekeyLiveVariants(liveDATA, internalPublic) {
@@ -312,8 +312,7 @@ const internalOnlySourceConfirmed = eligibleInternalOnlyRows.every(({ row }) =>
   (effectiveAdditiveSource(row) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
 );
 const additiveReconciliationSafe =
-  // Variantes sem correspondência inequívoca continuam preservadas no Gist;
-  // a reconciliação nunca exige rekey forçado para aprovar uma operação aditiva.
+  rekeyAudit.unmatched === 0 &&
   liveOnlyKeys.length === 0 &&
   eligibleInternalOnlyRows.length > 0 &&
   eligibleInternalOnlyRows.length <= 80 &&
