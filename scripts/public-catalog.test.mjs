@@ -280,3 +280,19 @@ test("marcas ONLY YOU e MAIS YOU permanecem separadas mesmo com nomes semelhante
   const ids = out.feminino.map(group => group.items[0].public_id);
   assert.equal(new Set(ids).size, 2);
 });
+
+test("stock_ref já validado prevalece sobre ID de origem alterado", () => {
+  const DATA = {
+    acessorios: [{ brand: "Empório A.R", cat: "Masculinos", items: [{
+      nome: "Colar Masculino 3x1 Aço Inoxidavel",
+      id_origem: "novo-id-da-fonte",
+      fonte: "acessorios",
+      stock_ref: "s_df05a28999eac34ac1580fe3",
+      stock_route: "a"
+    }] }]
+  };
+  const item = toPublicCatalog(DATA).acessorios[0].items[0];
+  assert.equal(item.stock_ref, "s_df05a28999eac34ac1580fe3");
+  assert.equal(item.stock_route, "a");
+  assert.equal(item.id_origem, undefined);
+});
