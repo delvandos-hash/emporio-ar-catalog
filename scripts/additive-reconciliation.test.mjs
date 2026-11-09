@@ -151,3 +151,8 @@ test("baseline do sincronizador compara IDs públicos estáveis e bloqueia qualq
   assert.match(sync, /onlyInternal > 80/);
   assert.doesNotMatch(sync, /countCatalogIdentity/);
 });
+
+test("restauração preserva stock_ref e stock_route canônicos do Gist", () => {
+  assert.match(restore, /publicItem\.stock_ref && target\.stock_ref !== publicItem\.stock_ref/);
+  assert.match(restore, /publicItem\.stock_route && target\.stock_route !== publicItem\.stock_route/);
+});
