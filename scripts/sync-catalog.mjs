@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
-import { normalProductKey, miniIdentityBaseKey, miniIdentityKey, miniIdentityNameVolumeKey } from './catalog-identity.mjs';
+import { normalProductKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource } from './catalog-identity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1688,8 +1688,8 @@ async function main() {
         indexNameVolume.add(normalProductKey(it.nome, it.volume));
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const baseKey = miniIdentityBaseKey(it, g.brand);
-          if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, new Set());
-          indexMiniByBase.get(baseKey).add(miniIdentityKey(it, g.brand));
+          if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
+          indexMiniByBase.get(baseKey).push({ id_origem: it.id_origem ?? "" });
           indexMiniNameVolume.add(miniIdentityNameVolumeKey(it));
         }
       }
@@ -1725,19 +1725,13 @@ async function main() {
           // exata no catálogo sob uma marca conhecida.
           duplicado = true;
         } else if (existing) {
-          // Só busca detalhes quando há uma identidade candidata; compara a galeria
-          // completa antes de bloquear a inclusão.
-          if (p.slug && !SYNC_SKIP_DETAILS) detail = await fetchImaratDetail(p.slug);
-          imgsNew = imaratImagesFrom(p, detail);
-          candidate.foto = imgsNew[0] || '';
-          candidate.fotos = imgsNew;
-          const miniFullKey = miniIdentityKey(candidate, brand);
-          duplicado = existing.has(miniFullKey);
+          // ID de origem é a identidade primária. Se IDs forem diferentes, mantém
+          // os dois registros; se faltar ID, usa marca + nome-base + volume.
+          duplicado = isDuplicateMiniSource(existing, p.id ?? p.productId ?? "");
           if (!duplicado) {
-            console.log('VARIANTE MINIATURA PARA REVISÃO: ' + JSON.stringify({
-              nome, marca: brand, volume, varejo: prices.varejo, atacado: prices.atacado,
-              quantidadeRegistrosComMesmaBase: existing.size,
-              imagemPrincipal: imgsNew[0] || ''
+            console.log('MINIATURA COM ID DE ORIGEM DISTINTO: ' + JSON.stringify({
+              nome, marca: brand, volume, idOrigem: p.id ?? p.productId ?? "",
+              idsExistentes: existing.map(item => item.id_origem || "sem ID")
             }));
           }
         } else {
@@ -1786,8 +1780,8 @@ async function main() {
         const actualMini = { nome, volume, varejo: prices.varejo, atacado: prices.atacado, foto, fotos: imgsNew };
         const baseKey = miniIdentityBaseKey(actualMini, brand);
         const fullKey = miniIdentityKey(actualMini, brand);
-        if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, new Set());
-        indexMiniByBase.get(baseKey).add(fullKey);
+        if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
+        indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
         indexMiniNameVolume.add(miniIdentityNameVolumeKey(actualMini));
       }
       addedImarat++;
