@@ -274,6 +274,22 @@ for(const [line,groups] of Object.entries(DATA)) {
     });
   }
 }
+const publicIdCollisionMap = new Map();
+for (const item of catalog) {
+  const id = String(item.item?.public_id || "").trim();
+  if (!id) continue;
+  if (!publicIdCollisionMap.has(id)) publicIdCollisionMap.set(id, []);
+  publicIdCollisionMap.get(id).push({
+    line: item.line, brand: item.brand, category: item.category, name: item.name,
+    fonte: item.item?.fonte || "", id_origem: item.item?.id_origem || "",
+    stock_ref: item.item?.stock_ref || "", origin_ref: item.item?.origin_ref || ""
+  });
+}
+const publicIdCollisions = [...publicIdCollisionMap].filter(([, rows]) => rows.length > 1);
+console.log(`PUBLIC_ID_COLLISION_GROUPS=${publicIdCollisions.length}`);
+for (const [public_id, rows] of publicIdCollisions) {
+  console.log("PUBLIC_ID_COLLISION_DETAIL " + JSON.stringify({ public_id, rows }));
+}
 const internalItemCount=internalPublicIndex.size;
 const liveKeySet=new Set(catalog.map(x=>String(x.item.public_id||"")));
 const internalOnlyKeys=[...internalPublicIndex.keys()].filter(key=>!liveKeySet.has(key));
