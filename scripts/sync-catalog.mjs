@@ -74,6 +74,56 @@ function norm(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
 
+function volumeMatch(value, name) {
+  let raw = String(value || '').trim();
+  if (raw && /^\d+(?:[.,]\d+)?$/.test(raw)) raw += 'ml';
+  const match = raw.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i) ||
+    String(name || '').match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  return match ? String(Number(match[1].replace(',', '.'))) + match[2].toLowerCase() : '';
+}
+
+function titleMatchKey(name, category, brand) {
+  let value = norm(name).replace(/\b\d+(?:[.,]\d+)?\s*(ml|g)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  const brandKey = norm(brand);
+  if (brandKey && value.startsWith(brandKey + ' ')) value = value.slice(brandKey.length).trim();
+  if (norm(category).includes('mini')) {
+    value = value.replace(/^(miniatura|mini)\s+/, '');
+    value = value.replace(/\s+(afeer|only you|lattafa|armaf|meryam|orientica)$/, '');
+  }
+  return value;
+}
+
+function titleEditDistance(a, b) {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let diagonal = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const above = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diagonal = above;
+    }
+  }
+  return row[b.length];
+}
+
+function titleTokenSimilarity(a, b) {
+  const left = new Set(a.split(' ').filter(Boolean));
+  const right = new Set(b.split(' ').filter(Boolean));
+  if (!left.size || !right.size) return 0;
+  let intersection = 0;
+  for (const token of left) if (right.has(token)) intersection++;
+  return intersection / (left.size + right.size - intersection);
+}
+
+function titleSimilarity(a, b) {
+  if (!a || !b) return { score: 0, tokens: 0 };
+  return {
+    score: 1 - titleEditDistance(a, b) / Math.max(a.length, b.length),
+    tokens: titleTokenSimilarity(a, b)
+  };
+}
+
 // Remove apenas volumes, MANTENDO a palavra "caixa" e outras nomenclaturas.
 function limparParaComparacao(s) { 
     return norm(s)
@@ -1352,6 +1402,7 @@ async function main() {
   }
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
+  let titulosFuzzyCorrigidos = 0;
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
@@ -1363,15 +1414,55 @@ async function main() {
 
         const n = norm(it.nome); const b = norm(g.brand);
         const nomeSemPrefixoPrestige = n.replace(/^prestige\s+/, '');
-        const hit =
-          imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) ||
-          imaratList.find((p) => norm(p.name) === n) ||
-          // A marca Arabiyat Prestige pode estar agrupada historicamente como "ARABIYAT".
-          // Nesse caso, remove "Prestige" somente para localizar o produto na marca correta.
-          imaratList.find((p) => norm(p.brand).includes('arabiyat prestige') && norm(p.name) === nomeSemPrefixoPrestige);
+        const candidatosNomeExato = imaratList.filter(p => norm(p.name) === n);
+        // Primeiro exige coincidência de marca, considerando Imarat → Empório A.R.
+        let hit = candidatosNomeExato.find(p => norm(marcaPublicaImarat(p.brand)) === b);
+        // Exceção histórica comprovada: Arabiyat Prestige era agrupada como ARABIYAT.
+        if (!hit && b === 'arabiyat') {
+          hit = candidatosNomeExato.find(p => norm(p.brand).includes('arabiyat prestige'));
+        }
+        // Em grupos genéricos, só aceita associação se o nome for único em toda a API.
+        if (!hit && ['outros', 'outra', 'emporio a r'].includes(b) && candidatosNomeExato.length === 1) {
+          hit = candidatosNomeExato[0];
+        }
+        // Corrige títulos legados somente com marca compatível, volume compatível
+        // e correspondência textual forte e sem ambiguidade.
+        if (!hit && !['outros', 'outra', 'emporio a r'].includes(b)) {
+          const fuzzyCandidates = imaratList.filter(p =>
+            norm(marcaPublicaImarat(p.brand)) === b ||
+            (b === 'arabiyat' && norm(p.brand).includes('arabiyat prestige'))
+          ).filter(p => {
+            const itemVolume = volumeMatch(it.volume, it.nome);
+            const sourceVolume = volumeMatch(p.sizeMl, p.name);
+            return !itemVolume || !sourceVolume || itemVolume === sourceVolume;
+          }).map(p => {
+            const itemKey = titleMatchKey(it.nome, g.cat, g.brand);
+            const sourceKey = titleMatchKey(p.name, g.cat, p.brand);
+            return { product: p, ...titleSimilarity(itemKey, sourceKey) };
+          }).sort((a, b) => b.score - a.score);
+          const best = fuzzyCandidates[0];
+          const second = fuzzyCandidates[1];
+          if (best && best.score >= 0.86 && best.tokens >= 0.8 &&
+              (!second || best.score - second.score >= 0.08)) {
+            hit = best.product;
+          }
+        }
+        // Prefixo histórico de Arabiyat Prestige: comparar sem a palavra da marca.
+        if (!hit && b === 'arabiyat') {
+          hit = imaratList.find(p =>
+            norm(p.brand).includes('arabiyat prestige') && norm(p.name) === nomeSemPrefixoPrestige
+          );
+        }
         if (!hit) continue;
 
         // Identifica a origem e atualiza o título exatamente como consta na API raiz.
+        if (String(it.nome || '') !== String(hit.name || '')) {
+          titulosFuzzyCorrigidos++;
+          console.log('TÍTULO IMARAT CORRIGIDO POR MARCA/VOLUME: ' + JSON.stringify({
+            linha: line, marca: g.brand, categoria: g.cat,
+            nomeAnterior: it.nome, nomeNoSiteRaiz: hit.name
+          }));
+        }
         it.fonte = 'imarat';
         it.nome = hit.name;
 
@@ -1857,6 +1948,7 @@ async function main() {
 
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
+  console.log(`Títulos corrigidos por correspondência forte de marca/volume: ${titulosFuzzyCorrigidos}`);
   console.log(`Novos Brand: ${addedBrand}`);
   console.log(`Roupas Sophia: ${roupasCount} | Franny: ${frannyCount} | Acessórios: ${acessoriosCount}`);
   console.log(`Estoque alterado: ${stockChanged}`);

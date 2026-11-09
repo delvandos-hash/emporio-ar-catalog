@@ -1,0 +1,19 @@
+name: Testes de correspondência Imarat
+
+on:
+  pull_request:
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - "scripts/imarat-source-guard.test.mjs"
+      - ".github/workflows/test-imarat-matching.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar regras de origem Imarat
+        run: node --test scripts/imarat-source-guard.test.mjs

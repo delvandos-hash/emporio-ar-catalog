@@ -17,3 +17,17 @@ test("Arabiyat Prestige permanece no campo de marca, separado do nome do produto
   assert.match(source, /limparTexto\(hit\.brand \|\| g\.brand \|\| 'Outros'\)\.trim\(\)/);
   assert.match(source, /limparTexto\(p\.brand \|\| 'Outros'\)\.trim\(\)/);
 });
+
+test("identificação Imarat exige marca compatível ou nome único em grupo genérico", () => {
+  assert.match(source, /candidatosNomeExato\.find\(p => norm\(marcaPublicaImarat\(p\.brand\)\) === b\)/);
+  assert.doesNotMatch(source, /imaratList\.find\(\(p\) => norm\(p\.name\) === n\)\s*\|\|/);
+  assert.match(source, /\['outros', 'outra', 'emporio a r'\]\.includes\(b\) && candidatosNomeExato\.length === 1/);
+});
+
+test("correções aproximadas exigem marca, volume compatível e alta confiança", () => {
+  assert.match(source, /norm\(marcaPublicaImarat\(p\.brand\)\) === b/);
+  assert.match(source, /itemVolume === sourceVolume/);
+  assert.match(source, /best\.score >= 0\.86 && best\.tokens >= 0\.8/);
+  assert.match(source, /best\.score - second\.score >= 0\.08/);
+  assert.match(source, /!\['outros', 'outra', 'emporio a r'\]\.includes\(b\)/);
+});
