@@ -118,7 +118,7 @@ test("deduplicação de miniaturas exige identidade exata, marca, volume, preço
   assert.ok(source.includes("const existing = indexMiniByBase.get(miniBaseKey)"));
   assert.ok(source.includes("duplicado = existing.has(miniFullKey)"));
   assert.ok(source.includes("candidate.fotos = imgsNew"));
-  assert.ok(!source.includes("indexMiniNameVolume"));
+  assert.ok(source.includes("!marcaConhecida && indexMiniNameVolume.has(miniIdentityNameVolumeKey(candidate))"));
 });
 
 test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
