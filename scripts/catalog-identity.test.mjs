@@ -45,3 +45,11 @@ test("only fully identical records share the safe deletion fingerprint", () => {
   assert.notEqual(exactCatalogFingerprint({...base,foto:"https://img.example/b.webp"},"Lattafa","imarat"),key);
   assert.notEqual(exactCatalogFingerprint({...base,notas:"Notas diferentes"},"Lattafa","imarat"),key);
 });
+
+test("fingerprint exato preserva linha, categoria e referências de estoque distintas", () => {
+  const base={nome:"Perfume Alfa 100ml",volume:"100ml",varejo:"199,90",atacado:"149,90",foto:"https://img.example/a.webp",id_origem:"101",fonte:"imarat",stock_ref:"stock-a"};
+  const key=exactCatalogFingerprint(base,"Marca A","imarat","masculino","Perfumes");
+  assert.notEqual(exactCatalogFingerprint(base,"Marca A","imarat","feminino","Perfumes"),key);
+  assert.notEqual(exactCatalogFingerprint(base,"Marca A","imarat","masculino","Miniaturas"),key);
+  assert.notEqual(exactCatalogFingerprint({...base,stock_ref:"stock-b"},"Marca A","imarat","masculino","Perfumes"),key);
+});
