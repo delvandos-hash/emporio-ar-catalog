@@ -1637,10 +1637,8 @@ async function main() {
         indexNormal.add(limparParaComparacao(it.nome));
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const chaveMini = chaveComparacaoMini(it.nome);
-          // Regra homologada: comparação global por nome-base, sem prefixo e sem volume,
-          // exclusiva para miniaturas Imarat. Mantém o bloqueio entre marcas/grupos.
-          indexMiniImarat.add(chaveMini);
-          indexMiniImarat.add(`${chaveMini}|${norm(g.brand)}`);
+          // Marca e volume integram a chave; nomes parecidos de marcas diferentes coexistem.
+          indexMiniImarat.add(`${norm(g.brand)}|${chaveMini}|${volumeMatch(it.volume, it.nome)}`);
         }
       }
     }
