@@ -16,7 +16,6 @@ permissions:
 
 jobs:
   sync:
-    if: github.event_name != 'push' || startsWith(github.event.head_commit.message, 'ops: one-time Imarat recovery')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,7 +50,7 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
-          SYNC_IMARAT_ONLY: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops: one-time Imarat recovery') && '1' || '0' }}
+          SYNC_IMARAT_ONLY: ${{ github.event_name == 'push' && '1' || '0' }}
       - name: Persistir data.js após sincronização bem-sucedida
         run: |
           if git diff --quiet -- js/data.js; then
