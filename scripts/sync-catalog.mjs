@@ -103,7 +103,11 @@ function removerMarcaDoNome(s) {
 
 // Mini Marshmellow === Mini Armaf Marshmellow → "marshmellow"
 function chaveComparacaoMini(nome) {
-  return removerMarcaDoNome(removerPrefixosMini(limparParaComparacao(nome)));
+  const nomeNormalizado = limparParaComparacao(nome);
+  // Corrige a variação de digitação conhecida da miniatura Afeer:
+  // "Miniatura Atheri Afeer" e "Miniatura Atherri Afeer" são o mesmo produto.
+  if (nomeNormalizado === 'miniatura atheri afeer' || nomeNormalizado === 'miniatura atherri afeer') return 'atherri';
+  return removerMarcaDoNome(removerPrefixosMini(nomeNormalizado));
 }
 
 function isOleo(nome) {
@@ -1295,6 +1299,34 @@ async function main() {
       }
     }
   }
+
+  // Correção nominal específica validada pelo responsável do catálogo:
+  // Atheri é a grafia incorreta; Atherri é a grafia correta da miniatura Afeer.
+  // Só atua na categoria Miniaturas e no grupo da marca Afeer.
+  const nomeMiniAfeerErrado = 'miniatura atheri afeer';
+  const nomeMiniAfeerCorreto = 'miniatura atherri afeer';
+  const miniAfeerCorretaNaApi = imaratList.some(p =>
+    norm(p.name) === nomeMiniAfeerCorreto && norm(p.brand || '').includes('afeer')
+  );
+  const miniAfeerCorretaNoSnapshot = Object.keys(DATA).some(line =>
+    (DATA[line] || []).some(g =>
+      norm(g.cat).includes('miniatura') &&
+      norm(g.brand).includes('afeer') &&
+      (g.items || []).some(item => norm(item.nome) === nomeMiniAfeerCorreto)
+    )
+  );
+  let miniAfeerGrafiaErradaRemovida = 0;
+  if (miniAfeerCorretaNaApi || miniAfeerCorretaNoSnapshot) {
+    for (const line of Object.keys(DATA)) {
+      for (const g of DATA[line] || []) {
+        if (!norm(g.cat).includes('miniatura') || !norm(g.brand).includes('afeer')) continue;
+        const antes = (g.items || []).length;
+        g.items = (g.items || []).filter(item => norm(item.nome) !== nomeMiniAfeerErrado);
+        miniAfeerGrafiaErradaRemovida += antes - g.items.length;
+      }
+    }
+  }
+  console.log(`Miniatura Atheri Afeer (grafia incorreta) removida: ${miniAfeerGrafiaErradaRemovida}`);
 
   // Filtro de segurança: duplicatas exatas dentro de cada grupo.
   for (const line of Object.keys(DATA)) {
