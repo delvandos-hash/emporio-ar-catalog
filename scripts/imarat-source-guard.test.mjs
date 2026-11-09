@@ -90,3 +90,11 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
   assert.match(source, /DUPLICATA IMARAT CONSOLIDADA POR ID DA ORIGEM/);
   assert.match(source, /if \(norm\(item\.fonte\) === 'imarat' && item\.id_origem\)/);
 });
+
+
+test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
+  assert.ok(source.includes(".replace(/['’]s\\b/gi, '')"));
+  assert.ok(auditAllSource.includes('.replace(/['’]s\\b/gi, "")'));
+  assert.ok(auditSource.includes('.replace(/['’]s\\b/gi, "")'));
+  assert.ok(auditMiniSource.includes('.replace(/['’]s\\b/gi, "")'));
+});
