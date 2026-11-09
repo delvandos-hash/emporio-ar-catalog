@@ -1418,6 +1418,14 @@ async function main() {
         if (it.notas) it.notas = limparTexto(it.notas);
 
         const n = norm(it.nome); const b = norm(g.brand);
+        if (b === 'ard al zaafaran' && (n.includes('durrat al aroos') || n.includes('shagaf al ward'))) {
+          const candidatesDebug = imaratList.filter(p => norm(p.brand) === b &&
+            (norm(p.name).includes('durrat al aroos') || norm(p.name).includes('shagaf al ward')));
+          console.log('DEBUG OLEO IMARAT', JSON.stringify({
+            nome: it.nome, categoria: g.cat, marca: g.brand, volume: volumeMatch(it.volume, it.nome),
+            candidatos: candidatesDebug.map(p => ({ nome: p.name, marca: p.brand, volume: volumeMatch(p.sizeMl, p.name) }))
+          }));
+        }
         const nomeSemPrefixoPrestige = n.replace(/^prestige\s+/, '');
         const candidatosNomeExato = imaratList.filter(p => norm(p.name) === n);
         // Primeiro exige coincidência de marca, considerando Imarat → Empório A.R.
