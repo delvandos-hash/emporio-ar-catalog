@@ -143,6 +143,43 @@ for(const p of source) {
 }
 const catalogDuplicateGroups=[...catalogByKey].filter(([,items])=>items.length>1);
 const apiDuplicateGroups=[...apiByKey].filter(([,items])=>items.length>1);
+// Simula, em memória, a ordem de importação da Imarat usando as mesmas chaves
+// e as mesmas atualizações de índice de sync-catalog.mjs. Não altera DATA/Gist.
+const normalIndex=new Set();
+const miniIndex=new Set();
+for(const item of catalog) {
+  normalIndex.add(limparParaComparacao(item.name));
+  normalIndex.add(`${limparParaComparacao(item.name)}|${norm(item.brand)}`);
+  if(isMiniatura(item.name,item.volume,item.category)&&!isOleo(item.name))
+    miniIndex.add(chaveComparacaoMini(item.name));
+}
+const simulatedNew=[];
+const simulatedBlocked=[];
+for(const p of source) {
+  const name=String(p.name||"").trim();
+  if(!name) continue;
+  const volume=volumeFrom(p.sizeMl,name);
+  const category=p.categoria_nome||p.categoria||"";
+  const brand=String(p.brand||"Outros").toUpperCase();
+  const mini=isMiniatura(name,volume,category)&&!isOleo(name);
+  const normalKey=limparParaComparacao(name);
+  const miniKey=chaveComparacaoMini(name);
+  const duplicate=mini
+    ? (miniIndex.has(miniKey)||miniIndex.has(`${miniKey}|${norm(brand)}`)
+      ||miniIndex.has(`${miniKey}|armaf`)||miniIndex.has(`${miniKey}|outros`)||miniIndex.has(`${miniKey}|outra`))
+    : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
+  if(duplicate) {
+    simulatedBlocked.push({name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`});
+    continue;
+  }
+  simulatedNew.push({name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`});
+  normalIndex.add(normalKey);
+  normalIndex.add(`${normalKey}|${norm(brand)}`);
+  if(mini) {
+    miniIndex.add(miniKey);
+    miniIndex.add(`${miniKey}|${norm(brand)}`);
+  }
+}
 const apiAlreadyPresent=source.map(p=>{
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
@@ -165,6 +202,7 @@ console.log(`Itens do catálogo cuja chave coincide com algum produto Imarat: ${
 console.log(`Grupos de colisão de chave no catálogo (2+ itens para chave Imarat): ${imaratDuplicateGroups.length}`);
 console.log(`Grupos duplicados na própria API Imarat: ${apiDuplicateGroups.length}`);
 console.log(`Produtos da API cuja chave já existe no catálogo (bloqueio esperado): ${apiAlreadyPresent.length}`);
+console.log(`Simulação do sincronizador: ${simulatedNew.length} novos produtos únicos | ${simulatedBlocked.length} bloqueados por chave já existente/repetida`);
 const imaratSourceCatalog=catalog.filter(x=>x.source.toLowerCase()==="imarat");
 const repeatedOriginIds=[...new Set(imaratSourceCatalog.filter(x=>x.originId).map(x=>x.originId))]
   .filter(id=>imaratSourceCatalog.filter(x=>x.originId===id).length>1);
