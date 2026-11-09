@@ -212,6 +212,7 @@ function notesToText(notes) {
 }
 
 // No catálogo público, a marca genérica "Imarat" deve ser apresentada como Empório A.R.
+// Normalização final: remove espaços externos de todas as marcas públicas.
 function marcaPublicaImarat(brand) {
   const valor = limparTexto(brand || 'Outros').trim();
   return norm(valor) === 'imarat' ? 'Empório A.R' : valor;
