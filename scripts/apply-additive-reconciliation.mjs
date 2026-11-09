@@ -96,11 +96,18 @@ function collectKeys(DATA) {
 }
 
 function collectContentKeys(DATA) {
+  // IDs podem ser reatribuídos durante a reconciliação; a proteção mede conteúdo
+  // e multiplicidade de registros, não o public_id que está sendo corrigido.
   const keys = new Set();
+  const occurrences = new Map();
   for (const [line, groups] of Object.entries(DATA || {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
-        if (item?.nome) keys.add(identity(line, group, item) + "|" + String(item?.public_id || "") + "|" + publicFingerprint(item));
+        if (!item?.nome) continue;
+        const contentKey = identity(line, group, item) + "|" + publicFingerprint(item);
+        const occurrence = occurrences.get(contentKey) || 0;
+        occurrences.set(contentKey, occurrence + 1);
+        keys.add(contentKey + "|occurrence=" + occurrence);
       }
     }
   }
