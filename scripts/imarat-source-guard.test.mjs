@@ -128,7 +128,7 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
 });
 
 test("perfumes usam nome normalizado exato e volume, sem similaridade aproximada", () => {
-  assert.ok(source.includes("indexNameVolume.add(normalProductKey(it.nome, it.volume))"));
+  assert.ok(source.includes("indexNameVolume.add(normalProductNameVolumeKey(it.nome, it.volume))"));
   assert.ok(source.includes("duplicado = indexNameVolume.has(normalProductKey(nome, volume))"));
   assert.ok(source.includes("Não usa substring, similaridade aproximada ou marca como chave."));
   assert.ok(source.includes("indexNormal.add(`${norm(brand)}|${nomeKey}|${volumeKey}`)"));
