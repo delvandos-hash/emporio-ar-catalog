@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
-import { normalProductKey, miniIdentityBaseKey, miniIdentityKey } from './catalog-identity.mjs';
+import { normalProductKey, miniIdentityBaseKey, miniIdentityKey, miniIdentityNameVolumeKey } from './catalog-identity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1678,6 +1678,7 @@ async function main() {
   const indexNormal = new Set();
   const indexNameVolume = new Set();
   const indexMiniByBase = new Map();
+  const indexMiniNameVolume = new Set();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
       for (const it of g.items || []) {
@@ -1689,6 +1690,7 @@ async function main() {
           const baseKey = miniIdentityBaseKey(it, g.brand);
           if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, new Set());
           indexMiniByBase.get(baseKey).add(miniIdentityKey(it, g.brand));
+          indexMiniNameVolume.add(miniIdentityNameVolumeKey(it));
         }
       }
     }
@@ -1698,6 +1700,7 @@ async function main() {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
       const marcaOrigem = limparTexto(p.brand || 'Outros').trim();
+      const marcaConhecida = Boolean(String(p.brand || '').trim()) && !['outros', 'outra'].includes(norm(marcaOrigem));
       const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
@@ -1717,7 +1720,11 @@ async function main() {
         };
         const miniBaseKey = miniIdentityBaseKey(candidate, brand);
         const existing = indexMiniByBase.get(miniBaseKey);
-        if (existing) {
+        if (!marcaConhecida && indexMiniNameVolume.has(miniIdentityNameVolumeKey(candidate))) {
+          // Marca ausente: não atribuir o produto a "Outros" se já há identidade
+          // exata no catálogo sob uma marca conhecida.
+          duplicado = true;
+        } else if (existing) {
           // Só busca detalhes quando há uma identidade candidata; compara a galeria
           // completa antes de bloquear a inclusão.
           if (p.slug && !SYNC_SKIP_DETAILS) detail = await fetchImaratDetail(p.slug);
@@ -1781,6 +1788,7 @@ async function main() {
         const fullKey = miniIdentityKey(actualMini, brand);
         if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, new Set());
         indexMiniByBase.get(baseKey).add(fullKey);
+        indexMiniNameVolume.add(miniIdentityNameVolumeKey(actualMini));
       }
       addedImarat++;
     }
