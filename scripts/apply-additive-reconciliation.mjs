@@ -168,6 +168,11 @@ async function main() {
   console.log(`SOURCE_CONFIRMED_ADDITIONS=${appended}`);
   console.log("GIST será atualizado somente com itens novos; registros atuais, preços e imagens existentes permanecem intactos.");
 
+  if (process.env.APPLY_ADDITIVE_RECONCILIATION !== "1") {
+    console.log("ADDITIVE_RECONCILIATION_DRY_RUN=true; Gist de produção não foi alterado.");
+    return;
+  }
+
   const patch = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
     method: "PATCH",
     headers: {
