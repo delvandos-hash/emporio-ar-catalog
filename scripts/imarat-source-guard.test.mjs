@@ -98,8 +98,10 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
 
 test("baseline de publicação compara IDs públicos estáveis e bloqueia qualquer ID vivo ausente", () => {
   assert.match(source, /async function fetchLiveGistBaseline\(\)/);
-  assert.match(source, /function countCatalogPublicIds\(DATA\)/);
-  assert.match(source, /if \(!SYNC_DRY_RUN && \(onlyLive > 0 \|\| onlyInternal > 80/);
+  assert.match(source, /function countCatalogPublicIds\(DATA, alreadyPublic = false\)/);
+  assert.match(source, /countCatalogPublicIds\(liveDATA, true\)/);
+  assert.match(source, /return \{ count: keys\.size, items, missingIds, keys \}/);
+  assert.match(source, /if \(!SYNC_DRY_RUN && \(liveBaseline\.missingIds > 0 \|\| onlyLive > 0 \|\| onlyInternal > 80/);
   assert.match(source, /IDs públicos do Gist sem representação interna/);
 });
 
