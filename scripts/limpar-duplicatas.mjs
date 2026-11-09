@@ -4,6 +4,7 @@
  */
 
 import fs from 'fs';
+import { toPublicCatalog } from './public-catalog.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -89,7 +90,7 @@ async function main() {
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
 
     const dadosParaSite = {
-      DATA: DATA,
+      DATA: toPublicCatalog(DATA),
       WHATSAPP: "5562991134488",
       BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" },
       ultimaAtualizacao: new Date().toISOString()
