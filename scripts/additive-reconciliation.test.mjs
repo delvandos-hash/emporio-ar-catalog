@@ -102,3 +102,14 @@ test("restauração aditiva preserva itens legados de todas as linhas, marcas e 
   assert.match(restore, /LEGACY_GIST_RESTORED/);
   assert.doesNotMatch(restore, /isBrandLegacy|isEmporioLegacy/);
 });
+
+test("auditoria classifica entradas internas repetidas por stock_ref como já representadas", () => {
+  assert.match(audit, /duplicateInternalSourceRows/);
+  assert.match(audit, /eligibleInternalOnlyRows/);
+  assert.match(audit, /duplicateSourceRepresentations/);
+});
+test("publicação aditiva não duplica item com stock_ref já presente no Gist", () => {
+  assert.match(apply, /liveStockRefs/);
+  assert.match(apply, /duplicateSourceKeys/);
+  assert.match(apply, /DUPLICATE_SOURCE_REPRESENTATIONS_SKIPPED/);
+});
