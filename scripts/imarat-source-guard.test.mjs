@@ -112,11 +112,13 @@ test("restauração Only You é append-only, respeita preço manual e valida ant
   assert.doesNotMatch(restoreOnlyYouSource, /group\.items\s*=\s*group\.items\.filter/);
 });
 
-test("deduplicação de miniaturas exige marca e volume compatíveis", () => {
-  assert.ok(source.includes("marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}"));
-  assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeKey}`"));
-  assert.ok(source.includes("duplicado = indexMiniImarat.has(chaveComIdentidade)"));
-  assert.ok(!source.includes("indexMiniImarat.has(chave)"));
+test("deduplicação de miniaturas exige identidade exata, marca, volume, preço e fotos", () => {
+  assert.ok(source.includes("miniIdentityBaseKey(it, g.brand)"));
+  assert.ok(source.includes("miniIdentityKey(it, g.brand)"));
+  assert.ok(source.includes("const existing = indexMiniByBase.get(miniBaseKey)"));
+  assert.ok(source.includes("duplicado = existing.has(miniFullKey)"));
+  assert.ok(source.includes("candidate.fotos = imgsNew"));
+  assert.ok(!source.includes("indexMiniNameVolume"));
 });
 
 test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
@@ -126,13 +128,14 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
   assert.ok(auditMiniSource.includes(".replace(/['’]s"));
 });
 
-test("deduplicação geral preserva nomes iguais entre marcas e volumes diferentes", () => {
-  assert.ok(source.includes("const chave = id ? `id|\u0024{norm(g.brand)}|\u0024{id}`"));
-  assert.ok(source.includes("`produto|\u0024{norm(g.brand)}|\u0024{limparParaComparacao(item.nome)}|\u0024{volume}`"));
-  assert.ok(source.includes("indexNormal.add(`\u0024{norm(g.brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
-  assert.ok(!source.includes("indexNormal.add(limparParaComparacao(it.nome))"));
-  assert.ok(source.includes("duplicado = indexNormal.has(`\u0024{norm(brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
+test("perfumes usam nome normalizado exato e volume, sem similaridade aproximada", () => {
+  assert.ok(source.includes("indexNameVolume.add(normalProductKey(it.nome, it.volume))"));
+  assert.ok(source.includes("duplicado = indexNameVolume.has(normalProductKey(nome, volume))"));
+  assert.ok(source.includes("Não usa substring, similaridade aproximada ou marca como chave."));
+  assert.ok(source.includes("indexNormal.add(`${norm(brand)}|${nomeKey}|${volumeKey}`)"));
 });
+
+undefined
 
 test("marca ausente não pode criar duplicata ambígua em outra marca", () => {
   assert.match(source, /const marcaConhecida = Boolean\(String\(p\.brand \|\| ''\)\.trim\(\)\)/);
@@ -141,4 +144,10 @@ test("marca ausente não pode criar duplicata ambígua em outra marca", () => {
   assert.match(audit, /const brandKnown=Boolean\(String\(p\.brand\|\|""\)\.trim\(\)\)/);
   assert.match(audit, /!brandKnown&&normalNameVolumeIndex\.has/);
   assert.match(audit, /!brandKnown&&miniNameVolumeIndex\.has/);
+});
+
+test("sincronização não remove produtos já existentes automaticamente", () => {
+  assert.match(source, /Deduplicação destrutiva desativada: todos os registros existentes foram preservados/);
+  assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
+  assert.doesNotMatch(source, /miniaturasDuplicadasRemovidas\+\+/);
 });
