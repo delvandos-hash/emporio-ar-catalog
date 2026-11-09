@@ -27,6 +27,7 @@ const BRAND_ALLOWED_SESSIONS = [
 ];
 
 const SYNC_DRY_RUN = process.env.SYNC_DRY_RUN === '1';
+const SYNC_SKIP_DETAILS = process.env.SYNC_SKIP_DETAILS === '1';
 const SYNC_DANDE_ONLY = process.env.SYNC_DANDE_ONLY === '1';
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
@@ -1297,7 +1298,7 @@ async function main() {
         // duas requisições idênticas por produto durante a sincronização.
         let detailImgs = null;
         let notas = '';
-        if (hit.slug) {
+        if (hit.slug && !SYNC_SKIP_DETAILS) {
           detailImgs = await fetchImaratDetail(hit.slug);
           if (detailImgs) {
             notas = notesToText(detailImgs.notes) || (detailImgs.shortDesc || detailImgs.description || '').slice(0, 400);
@@ -1446,7 +1447,7 @@ async function main() {
 
       let notas = '';
       let detail = null;
-      if (p.slug) {
+      if (p.slug && !SYNC_SKIP_DETAILS) {
         detail = await fetchImaratDetail(p.slug);
         if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
       }
