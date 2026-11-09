@@ -1,0 +1,28 @@
+name: Auditoria somente leitura — miniaturas Imarat
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/audit-miniaturas-imarat.mjs"
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/audit-miniaturas-imarat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-miniaturas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Auditar snapshot público (somente leitura)
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: node scripts/audit-miniaturas-imarat.mjs
