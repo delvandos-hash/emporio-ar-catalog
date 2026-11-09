@@ -92,6 +92,13 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
 });
 
 
+test("bloqueia publicação quando a base interna diverge do Gist vivo", () => {
+  assert.match(source, /async function fetchLiveGistBaseline\(\)/);
+  assert.match(source, /function countCatalogIdentity\(DATA\)/);
+  assert.match(source, /if \(!SYNC_DRY_RUN && \(onlyLive > 25 \|\| onlyInternal > 25/);
+  assert.match(source, /SINCRONIZAÇÃO BLOQUEADA: data\.js interno diverge do Gist vivo/);
+});
+
 test("deduplicação de miniaturas exige marca e volume compatíveis", () => {
   assert.ok(source.includes("marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}"));
   assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`"));

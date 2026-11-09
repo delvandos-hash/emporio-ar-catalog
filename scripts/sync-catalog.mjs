@@ -30,6 +30,51 @@ const SYNC_DRY_RUN = process.env.SYNC_DRY_RUN === '1';
 const SYNC_SKIP_DETAILS = process.env.SYNC_SKIP_DETAILS === '1';
 const SYNC_IMARAT_ONLY = process.env.SYNC_IMARAT_ONLY === '1';
 const SYNC_DANDE_ONLY = process.env.SYNC_DANDE_ONLY === '1';
+const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
+
+async function fetchLiveGistBaseline() {
+  const token = process.env.GIST_TOKEN;
+  if (!token) throw new Error("GIST_TOKEN não configurado para validar a base viva do catálogo.");
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "EmporioAR-Sync-Baseline-Guard/1.0"
+  };
+  const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers });
+  if (!response.ok) throw new Error(`Falha ao validar Gist vivo: HTTP ${response.status}`);
+  const gist = await response.json();
+  const file = gist.files?.["catalogo.json"];
+  if (!file) throw new Error("Gist vivo sem catalogo.json; sincronização bloqueada por segurança.");
+  let raw = file.content;
+  if (file.truncated || !raw) {
+    if (!file.raw_url) throw new Error("Gist truncado sem raw_url; sincronização bloqueada.");
+    const rawResponse = await fetch(file.raw_url, { headers });
+    if (!rawResponse.ok) throw new Error(`Falha ao baixar Gist vivo: HTTP ${rawResponse.status}`);
+    raw = await rawResponse.text();
+  }
+  const snapshot = JSON.parse(String(raw).replace(/^\uFEFF/, ""));
+  const DATA = snapshot.DATA || snapshot;
+  if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) {
+    throw new Error("Estrutura DATA inválida no Gist vivo; sincronização bloqueada.");
+  }
+  return DATA;
+}
+
+function countCatalogIdentity(DATA) {
+  const keys = new Set();
+  let count = 0;
+  for (const [line, groups] of Object.entries(DATA || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        if (!item?.nome) continue;
+        count++;
+        keys.add([norm(line), norm(group.brand), norm(item.nome), volumeMatch(item.volume, item.nome)].join("|"));
+      }
+    }
+  }
+  return { count, keys };
+}
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
 const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura armaf', 'miniatura', 'mini'];
@@ -1278,6 +1323,28 @@ async function main() {
   if (!m) throw new Error('DATA não encontrado');
   const DATA = JSON.parse(m[1]);
 
+  if (!SYNC_DANDE_ONLY) {
+    if (!process.env.GIST_TOKEN && !SYNC_DRY_RUN) {
+      throw new Error("GIST_TOKEN ausente; sincronização de produção bloqueada antes de qualquer publicação.");
+    }
+    if (process.env.GIST_TOKEN) {
+      const internalBaseline = countCatalogIdentity(DATA);
+      const liveDATA = await fetchLiveGistBaseline();
+      const liveBaseline = countCatalogIdentity(liveDATA);
+      const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
+      const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
+      console.log(`BASELINE INTERNA × GIST VIVO: data.js=${internalBaseline.count}; Gist=${liveBaseline.count}; só data.js=${onlyInternal}; só Gist=${onlyLive}`);
+      if (!SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25 || Math.abs(liveBaseline.count - internalBaseline.count) > 25)) {
+        throw new Error("SINCRONIZAÇÃO BLOQUEADA: data.js interno diverge do Gist vivo. Reconcilie a base antes de publicar para evitar perda de produtos e ajustes.");
+      }
+      if (SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25)) {
+        console.log("⚠️ Base divergente detectada; dry-run permitido apenas para diagnóstico. Nenhuma publicação será feita.");
+      }
+    } else {
+      console.log("SYNC_DRY_RUN=1 sem GIST_TOKEN; validação de divergência do Gist ignorada (sem publicação).");
+    }
+  }
+
   console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW} ADD_ROUPAS=${ADD_ROUPAS}`);
 
   if (SYNC_DANDE_ONLY) {
@@ -2163,7 +2230,7 @@ async function main() {
 
   console.log('Enviando dados para o GitHub Gist...');
   try {
-    const gistId = "11918b7196b3ee6a0d8a91739167b312";
+    const gistId = GIST_ID;
     const githubToken = process.env.GIST_TOKEN;
     if (!githubToken) throw new Error('GIST_TOKEN não configurado');
     const dadosParaSite = { DATA: toPublicCatalog(DATA), WHATSAPP: "5562991134488", BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" }, ultimaAtualizacao: new Date().toISOString() };
