@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
+import { resolveLegacyStockMatch } from "./legacy-restore-identity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
@@ -181,7 +182,14 @@ async function main() {
           continue;
         }
         if (stockMatches.length > 1) {
-          ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, stock_ref: stockRef, matches: stockMatches.length });
+          const identityMatches = indexes.identityIndex.get(key) || [];
+          const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, publicItem);
+          if (resolved) {
+            mergePublicFields(resolved.item, publicItem);
+            merged++;
+            continue;
+          }
+          ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, stock_ref: stockRef, matches: stockMatches.length, identityMatches: identityMatches.length, reason: "sem correspondência inequívoca por public_id, identidade e fotografia" });
           continue;
         }
 
