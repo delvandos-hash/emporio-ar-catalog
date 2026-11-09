@@ -142,3 +142,12 @@ test("auditoria reconhece item Brand legado com mesmo nome-base e foto como já 
   assert.match(audit, /liveLoosePhotoKeys/);
   assert.match(apply, /rowCategory\.includes\("brand"\)/);
 });
+
+test("baseline do sincronizador compara IDs públicos estáveis e bloqueia qualquer ID do Gist ausente", () => {
+  assert.match(sync, /function countCatalogPublicIds/);
+  assert.match(sync, /const internalBaseline = countCatalogPublicIds\(DATA\)/);
+  assert.match(sync, /const liveBaseline = countCatalogPublicIds\(liveDATA\)/);
+  assert.match(sync, /onlyLive > 0/);
+  assert.match(sync, /onlyInternal > 80/);
+  assert.doesNotMatch(sync, /countCatalogIdentity/);
+});
