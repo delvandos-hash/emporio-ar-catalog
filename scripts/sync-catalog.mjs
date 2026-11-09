@@ -209,6 +209,12 @@ function notesToText(notes) {
   return parts.join(' | ');
 }
 
+// No catálogo público, a marca genérica "Imarat" deve ser apresentada como Empório A.R.
+function marcaPublicaImarat(brand) {
+  const valor = limparTexto(brand || 'Outros');
+  return norm(valor) === 'imarat' ? 'Empório A.R' : valor;
+}
+
 function ensureBrandGroup(DATA, line, brand, cat) {
   DATA[line] = DATA[line] || [];
   let g = DATA[line].find((x) => x.brand === brand && x.cat === cat);
@@ -1253,7 +1259,9 @@ async function main() {
 
         // Identifica a origem para a limpeza global de duplicatas históricas Imarat.
         it.fonte = 'imarat';
-        it.nome = hit.name; 
+        it.nome = hit.name;
+        // Regra comercial vigente: marca "Imarat" na origem é exibida como Empório A.R.
+        if (norm(hit.brand) === 'imarat') g.brand = 'Empório A.R'; 
         
         let notas = '';
         if (hit.slug) { 
@@ -1394,7 +1402,7 @@ async function main() {
   if (ADD_IMARAT_NEW) {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
-      const brand = limparTexto((p.brand || 'Outros')).toUpperCase();
+      const brand = marcaPublicaImarat(p.brand || 'Outros').toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
       const ehOleo = isOleo(nome);
