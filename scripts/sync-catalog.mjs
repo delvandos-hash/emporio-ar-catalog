@@ -1726,11 +1726,23 @@ async function main() {
           candidate.fotos = imgsNew;
           const miniFullKey = miniIdentityKey(candidate, brand);
           duplicado = existing.has(miniFullKey);
+          if (!duplicado) {
+            console.log('VARIANTE MINIATURA PARA REVISÃO: ' + JSON.stringify({
+              nome, marca: brand, volume, varejo: prices.varejo, atacado: prices.atacado,
+              quantidadeRegistrosComMesmaBase: existing.size,
+              imagemPrincipal: imgsNew[0] || ''
+            }));
+          }
+        } else {
+          console.log('NOVA MINIATURA CANDIDATA: ' + JSON.stringify({
+            nome, marca: brand, volume, varejo: prices.varejo, atacado: prices.atacado
+          }));
         }
       } else {
         // Perfumes: comparação global por nome exato normalizado + volume.
         // Não usa substring, similaridade aproximada ou marca como chave.
         duplicado = indexNameVolume.has(normalProductKey(nome, volume));
+        if (!duplicado) console.log('NOVO PERFUME CANDIDATO: ' + JSON.stringify({ nome, marca: brand, volume }));
       }
       if (duplicado) continue;
 
