@@ -301,15 +301,24 @@ const categoryMismatches=matchedCatalog.filter(x=>{
 // Simula, em memória, a ordem de importação da Imarat usando as mesmas chaves
 // e as mesmas atualizações de índice de sync-catalog.mjs. Não altera DATA/Gist.
 const normalIndex=new Set();
+const normalNameVolumeIndex=new Set();
 const miniIndex=new Set();
+const miniNameVolumeIndex=new Set();
 for(const item of catalog) {
-  normalIndex.add(limparParaComparacao(item.name));
-  normalIndex.add(`${limparParaComparacao(item.name)}|${norm(item.brand)}`);
-  if(isMiniatura(item.name,item.volume,item.category)&&!isOleo(item.name))
+  const normalKey=limparParaComparacao(item.name);
+  const volumeKey=volumeMatch(item.volume,item.name);
+  normalIndex.add(`${norm(item.brand)}|${normalKey}|${volumeKey}`);
+  normalNameVolumeIndex.add(`${normalKey}|${volumeKey}`);
+  if(isMiniatura(item.name,item.volume,item.category)&&!isOleo(item.name)) {
+    const miniKey=chaveComparacaoMini(item.name);
     miniIndex.add(miniIdentityKey(item.brand,item.name,item.volume));
+    miniNameVolumeIndex.add(`${miniKey}|${volumeKey}`);
+  }
 }
 const initialNormalIndex=new Set(normalIndex);
+const initialNormalNameVolumeIndex=new Set(normalNameVolumeIndex);
 const initialMiniIndex=new Set(miniIndex);
+const initialMiniNameVolumeIndex=new Set(miniNameVolumeIndex);
 const simulatedNew=[];
 const blockedByCatalog=[];
 const blockedWithinImarat=[];
@@ -319,24 +328,29 @@ for(const p of source) {
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
   const brand=String(p.brand||"Outros").toUpperCase();
+  const brandKnown=Boolean(String(p.brand||"").trim())&&!["outros","outra"].includes(norm(brand));
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   const normalKey=limparParaComparacao(name);
   const miniKey=chaveComparacaoMini(name);
+  const volumeKey=volumeMatch(volume,name);
   const miniIdentity=miniIdentityKey(brand,name,volume);
   const duplicate=mini
-    ? miniIndex.has(miniIdentity)
-    : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
+    ? miniIndex.has(miniIdentity)||(!brandKnown&&miniNameVolumeIndex.has(`${miniKey}|${volumeKey}`))
+    : normalIndex.has(`${norm(brand)}|${normalKey}|${volumeKey}`)||(!brandKnown&&normalNameVolumeIndex.has(`${normalKey}|${volumeKey}`));
   if(duplicate) {
-    const entry={name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${normalKey}`};
-    const existedBefore=mini?initialMiniIndex.has(miniIdentity):initialNormalIndex.has(normalKey);
+    const entry={name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${norm(brand)}|${normalKey}|${volume}`};
+    const existedBefore=mini
+      ? initialMiniIndex.has(miniIdentity)||(!brandKnown&&initialMiniNameVolumeIndex.has(`${miniKey}|${volumeKey}`))
+      : initialNormalIndex.has(`${norm(brand)}|${normalKey}|${volumeKey}`)||(!brandKnown&&initialNormalNameVolumeIndex.has(`${normalKey}|${volumeKey}`));
     (existedBefore?blockedByCatalog:blockedWithinImarat).push(entry);
     continue;
   }
-  simulatedNew.push({name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${normalKey}`});
-  normalIndex.add(normalKey);
-  normalIndex.add(`${normalKey}|${norm(brand)}`);
+  simulatedNew.push({name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${norm(brand)}|${normalKey}|${volume}`});
+  normalIndex.add(`${norm(brand)}|${normalKey}|${volumeKey}`);
+  normalNameVolumeIndex.add(`${normalKey}|${volumeKey}`);
   if(mini) {
-    miniIndex.add(miniIdentityKey(brand,name,volume));
+    miniIndex.add(miniIdentity);
+    miniNameVolumeIndex.add(`${miniKey}|${volumeKey}`);
   }
 }
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
