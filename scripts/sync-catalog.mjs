@@ -1942,9 +1942,169 @@ async function main() {
       g.items = itensUnicos;
     }
   }
+  // Consolidação global por ID da origem: identifica o mesmo produto mesmo quando
+  // ele aparece em linhas, marcas genéricas ou categorias diferentes no catálogo.
+  // O ID é interno e será removido pela projeção pública (toPublicCatalog).
+  const imaratPorId = new Map();
+  for (const produto of imaratList) {
+    if (produto.id != null) imaratPorId.set(String(produto.id), produto);
+  }
+  const registrosPorId = new Map();
+  for (const line of Object.keys(DATA)) {
+    for (const group of DATA[line] || []) {
+      for (const item of group.items || []) {
+        if (norm(item.fonte) !== 'imarat') continue;
+        const id = String(item.id_origem || '').trim();
+        if (!id || !imaratPorId.has(id)) continue;
+        if (!registrosPorId.has(id)) registrosPorId.set(id, []);
+        registrosPorId.get(id).push({ line, group, item });
+      }
+    }
+  }
+
+  let duplicatasImaratPorIdRemovidas = 0;
+  let conflitosVolumeImaratPorId = 0;
+  let conflitosGeneroImaratPorId = 0;
+  let conflitosPrecoImaratPorId = 0;
+  let gruposImaratPorIdConsolidados = 0;
+  const normalizarVolumeId = value => String(value || '').toLowerCase().replace(/\\s+/g, '').replace(',', '.');
+  const chavePrecoId = item => String(item.varejo ?? '').trim() + '|' + String(item.atacado ?? '').trim();
+  const completudeItem = item => Object.values(item || {}).filter(value =>
+    value !== null && value !== undefined && value !== '' && value !== '—'
+  ).length;
+
+  for (const [id, registros] of registrosPorId) {
+    if (registros.length < 2) continue;
+    const source = imaratPorId.get(id);
+    const sourceVolume = volumeMatch(source.sizeMl, source.name);
+    const volumesCatalogo = new Set(registros.map(r => normalizarVolumeId(volumeProduto(r.item))).filter(Boolean));
+    const sourceVolumeKey = normalizarVolumeId(sourceVolume);
+
+    if (volumesCatalogo.size > 1 ||
+        (sourceVolumeKey && [...volumesCatalogo].some(volume => volume !== sourceVolumeKey))) {
+      conflitosVolumeImaratPorId++;
+      console.log('DUPLICIDADE IMARAT PRESERVADA POR CONFLITO DE VOLUME: ' + JSON.stringify({
+        id, nome: source.name, volumesCatalogo: [...volumesCatalogo], volumeOrigem: sourceVolume || 'não informado'
+      }));
+      continue;
+    }
+
+    const linhas = new Set(registros.map(r => r.line));
+    const generoOrigem = String(source.gender || source.genero || source.sexo || '').trim();
+    if (!generoOrigem && linhas.size > 1) {
+      conflitosGeneroImaratPorId++;
+      console.log('DUPLICIDADE IMARAT PRESERVADA POR GÊNERO NÃO INFORMADO: ' + JSON.stringify({
+        id, nome: source.name, linhas: [...linhas]
+      }));
+      continue;
+    }
+
+    const linhaDestino = generoOrigem ? genderLine(generoOrigem) : registros[0].line;
+    const marcaOrigem = String(source.brand || '').trim();
+    const marcaDestino = marcaOrigem
+      ? limparTexto(marcaPublicaImarat(marcaOrigem)).trim().toUpperCase()
+      : 'OUTROS';
+    const categoriaOrigem = String(source.categoria_nome || source.categoria || '').trim();
+    const volumeDestino = sourceVolume || [...volumesCatalogo][0] || '';
+    const categoriaDestino = categoriaOrigem ||
+      (isOleo(source.name) ? 'Óleos' :
+        isMiniatura(source.name, volumeDestino, '') ? 'Miniaturas' : 'Perfumes');
+    const grupoDestino = ensureBrandGroup(DATA, linhaDestino, marcaDestino, categoriaDestino);
+
+    const precos = new Set(registros.map(r => chavePrecoId(r.item)));
+    const registrosManuais = registros.filter(r => precoManualAtivo(r.item));
+    let keeper;
+
+    if (precos.size > 1) {
+      const precosManuais = new Set(registrosManuais.map(r => chavePrecoId(r.item)));
+      if (!registrosManuais.length || precosManuais.size !== 1) {
+        conflitosPrecoImaratPorId++;
+        console.log('DUPLICIDADE IMARAT PRESERVADA POR CONFLITO DE PREÇO: ' + JSON.stringify({
+          id, nome: source.name,
+          itens: registros.map(r => ({
+            linha: r.line, marca: r.group.brand, categoria: r.group.cat,
+            varejo: r.item.varejo, atacado: r.item.atacado,
+            precoManual: precoManualAtivo(r.item)
+          }))
+        }));
+        continue;
+      }
+      keeper = registrosManuais.find(r => chavePrecoId(r.item) === [...precosManuais][0]);
+    } else {
+      keeper = registros.find(r => r.group === grupoDestino) ||
+        registrosManuais[0] ||
+        [...registros].sort((a, b) => completudeItem(b.item) - completudeItem(a.item))[0];
+    }
+
+    const itemMantido = keeper.item;
+    for (const registro of registros) {
+      if (registro === keeper) continue;
+      const outro = registro.item;
+      for (const [campo, valor] of Object.entries(outro)) {
+        if (['nome', 'volume', 'varejo', 'atacado', 'precoManual', 'id_origem', 'fonte'].includes(campo)) continue;
+        if (itemMantido[campo] == null || itemMantido[campo] === '' || itemMantido[campo] === '—') {
+          itemMantido[campo] = valor;
+        }
+      }
+      const fotos = [
+        ...(Array.isArray(itemMantido.fotos) ? itemMantido.fotos : []),
+        itemMantido.foto,
+        ...(Array.isArray(outro.fotos) ? outro.fotos : []),
+        outro.foto
+      ].filter(Boolean);
+      const fotosUnicas = [...new Set(fotos)];
+      if (fotosUnicas.length) {
+        itemMantido.fotos = fotosUnicas;
+        if (!itemMantido.foto) itemMantido.foto = fotosUnicas[0];
+      }
+      if (outro.disponivel === 'Sim') itemMantido.disponivel = 'Sim';
+      const estoqueAtual = Number(itemMantido.estoque);
+      const estoqueOutro = Number(outro.estoque);
+      if (Number.isFinite(estoqueOutro) && (!Number.isFinite(estoqueAtual) || estoqueOutro > estoqueAtual)) {
+        itemMantido.estoque = outro.estoque;
+      }
+    }
+
+    itemMantido.nome = source.name || itemMantido.nome;
+    if (volumeDestino) itemMantido.volume = volumeDestino;
+    itemMantido.fonte = 'imarat';
+    itemMantido.id_origem = id;
+    if (registrosManuais.length) itemMantido.precoManual = true;
+
+    if (keeper.group !== grupoDestino) {
+      keeper.group.items = (keeper.group.items || []).filter(item => item !== itemMantido);
+      if (!Array.isArray(grupoDestino.items)) grupoDestino.items = [];
+      grupoDestino.items.push(itemMantido);
+      keeper.group = grupoDestino;
+    }
+    for (const registro of registros) {
+      if (registro === keeper) continue;
+      registro.group.items = (registro.group.items || []).filter(item => item !== registro.item);
+    }
+
+    const removidas = registros.length - 1;
+    duplicatasImaratPorIdRemovidas += removidas;
+    gruposImaratPorIdConsolidados++;
+    console.log('DUPLICATA IMARAT CONSOLIDADA POR ID DA ORIGEM: ' + JSON.stringify({
+      id, nome: itemMantido.nome, removidas,
+      linhaFinal: linhaDestino, marcaFinal: marcaDestino, categoriaFinal: categoriaDestino,
+      volume: itemMantido.volume || 'não informado',
+      varejo: itemMantido.varejo, atacado: itemMantido.atacado
+    }));
+  }
+
+  for (const line of Object.keys(DATA)) {
+    DATA[line] = (DATA[line] || []).filter(group => (group.items || []).length > 0);
+  }
+
   console.log(`Grupos Imarat consolidados: ${gruposImaratConsolidados}`);
   console.log(`Duplicatas exatas Imarat removidas: ${duplicatasImaratRemovidas}`);
   console.log(`Conflitos de preço preservados para revisão: ${conflitosPrecoImaratPreservados}`);
+  console.log(`Grupos de duplicidade Imarat consolidados por ID da origem: ${gruposImaratPorIdConsolidados}`);
+  console.log(`Duplicatas Imarat removidas por ID da origem: ${duplicatasImaratPorIdRemovidas}`);
+  console.log(`Conflitos de volume preservados por ID: ${conflitosVolumeImaratPorId}`);
+  console.log(`Conflitos de gênero preservados por ID: ${conflitosGeneroImaratPorId}`);
+  console.log(`Conflitos de preço preservados por ID: ${conflitosPrecoImaratPorId}`);
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
