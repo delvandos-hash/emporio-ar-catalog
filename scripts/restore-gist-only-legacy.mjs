@@ -97,6 +97,7 @@ async function main() {
         }
 
         const legacy = {
+          ...(item.public_id ? { public_id: item.public_id } : {}),
           nome: item.nome,
           volume: item.volume || "—",
           varejo: item.varejo,
