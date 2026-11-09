@@ -328,7 +328,7 @@ for(const p of source) {
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
   const brand=String(p.brand||"Outros").toUpperCase();
-  const brandKnown=Boolean(String(p.brand||"").trim())&&!["outros","outra"].includes(norm(brand));
+  const brandKnown=Boolean(String(p.brand||"").trim())&&!["outros","outra","sem marca","sem marca definida","nao informado","n/a"].includes(norm(brand));
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   const normalKey=limparParaComparacao(name);
   const miniKey=chaveComparacaoMini(name);
