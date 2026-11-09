@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
+import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -17,17 +18,6 @@ const IMARAT_ORIGIN = process.env.IMARAT_ORIGIN_URL;
 const BRAND_BASE = process.env.BRAND_BASE_URL;
 const CDN_IMAGE_BASE = process.env.CDN_IMAGE_BASE_URL;
 
-function resolveImaratImageUrl(value) {
-  if (!value) return '';
-  const raw = String(value).trim();
-  if (!raw) return '';
-  if (/^https:\/\//i.test(raw)) return raw;
-  if (!IMARAT_ORIGIN) return '';
-  try {
-    const base = IMARAT_ORIGIN.endsWith('/') ? IMARAT_ORIGIN : IMARAT_ORIGIN + '/';
-    return new URL(raw, base).toString();
-  } catch { return ''; }
-}
 const BRAND_SELLER = 'darlanaugusto';
 
 const BRAND_ALLOWED_SESSIONS = [
