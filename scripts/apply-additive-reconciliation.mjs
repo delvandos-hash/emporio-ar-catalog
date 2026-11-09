@@ -73,7 +73,8 @@ function publicFingerprint(item) {
     novoDesde: String(item?.novoDesde ?? ""),
     variacoes: item?.variacoes || [],
     stock_ref: String(item?.stock_ref ?? ""),
-    stock_route: String(item?.stock_route ?? "")
+    stock_route: String(item?.stock_route ?? ""),
+    origin_ref: String(item?.origin_ref ?? "")
   });
 }
 
@@ -107,21 +108,10 @@ function collectContentKeys(DATA) {
 }
 
 function dedupeExactLiveVariants(DATA) {
-  const seen = new Set();
-  let removed = 0;
-  for (const [line, groups] of Object.entries(DATA || {})) {
-    for (const group of Array.isArray(groups) ? groups : []) {
-      const kept = [];
-      for (const item of Array.isArray(group?.items) ? group.items : []) {
-        const key = identity(line, group, item) + "|" + String(item?.public_id || "") + "|" + publicFingerprint(item);
-        if (seen.has(key)) { removed++; continue; }
-        seen.add(key);
-        kept.push(item);
-      }
-      group.items = kept;
-    }
-  }
-  return removed;
+  // Durante a recuperação, nem mesmo cópias visualmente idênticas são removidas:
+  // o Gist legado pode ter public_id colidido para IDs de origem distintos.
+  // A limpeza só poderá ocorrer após reconciliação por origin_ref estável.
+  return 0;
 }
 
 function collectInternalIndex(DATA) {
@@ -156,10 +146,16 @@ function collectInternalIndex(DATA) {
 
 function rekeyLiveVariants(liveDATA, internalIndex) {
   const internalByBase = new Map();
+  const internalByOriginRef = new Map();
   for (const rows of internalIndex.values()) for (const row of rows) {
     const base = identity(row.publicLine, row.publicGroup, row.publicItem);
     if (!internalByBase.has(base)) internalByBase.set(base, []);
     internalByBase.get(base).push(row);
+    const originRef = String(row.publicItem?.origin_ref || "").trim();
+    if (originRef) {
+      if (!internalByOriginRef.has(originRef)) internalByOriginRef.set(originRef, []);
+      internalByOriginRef.get(originRef).push(row);
+    }
   }
   const used = new Set();
   let rekeyed = 0;
@@ -172,19 +168,24 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
         const byExistingId = item.public_id
           ? candidates.filter(row => row.publicItem.public_id === item.public_id)
           : [];
+        const byOriginRef = String(item.origin_ref || "").trim()
+          ? (internalByOriginRef.get(String(item.origin_ref).trim()) || []).filter(row => !used.has(row.publicItem.public_id))
+          : [];
         const photoFingerprint = publicPhotoFingerprint(item);
         const byPhoto = photoFingerprint !== "[]" ? candidates.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
         const byExactContent = candidates.filter(row => publicFingerprint(row.publicItem) === fingerprint);
         const match = byExistingId.length === 1
           ? byExistingId[0]
-          : byPhoto.length === 1
+          : byOriginRef.length === 1
+            ? byOriginRef[0]
+            : byPhoto.length === 1
             ? byPhoto[0]
             : byExactContent.length === 1
               ? byExactContent[0]
               : candidates.length === 1
                 ? candidates[0]
                 : null;
-        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (candidatas=${candidates.length}, fotosCompatíveis=${byPhoto.length}, conteúdoExato=${byExactContent.length})`);
+        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (candidatas=${candidates.length}, origin_ref=${byOriginRef.length}, fotosCompatíveis=${byPhoto.length}, conteúdoExato=${byExactContent.length})`);
         used.add(match.publicItem.public_id);
         if (item.public_id !== match.publicItem.public_id) {
           item.public_id = match.publicItem.public_id;
