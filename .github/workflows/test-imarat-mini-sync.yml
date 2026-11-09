@@ -1,6 +1,11 @@
-name: Validar miniaturas Imarat sem publicar
+name: Dry-run completo de sincronização Imarat sem publicar
 
 on:
+  push:
+    branches: [fix/imarat-global-duplicate-prevention]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/test-imarat-mini-sync.yml"
   workflow_dispatch:
 
 permissions:
