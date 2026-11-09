@@ -195,22 +195,24 @@ async function fetchLiveGistBaseline() {
   return DATA;
 }
 
-function countCatalogPublicIds(DATA) {
-  // A identidade comercial (nome/categoria) pode mudar sem que o produto seja outro.
-  // A proteção de publicação compara IDs públicos estáveis, gerados pela mesma projeção da vitrine.
-  const publicDATA = toPublicCatalog(DATA || {});
+function countCatalogPublicIds(DATA, alreadyPublic = false) {
+  // O Gist já contém a projeção pública: não regenere seus IDs, pois isso pode
+  // mascarar colisões históricas. Na base interna, gere IDs pela projeção oficial.
+  const publicDATA = alreadyPublic ? (DATA || {}) : toPublicCatalog(DATA || {});
   const keys = new Set();
-  let count = 0;
+  let items = 0, missingIds = 0;
   for (const groups of Object.values(publicDATA || {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
-        if (!item?.nome || !item?.public_id) continue;
-        count++;
-        keys.add(String(item.public_id));
+        if (!item?.nome) continue;
+        items++;
+        const id = String(item?.public_id || "").trim();
+        if (!id) { missingIds++; continue; }
+        keys.add(id);
       }
     }
   }
-  return { count, keys };
+  return { count: keys.size, items, missingIds, keys };
 }
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
@@ -1468,11 +1470,11 @@ async function main() {
       const internalBaseline = countCatalogPublicIds(DATA);
       const liveDATA = await fetchLiveGistBaseline();
       LIVE_GIST_DATA = liveDATA;
-      const liveBaseline = countCatalogPublicIds(liveDATA);
+      const liveBaseline = countCatalogPublicIds(liveDATA, true);
       const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
       const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
-      console.log(`BASELINE POR PUBLIC_ID: data.js=${internalBaseline.count}; Gist=${liveBaseline.count}; IDs só no data.js=${onlyInternal}; IDs só no Gist=${onlyLive}`);
-      if (!SYNC_DRY_RUN && (onlyLive > 0 || onlyInternal > 80 || Math.abs(liveBaseline.count - internalBaseline.count) > 80)) {
+      console.log(`BASELINE POR PUBLIC_ID: data.js=${internalBaseline.count} IDs/${internalBaseline.items} itens; Gist=${liveBaseline.count} IDs/${liveBaseline.items} itens; IDs sem origem interna=${liveBaseline.missingIds}; IDs só no data.js=${onlyInternal}; IDs só no Gist=${onlyLive}`);
+      if (!SYNC_DRY_RUN && (liveBaseline.missingIds > 0 || onlyLive > 0 || onlyInternal > 80 || Math.abs(liveBaseline.count - internalBaseline.count) > 80)) {
         throw new Error("SINCRONIZAÇÃO BLOQUEADA: há IDs públicos do Gist sem representação interna ou excesso de novos IDs. Reconcilie a base antes de publicar para evitar perda de produtos e ajustes.");
       }
       if (SYNC_DRY_RUN && (onlyLive > 0 || onlyInternal > 80)) {
