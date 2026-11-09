@@ -141,7 +141,7 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
         :candidates.length===1?candidates[0]
         :byLoosePhoto.length===1?byLoosePhoto[0]
         :byLoose.length===1?byLoose[0]:null;
-      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,public_id_global:byGlobalId.length,stock_ref_global:byStock.length,candidatas:candidates.length,origin_ref:byOrigin.length,fotosCompativeis:byPhoto.length,identidadeFlexivel:byLoose.length,fotoFlexivel:byLoosePhoto.length,conteudoExato:byExactContent.length}));continue;}
+      if(!match){unmatched++;const sameNameKeys=[...byLooseIdentity.keys()].filter(k=>k.endsWith("|"+norm(item.nome))).slice(0,8);console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,looseKey:looseKey,sameNameKeys,public_id_global:byGlobalId.length,stock_ref_global:byStock.length,candidatas:candidates.length,origin_ref:byOrigin.length,fotosCompativeis:byPhoto.length,identidadeFlexivel:byLoose.length,fotoFlexivel:byLoosePhoto.length,conteudoExato:byExactContent.length}));continue;}
       used.add(match);
       if(item.public_id!==match.public_id){item.public_id=match.public_id;rekeyed++;}
     }
