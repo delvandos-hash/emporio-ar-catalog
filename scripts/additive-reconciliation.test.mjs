@@ -128,3 +128,10 @@ test("reidentificação flexível tolera categoria ou volume legado divergente s
   assert.match(audit, /byLoosePhoto\.length===1/);
   assert.match(apply, /function looseIdentity/);
 });
+
+test("variantes legadas sem reidentificação inequívoca permanecem preservadas sem exclusão", () => {
+  assert.match(apply, /VARIANTE GIST PRESERVADA SEM REKEY AUTOMÁTICO/);
+  assert.match(apply, /GIST_VARIANTS_PRESERVED_WITHOUT_REKEY/);
+  assert.doesNotMatch(apply, /if \(!match\) throw new Error\(\`Variante atual do Gist/);
+  assert.doesNotMatch(audit, /rekeyAudit\.unmatched === 0/);
+});
