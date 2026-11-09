@@ -1841,10 +1841,10 @@ async function main() {
         const nomeKey = limparParaComparacao(it.nome);
         const normalKey = normalProductKey(it.nome, it.volume, g.brand);
         if (!indexNormal.has(normalKey)) indexNormal.set(normalKey, []);
-        indexNormal.get(normalKey).push({ id_origem: it.id_origem ?? it.id ?? "" });
+        indexNormal.get(normalKey).push({ id_origem: it.id_origem ?? it.id ?? it.slug ?? "" });
         const nameVolumeKey = normalProductNameVolumeKey(it.nome, it.volume);
         if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
-        indexNameVolume.get(nameVolumeKey).push({ id_origem: it.id_origem ?? it.id ?? "" });
+        indexNameVolume.get(nameVolumeKey).push({ id_origem: it.id_origem ?? it.id ?? it.slug ?? "" });
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const baseKey = miniIdentityBaseKey(it, g.brand);
           if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
@@ -1885,14 +1885,14 @@ async function main() {
         if (!marcaConhecida && nameVolumeCandidates.length) {
           // Marca ausente: compara ID de origem com qualquer marca já cadastrada;
           // só usa nome/volume como fallback quando algum registro é legado sem ID.
-          duplicado = isDuplicateMiniSource(nameVolumeCandidates, p.id ?? p.productId ?? "");
+          duplicado = isDuplicateMiniSource(nameVolumeCandidates, p.id ?? p.productId ?? p.slug ?? "");
         } else if (existing) {
           // ID de origem é a identidade primária. Se IDs forem diferentes, mantém
           // os dois registros; se faltar ID, usa marca + nome-base + volume.
-          duplicado = isDuplicateMiniSource(existing, p.id ?? p.productId ?? "");
+          duplicado = isDuplicateMiniSource(existing, p.id ?? p.productId ?? p.slug ?? "");
           if (!duplicado) {
             console.log('MINIATURA COM ID DE ORIGEM DISTINTO: ' + JSON.stringify({
-              nome, marca: brand, volume, idOrigem: p.id ?? p.productId ?? "",
+              nome, marca: brand, volume, idOrigem: p.id ?? p.productId ?? p.slug ?? "",
               idsExistentes: existing.map(item => item.id_origem || "sem ID")
             }));
           }
@@ -1906,7 +1906,7 @@ async function main() {
         // Nomes iguais em marcas diferentes coexistem; marca ausente usa fallback conservador.
         const normalCandidates = indexNormal.get(normalProductKey(nome, volume, brand)) || [];
         const nameVolumeCandidates = indexNameVolume.get(normalProductNameVolumeKey(nome, volume)) || [];
-        const candidateId = p.id ?? p.productId ?? "";
+        const candidateId = p.id ?? p.productId ?? p.slug ?? "";
         if (!marcaConhecida) {
           duplicado = isDuplicateMiniSource(nameVolumeCandidates, candidateId);
         } else if (normalCandidates.length) {
@@ -1945,18 +1945,18 @@ async function main() {
       const volumeKey = volumeMatch(volume, nome);
       const normalKey = normalProductKey(nome, volume, brand);
       if (!indexNormal.has(normalKey)) indexNormal.set(normalKey, []);
-      indexNormal.get(normalKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
+      indexNormal.get(normalKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
       const nameVolumeKey = normalProductNameVolumeKey(nome, volume);
       if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
-      indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
+      indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
       if (ehMini) {
         const actualMini = { nome, volume, varejo: prices.varejo, atacado: prices.atacado, foto, fotos: imgsNew };
         const baseKey = miniIdentityBaseKey(actualMini, brand);
         if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
-        indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
+        indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
         const nameVolumeKey = miniIdentityNameVolumeKey(actualMini);
         if (!indexMiniNameVolume.has(nameVolumeKey)) indexMiniNameVolume.set(nameVolumeKey, []);
-        indexMiniNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
+        indexMiniNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
       }
       addedImarat++;
     }
@@ -2010,7 +2010,7 @@ async function main() {
       const volume = volumeFrom(null, nome);
       const brandKey = normalProductKey(nome, volume, session);
       const brandCandidates = indexNormal.get(brandKey) || [];
-      if (isDuplicateMiniSource(brandCandidates, p.id ?? p.productId ?? "")) continue;
+      if (isDuplicateMiniSource(brandCandidates, p.id ?? p.productId ?? p.slug ?? "")) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
@@ -2024,12 +2024,13 @@ async function main() {
           notas: notas.slice(0, 500), 
           foto,
           fonte: 'brand',
+          id_origem: String(p.id ?? p.productId ?? p.slug ?? ""),
       }, true));
       if (!indexNormal.has(brandKey)) indexNormal.set(brandKey, []);
-      indexNormal.get(brandKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
+      indexNormal.get(brandKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
       const nameVolumeKey = normalProductNameVolumeKey(nome, volume);
       if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
-      indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
+      indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
       addedBrand++;
     }
   }
