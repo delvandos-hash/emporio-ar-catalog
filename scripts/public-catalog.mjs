@@ -88,7 +88,9 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         const occurrence = identityIndexes.get(identityKey) || 0;
         identityIndexes.set(identityKey, occurrence + 1);
         const isVariant = (identityCounts.get(identityKey) || 0) > 1 && occurrence > 0;
-        safeItem.public_id = publicId(line, group, item, isVariant ? publicVariantToken(item, occurrence) : "");
+        const generatedPublicId = publicId(line, group, item, isVariant ? publicVariantToken(item, occurrence) : "");
+        const suppliedPublicId = String(item?.public_id || "").trim();
+        safeItem.public_id = /^p_[a-f0-9]{20}$/.test(suppliedPublicId) ? suppliedPublicId : generatedPublicId;
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
         if (liveRef) {
           safeItem.stock_ref = liveRef;
