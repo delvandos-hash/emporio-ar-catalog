@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { toPublicCatalog } from "./public-catalog.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
@@ -69,12 +70,53 @@ function isMiniatura(nome,volume,categoria) {
   }
   return false;
 }
+function publicFingerprint(item) {
+  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
+  return JSON.stringify({
+    nome: norm(item?.nome), volume: volumeMatch(item?.volume,item?.nome),
+    varejo: String(item?.varejo ?? "").trim(), atacado: String(item?.atacado ?? "").trim(),
+    foto: String(item?.foto ?? "").trim(),
+    fotos: [...new Set(photos.map(x=>String(x??"").trim()).filter(Boolean))].sort(),
+    notas: String(item?.notas ?? ""), badge: String(item?.badge ?? ""),
+    novoDesde: String(item?.novoDesde ?? ""), disponivel: String(item?.disponivel ?? ""),
+    variacoes: item?.variacoes || [], stock_ref: String(item?.stock_ref ?? ""),
+    stock_route: String(item?.stock_route ?? "")
+  });
+}
+
+function rekeyLiveVariants(liveDATA, internalPublic) {
+  const byBase = new Map();
+  for (const [line,groups] of Object.entries(internalPublic || {})) for (const group of groups || []) {
+    for (const item of group.items || []) {
+      const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+      if(!byBase.has(key)) byBase.set(key,[]);
+      byBase.get(key).push(item);
+    }
+  }
+  const used=new Set(); let rekeyed=0, unmatched=0;
+  for (const [line,groups] of Object.entries(liveDATA || {})) for (const group of groups || []) {
+    for (const item of group.items || []) {
+      const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+      const fp=publicFingerprint(item);
+      const candidates=(byBase.get(key)||[]).filter(candidate=>!used.has(candidate.public_id));
+      const byExistingId=item.public_id?candidates.filter(candidate=>candidate.public_id===item.public_id):[];
+      const byExactContent=candidates.filter(candidate=>publicFingerprint(candidate)===fp);
+      const match=byExistingId.length===1?byExistingId[0]
+        :candidates.length===1?candidates[0]
+        :byExactContent.length===1?byExactContent[0]:null;
+      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,candidatas:candidates.length,conteudoExato:byExactContent.length}));continue;}
+      used.add(match.public_id);
+      if(item.public_id!==match.public_id){item.public_id=match.public_id;rekeyed++;}
+    }
+  }
+  return {rekeyed,unmatched};
+}
+
 function syncKey(nome,volume,categoria,brand) {
   const mini=isMiniatura(nome,volume,categoria)&&!isOleo(nome);
-  const base=mini
+  return mini
     ? `mini|${norm(brand||"outros")}|${chaveComparacaoMini(nome)}|${volumeMatch(volume,nome)}`
     : `normal|${norm(brand||"outros")}|${limparParaComparacao(nome)}|${volumeMatch(volume,nome)}`;
-  return base;
 }
 function parseInternalData() {
   const source=readFileSync(new URL("../js/data.js",import.meta.url),"utf8");
@@ -157,12 +199,27 @@ const internalIndex=new Map();
 for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
   if(!Array.isArray(groups)) continue;
   for(const group of groups) for(const item of (Array.isArray(group?.items)?group.items:[])) {
-    const key=[norm(line),norm(group.brand),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+    const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
     if(!internalIndex.has(key)) internalIndex.set(key,[]);
     internalIndex.get(key).push(item);
   }
 }
 const DATA=await fetchLiveCatalog();
+const internalPublicData=toPublicCatalog(INTERNAL_DATA);
+const rekeyAudit=rekeyLiveVariants(DATA,internalPublicData);
+console.log(`GIST_VARIANTS_REKEYABLE=${rekeyAudit.rekeyed} unmatchedLiveVariants=${rekeyAudit.unmatched}`);
+const internalPublicIndex=new Map();
+const publicBuckets=new Map();
+for(const [line,groups] of Object.entries(internalPublicData)) for(const group of groups||[]) for(const item of group.items||[]) {
+  const base=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+  if(!publicBuckets.has(base)) publicBuckets.set(base,[]);
+  publicBuckets.get(base).push(item);
+}
+for(const [line,groups] of Object.entries(INTERNAL_DATA)) for(const group of groups||[]) for(const item of group.items||[]) {
+  const base=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+  const publicItem=publicBuckets.get(base)?.shift();
+  if(publicItem?.public_id) internalPublicIndex.set(publicItem.public_id,{line,group,item,publicItem});
+}
 const catalog=[];
 for(const [line,groups] of Object.entries(DATA)) {
   if(!Array.isArray(groups)) continue;
@@ -170,7 +227,7 @@ for(const [line,groups] of Object.entries(DATA)) {
     const name=String(item.nome||"").trim();
     if(!name) continue;
     const volume=String(item.volume||volumeFrom(null,name));
-    const internalKey=[norm(line),norm(group.brand),norm(name),volumeMatch(volume,name)].join("|");
+    const internalKey=[norm(line),norm(group.brand),norm(group.cat),norm(name),volumeMatch(volume,name)].join("|");
     const internal=internalIndex.get(internalKey)?.[0];
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
@@ -180,24 +237,48 @@ for(const [line,groups] of Object.entries(DATA)) {
     });
   }
 }
-const internalItemCount=[...internalIndex.values()].reduce((sum,items)=>sum+items.length,0);
-const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.name),volumeMatch(x.volume,x.name)].join("|")));
-const internalOnlyKeys=[...internalIndex.keys()].filter(key=>!liveKeySet.has(key));
-const liveOnlyKeys=[...liveKeySet].filter(key=>!internalIndex.has(key));
-console.log(`COMPARAÇÃO EXATA DO BLOQUEIO DE SYNC: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}; limite de publicação=25; publicação permitida=${internalOnlyKeys.length<=25&&liveOnlyKeys.length<=25&&Math.abs(catalog.length-internalItemCount)<=25}`);
-const summarizeKeys=keys=>{
+const internalItemCount=internalPublicIndex.size;
+const liveKeySet=new Set(catalog.map(x=>String(x.item.public_id||"")));
+const internalOnlyKeys=[...internalPublicIndex.keys()].filter(key=>!liveKeySet.has(key));
+const liveOnlyKeys=[...liveKeySet].filter(key=>!internalPublicIndex.has(key));
+console.log(`COMPARAÇÃO POR PUBLIC ID: data.js interno=${internalItemCount} IDs; Gist vivo=${catalog.length} itens; IDs só no data.js=${internalOnlyKeys.length}; IDs só no Gist=${liveOnlyKeys.length}; variantes sem correspondência=${rekeyAudit.unmatched}`);
+const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
+const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, row: internalPublicIndex.get(key) }));
+const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ row }) =>
+  Boolean(row) &&
+  allowedAdditiveSources.has(norm(row.item?.fonte)) &&
+  (norm(row.item?.fonte) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
+);
+const additiveReconciliationSafe =
+  rekeyAudit.unmatched === 0 &&
+  liveOnlyKeys.length === 0 &&
+  internalOnlyKeys.length > 0 &&
+  internalOnlyKeys.length <= 80 &&
+  Math.abs(catalog.length - internalItemCount) <= 80 &&
+  internalOnlySourceConfirmed;
+console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
+for (const row of internalOnlySourceRows) {
+  const item = row.row?.item || {};
+  const group = row.row?.group || {};
+  console.log("ADDITIVE SOURCE ITEM " + JSON.stringify({
+    key: row.key, fonte: item.fonte || "", id_origem: item.id_origem || "",
+    marca: group.brand || "", nome: item.nome || "", precoManual: item.precoManual || false
+  }));
+}
+
+const summarizeRows=rows=>{
   const byBrand=new Map();
-  for(const key of keys) {
-    const parts=key.split("|");
-    const brand=parts[1]||"sem marca";
+  for(const row of rows) {
+    const brand=norm(row?.group?.brand)||"sem marca";
     byBrand.set(brand,(byBrand.get(brand)||0)+1);
   }
   return [...byBrand.entries()].sort((x,y)=>y[1]-x[1]).map(([brand,count])=>({brand,count}));
 };
-console.log("DIFERENÇAS AGRUPADAS — SÓ DATA.JS "+JSON.stringify(summarizeKeys(internalOnlyKeys)));
-console.log("DIFERENÇAS AGRUPADAS — SÓ GIST "+JSON.stringify(summarizeKeys(liveOnlyKeys)));
-for(const key of internalOnlyKeys) console.log("SÓ NO DATA.JS "+key);
-for(const key of liveOnlyKeys) console.log("SÓ NO GIST "+key);
+const liveOnlyRows=liveOnlyKeys.map(key=>catalog.find(x=>String(x.item.public_id||"")===key));
+console.log("DIFERENÇAS AGRUPADAS — SÓ DATA.JS "+JSON.stringify(summarizeRows(internalOnlyKeys.map(key=>internalPublicIndex.get(key)))));
+console.log("DIFERENÇAS AGRUPADAS — SÓ GIST "+JSON.stringify(summarizeRows(liveOnlyRows)));
+for(const key of internalOnlyKeys) console.log("SÓ NO DATA.JS "+JSON.stringify({public_id:key,nome:internalPublicIndex.get(key)?.item?.nome||"",marca:internalPublicIndex.get(key)?.group?.brand||""}));
+for(const key of liveOnlyKeys) console.log("SÓ NO GIST "+JSON.stringify({public_id:key,nome:catalog.find(x=>String(x.item.public_id||"")===key)?.name||"",marca:catalog.find(x=>String(x.item.public_id||"")===key)?.brand||""}));
 
 const {all:source,total,pages}=await fetchAllImarat();
 function volumeCompatible(left,right) {
@@ -213,9 +294,11 @@ function sourceTitleKey(name,category,brand) {
 }
 function sourceBrandMatches(catalogBrand,sourceBrand) {
   const b=norm(catalogBrand), s=norm(sourceBrand);
+  const generic=new Set(["outros","outra","sem marca","sem marca definida","nao informado","n/a"]);
   if(b==="arabiyat" && s.includes("arabiyat prestige")) return true;
   if(b==="emporio a r" && s==="imarat") return true;
-  if(b==="outros" || b==="outra") return !s;
+  if(generic.has(b)) return generic.has(s) || !s;
+  if(generic.has(s)) return generic.has(b);
   return Boolean(b && s && b===s);
 }
 function matchSourceForCatalog(item) {
@@ -246,8 +329,6 @@ function miniIdentityKey(brand,name,volume) {
   return "mini|"+norm(brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volumeFrom(volume,name);
 }
 function apiDuplicateKey(p) {
-  const id=String(p.id||p.productId||"").trim();
-  if(id) return "source-id|"+id;
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
@@ -283,7 +364,7 @@ const miniGlobalGroups=new Map();
 for(const item of matchedCatalog) {
   if(!item.matchedSource) continue;
   if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
-  const key=sourceIdentity(item.matchedSource);
+  const key=miniIdentityKey(item.brand,item.name,item.volume);
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
@@ -332,7 +413,7 @@ for(const p of source) {
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
   const brand=String(p.brand||"Outros").toUpperCase();
-  const brandKnown=Boolean(String(p.brand||"").trim())&&!["outros","outra"].includes(norm(brand));
+  const brandKnown=Boolean(String(p.brand||"").trim())&&!["outros","outra","sem marca","sem marca definida","nao informado","n/a"].includes(norm(brand));
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   const normalKey=limparParaComparacao(name);
   const miniKey=chaveComparacaoMini(name);
