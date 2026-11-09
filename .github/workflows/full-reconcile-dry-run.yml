@@ -2,7 +2,22 @@ name: Reconciliação completa em dry-run (sem publicar)
 
 on:
   push:
-    branches: [fix/additive-recovery-after-brand-safe-dedupe]
+    branches: [fix/reconciliation-mainline-identity-safe-20261109]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - "scripts/audit-imarat-all-products.mjs"
+      - "scripts/restore-gist-only-legacy.mjs"
+      - "scripts/apply-additive-reconciliation.mjs"
+      - "scripts/public-catalog.mjs"
+      - "scripts/public-catalog.test.mjs"
+      - "scripts/catalog-identity.mjs"
+      - "scripts/catalog-identity.test.mjs"
+      - "scripts/imarat-source-guard.test.mjs"
+      - "scripts/additive-reconciliation.test.mjs"
+      - "js/app.js"
+      - ".github/workflows/full-reconcile-dry-run.yml"
+  pull_request:
+    branches: [main]
     paths:
       - "scripts/sync-catalog.mjs"
       - "scripts/audit-imarat-all-products.mjs"
@@ -26,7 +41,7 @@ concurrency:
 
 jobs:
   reconcile:
-    if: github.ref_name == 'fix/additive-recovery-after-brand-safe-dedupe'
+    if: github.head_ref == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'fix/reconciliation-mainline-identity-safe-20261109'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -101,7 +116,7 @@ jobs:
           path: js/data.js
           retention-days: 7
       - name: Persistir snapshot reconciliado somente se baseline passar
-        if: env.BASELINE_OK == 'true'
+        if: env.BASELINE_OK == 'true' && github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
