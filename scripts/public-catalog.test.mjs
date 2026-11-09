@@ -281,7 +281,7 @@ test("marcas ONLY YOU e MAIS YOU permanecem separadas mesmo com nomes semelhante
   assert.equal(new Set(ids).size, 2);
 });
 
-test("stock_ref e origin_ref não colapsam IDs iguais de marcas diferentes", () => {
+test("IDs públicos e origin_ref não colapsam marcas diferentes e stock_ref legado permanece estável", () => {
   const DATA = {
     acessorios: [
       { brand: "Marca A", cat: "Colares", items: [
@@ -295,7 +295,7 @@ test("stock_ref e origin_ref não colapsam IDs iguais de marcas diferentes", () 
   const out = toPublicCatalog(DATA);
   const items = out.acessorios.flatMap(g => g.items);
   assert.equal(items.length, 2);
-  assert.equal(new Set(items.map(i => i.stock_ref)).size, 2);
+  assert.equal(new Set(items.map(i => i.stock_ref)).size, 1);
   assert.equal(new Set(items.map(i => i.origin_ref)).size, 2);
   assert.equal(new Set(items.map(i => i.public_id)).size, 2);
 });
