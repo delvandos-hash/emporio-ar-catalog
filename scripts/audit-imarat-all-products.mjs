@@ -214,7 +214,7 @@ function apiDuplicateKey(p) {
   const category=p.categoria_nome||p.categoria||"";
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   return mini
-    ? "mini|"+chaveComparacaoMini(name)
+    ? "mini|"+norm(p.brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volume
     : "normal|"+norm(p.brand||"outros")+"|"+limparParaComparacao(name)+"|"+volume;
 }
 const matchedCatalog=catalog.map(item=>({...item,matchedSource:matchSourceForCatalog(item)}));
@@ -244,7 +244,7 @@ const miniGlobalGroups=new Map();
 for(const item of matchedCatalog) {
   if(!item.matchedSource) continue;
   if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
-  const key=chaveComparacaoMini(item.name);
+  const key=[norm(item.brand),chaveComparacaoMini(item.name),volumeFrom(item.volume,item.name)].join("|");
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
@@ -271,7 +271,7 @@ for(const item of catalog) {
   normalIndex.add(limparParaComparacao(item.name));
   normalIndex.add(`${limparParaComparacao(item.name)}|${norm(item.brand)}`);
   if(isMiniatura(item.name,item.volume,item.category)&&!isOleo(item.name))
-    miniIndex.add(chaveComparacaoMini(item.name));
+    miniIndex.add([norm(item.brand),chaveComparacaoMini(item.name),volumeFrom(item.volume,item.name)].join("|"));
 }
 const initialNormalIndex=new Set(normalIndex);
 const initialMiniIndex=new Set(miniIndex);
@@ -287,9 +287,9 @@ for(const p of source) {
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   const normalKey=limparParaComparacao(name);
   const miniKey=chaveComparacaoMini(name);
+  const miniIdentity=[norm(brand),miniKey,volume].join("|");
   const duplicate=mini
-    ? (miniIndex.has(miniKey)||miniIndex.has(`${miniKey}|${norm(brand)}`)
-      ||miniIndex.has(`${miniKey}|armaf`)||miniIndex.has(`${miniKey}|outros`)||miniIndex.has(`${miniKey}|outra`))
+    ? miniIndex.has(miniIdentity)
     : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
   if(duplicate) {
     const entry={name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`};
@@ -301,8 +301,7 @@ for(const p of source) {
   normalIndex.add(normalKey);
   normalIndex.add(`${normalKey}|${norm(brand)}`);
   if(mini) {
-    miniIndex.add(miniKey);
-    miniIndex.add(`${miniKey}|${norm(brand)}`);
+    miniIndex.add([norm(brand),miniKey,volume].join("|"));
   }
 }
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
