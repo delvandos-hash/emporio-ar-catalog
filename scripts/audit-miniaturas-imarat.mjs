@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 /**
  * Auditoria somente leitura das miniaturas do catálogo Empório A.R.
  * Lê o snapshot do Gist e a lista atual da Imarat. Nunca grava ou recalcula preços.
@@ -75,6 +76,24 @@ function isMini(item, group) {
   return name.includes("mini ") || name.includes("miniatura") || name.includes("mini-")
     || category.includes("miniatura") || (volume !== "sem-volume" && volume.endsWith("ml") && Number.isFinite(ml) && ml <= 50);
 }
+
+// O data.js versionado mantém metadados internos (incluindo precoManual)
+// que são removidos corretamente da projeção pública do Gist.
+const localDataText = readFileSync(new URL("../js/data.js", import.meta.url), "utf8");
+const localMatch = localDataText.match(/export const DATA = (\\{[\\s\\S]*?\\});\\s*\\nexport const WHATSAPP/);
+if (!localMatch) throw new Error("Não foi possível ler DATA interno de js/data.js.");
+const INTERNAL_DATA = JSON.parse(localMatch[1]);
+const internalIndex = new Map();
+for (const [line, groups] of Object.entries(INTERNAL_DATA)) {
+  if (!Array.isArray(groups)) continue;
+  for (const group of groups) {
+    for (const item of (Array.isArray(group?.items) ? group.items : [])) {
+      const key = [norm(line), norm(group.brand), baseMiniName(item.nome), volumeOf(item)].join("|");
+      if (!internalIndex.has(key)) internalIndex.set(key, []);
+      internalIndex.get(key).push(item);
+    }
+  }
+}
 function isKit2em1(name) { return norm(name).includes("kit 2 em 1"); }
 function isMiniaturaBolsa(name) { return norm(name).includes("bolsa"); }
 function isOleoCliveDorris(name, brand) { return norm(brand).includes("clive") && norm(name).includes("oleo"); }
@@ -147,7 +166,7 @@ function sourceMatch(item, group) {
 }
 
 const records = [];
-let sourceMatches = 0, automaticPriceDifferences = 0;
+let sourceMatches = 0, automaticPriceDifferences = 0, internalMatches = 0;
 const priceRuleDifferences = [];
 for (const [line, groups] of Object.entries(DATA)) {
   if (!Array.isArray(groups)) continue;
@@ -157,6 +176,12 @@ for (const [line, groups] of Object.entries(DATA)) {
       const name = baseMiniName(item.nome);
       if (!name) continue;
       const source = sourceMatch(item, group);
+      const internalKey = [norm(line), norm(group.brand), name, volumeOf(item)].join("|");
+      const internalCandidates = internalIndex.get(internalKey) || [];
+      const internal = internalCandidates.find(candidate =>
+        String(candidate.varejo) === String(item.varejo) && String(candidate.atacado) === String(item.atacado)
+      ) || internalCandidates[0] || null;
+      if (internal) internalMatches++;
       let expected = null;
       if (source) {
         sourceMatches++;
@@ -172,6 +197,7 @@ for (const [line, groups] of Object.entries(DATA)) {
             currentWholesale: item.atacado ?? "não informado",
             expectedRetail: expected.varejo, expectedWholesale: expected.atacado,
             sourceBrand: source.brand || "marca não informada",
+            precoManual: internal?.precoManual ?? "não localizado no data.js",
           });
         }
       }
@@ -182,6 +208,9 @@ for (const [line, groups] of Object.entries(DATA)) {
         varejo: item.varejo ?? "não informado",
         atacado: item.atacado ?? "não informado",
         sourceBrand: source ? (source.brand || "marca não informada") : "sem correspondência",
+        precoManual: internal?.precoManual ?? "não localizado no data.js",
+        fonteInterna: internal?.fonte ?? "não localizada",
+        idOrigemInterno: internal?.id_origem ?? "não localizado",
         sourcePrice: source?.priceCents != null ? fmtBRL(Number(source.priceCents) / 100) : "—",
         expectedRetail: expected?.varejo || "sem correspondência",
         expectedWholesale: expected?.atacado || "sem correspondência",
@@ -202,6 +231,7 @@ const priceConflicts = duplicates.filter(([, items]) =>
 console.log("AUDITORIA SOMENTE LEITURA — MINIATURAS DO CATÁLOGO");
 console.log(`Miniaturas analisadas: ${records.length}`);
 console.log(`Registros com correspondência na Imarat: ${sourceMatches}`);
+console.log(`Registros ligados ao data.js interno: ${internalMatches}`);
 console.log(`Registros diferentes da fórmula automática: ${automaticPriceDifferences} (podem incluir precoManual)`);
 console.log(`Grupos com possível duplicidade (nome normalizado + volume): ${duplicates.length}`);
 console.log(`Grupos com preços varejo/atacado diferentes: ${priceConflicts.length}`);
@@ -219,6 +249,7 @@ for (const [key, items] of duplicates) {
       nome: item.name, volume: item.volume,
       varejo: item.varejo, atacado: item.atacado,
       marcaNaImarat: item.sourceBrand, precoOrigem: item.sourcePrice,
+      precoManual: item.precoManual, fonteInterna: item.fonteInterna, idOrigemInterno: item.idOrigemInterno,
       varejoPelaRegra: item.expectedRetail, atacadoPelaRegra: item.expectedWholesale,
     }));
   }
