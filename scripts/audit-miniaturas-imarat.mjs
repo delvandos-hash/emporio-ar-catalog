@@ -96,6 +96,25 @@ for (const [line, groups] of Object.entries(INTERNAL_DATA)) {
     }
   }
 }
+
+// Duplicidade por ID de origem é evidência mais forte do que apenas nome parecido.
+const byOriginId = new Map();
+for (const [line, groups] of Object.entries(INTERNAL_DATA)) {
+  if (!Array.isArray(groups)) continue;
+  for (const group of groups) {
+    for (const item of (Array.isArray(group?.items) ? group.items : [])) {
+      if (!item?.id_origem || item.fonte !== "imarat" || !isMini(item, group)) continue;
+      const id = String(item.id_origem);
+      if (!byOriginId.has(id)) byOriginId.set(id, []);
+      byOriginId.get(id).push({
+        line, brand: group.brand, category: group.cat, name: item.nome,
+        volume: volumeOf(item), varejo: item.varejo, atacado: item.atacado,
+        precoManual: item.precoManual ?? false, fonte: item.fonte,
+      });
+    }
+  }
+}
+const duplicateOriginIds = [...byOriginId.entries()].filter(([, items]) => items.length > 1);
 function isKit2em1(name) { return norm(name).includes("kit 2 em 1"); }
 function isMiniaturaBolsa(name) { return norm(name).includes("bolsa"); }
 function isOleoCliveDorris(name, brand) { return norm(brand).includes("clive") && norm(name).includes("oleo"); }
@@ -234,6 +253,11 @@ console.log("AUDITORIA SOMENTE LEITURA — MINIATURAS DO CATÁLOGO");
 console.log(`Miniaturas analisadas: ${records.length}`);
 console.log(`Registros com correspondência na Imarat: ${sourceMatches}`);
 console.log(`Registros ligados ao data.js interno: ${internalMatches}`);
+console.log(`IDs de origem Imarat repetidos no data.js: ${duplicateOriginIds.length}`);
+for (const [id, items] of duplicateOriginIds) {
+  console.log("DUPLICIDADE CONFIRMADA POR ID " + id);
+  for (const item of items) console.log(JSON.stringify(item));
+}
 console.log(`Registros diferentes da fórmula automática: ${automaticPriceDifferences} (podem incluir precoManual)`);
 console.log(`Grupos com possível duplicidade (nome normalizado + volume): ${duplicates.length}`);
 console.log(`Grupos com preços varejo/atacado diferentes: ${priceConflicts.length}`);
