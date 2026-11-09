@@ -182,6 +182,14 @@ const afeersCatalog = Object.entries(DATA).flatMap(([line, groups]) =>
       .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, fonte: item.fonte || null })))
 );
 console.log('AFEER — TÍTULOS RELACIONADOS A ATHERRI NO GIST: ' + JSON.stringify(afeersCatalog));
+const arabiyatRoot = imaratList.filter(p => norm(p.brand).includes('arabiyat prestige') && /(noire|prestige)/.test(norm(p.name)));
+console.log('ARABIYAT PRESTIGE — TÍTULOS NOIRE/PRESTIGE NA ORIGEM: ' + JSON.stringify(arabiyatRoot.map(p => ({ name: p.name, brand: p.brand, slug: p.slug }))));
+const arabiyatCatalog = Object.entries(DATA).flatMap(([line, groups]) =>
+  (groups || []).filter(g => /(arabiyat|prestige)/.test(norm(g.brand)))
+    .flatMap(g => (g.items || []).filter(item => /(noire|prestige)/.test(norm(item.nome)))
+      .map(item => ({ line, brand: g.brand, category: g.cat, name: item.nome, fonte: item.fonte || null })))
+);
+console.log('ARABIYAT PRESTIGE — TÍTULOS NOIRE/PRESTIGE NO GIST: ' + JSON.stringify(arabiyatCatalog));
 
 function sourceMatch(item, group) {
   const name = norm(item?.nome);
