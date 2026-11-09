@@ -221,3 +221,13 @@ test("public_id legado é reservado antes de gerar IDs de variantes", () => {
   assert.notEqual(items[0].public_id, legacyId);
   assert.notEqual(items[0].public_id, items[1].public_id);
 });
+
+test("gera referência opaca e estável da origem sem expor o ID interno", () => {
+  const DATA = { masculino: [{ brand: "Lattafa", cat: "Miniaturas", items: [
+    { nome: "Mini Asad", volume: "30ml", id_origem: "1157", fonte: "imarat" }
+  ] }] };
+  const item = toPublicCatalog(DATA).masculino[0].items[0];
+  assert.match(item.origin_ref, /^o_[a-f0-9]{24}$/);
+  assert.equal(item.id_origem, undefined);
+  assert.equal(toPublicCatalog(DATA).masculino[0].items[0].origin_ref, item.origin_ref);
+});
