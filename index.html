@@ -746,6 +746,13 @@
   .modal-actions {
     display: flex;
     gap: .6rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: #fff;
+    padding: .75rem 0 calc(.75rem + env(safe-area-inset-bottom, 0px));
+    margin-top: .35rem;
+    border-top: 1px solid #eee;
   }
   .modal-actions .btn-buy {
     flex: 1;
