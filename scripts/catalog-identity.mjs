@@ -73,23 +73,22 @@ function normalizedImages(item) {
   return [...new Set(images.map(x => String(x ?? "").trim()).filter(Boolean))].sort().join("~");
 }
 
-// Só considera duplicata quando todos os atributos de identidade e exibição coincidem.
-// Diferenças de marca, volume, ID de origem, preço ou imagens preservam o registro.
-export function exactCatalogFingerprint(item, brand, source) {
-  return [
-    normalizeIdentity(brand),
-    normalizeIdentity(item?.nome),
-    normalizedVolume(item?.volume),
-    normalizeIdentity(source || item?.fonte || ""),
-    String(item?.id_origem ?? "").trim(),
-    normalizedPrice(item?.varejo),
-    normalizedPrice(item?.atacado),
-    normalizedImages(item),
-    String(item?.precoManual ?? ""),
-    String(item?.disponivel ?? ""),
-    String(item?.notas ?? ""),
-    String(item?.badge ?? ""),
-    String(item?.novoDesde ?? ""),
-    JSON.stringify(item?.variacoes || []),
-  ].join("|");
+function stableFingerprintValue(value) {
+  if (Array.isArray(value)) return value.map(stableFingerprintValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableFingerprintValue(value[key])]));
+  }
+  return value;
+}
+
+// Só remove uma cópia quando todos os campos do produto e seu contexto são idênticos.
+// Marca, linha, categoria, ID, estoque, preço, imagens ou qualquer metadado diferente preservam o registro.
+export function exactCatalogFingerprint(item, brand, source, line = "", category = "") {
+  return JSON.stringify({
+    line: normalizeIdentity(line),
+    category: normalizeIdentity(category),
+    brand: normalizeIdentity(brand),
+    source: normalizeIdentity(source || item?.fonte || ""),
+    item: stableFingerprintValue(item || {}),
+  });
 }
