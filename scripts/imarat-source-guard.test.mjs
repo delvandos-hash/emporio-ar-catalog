@@ -134,8 +134,9 @@ test("perfumes exigem marca, nome exato e volume; semelhanças entre marcas são
   assert.ok(source.includes("Nomes iguais em marcas diferentes coexistem"));
 });
 
-test("sincronização não remove produtos já existentes automaticamente", () => {
-  assert.match(source, /Deduplicação destrutiva desativada: todos os registros existentes foram preservados/);
+test("sincronização remove somente cópias integralmente idênticas", () => {
+  assert.match(source, /exactCatalogFingerprint\(item, group\.brand, item\.fonte\)/);
+  assert.match(source, /Duplicatas integralmente idênticas removidas/);
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
   assert.doesNotMatch(source, /miniaturasDuplicadasRemovidas\+\+/);
 });
