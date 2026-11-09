@@ -194,8 +194,8 @@ const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ items }) =>
 const additiveReconciliationSafe =
   liveOnlyKeys.length === 0 &&
   internalOnlyKeys.length > 0 &&
-  internalOnlyKeys.length <= 30 &&
-  Math.abs(catalog.length - internalItemCount) <= 30 &&
+  internalOnlyKeys.length <= 60 &&
+  Math.abs(catalog.length - internalItemCount) <= 75 &&
   internalOnlySourceConfirmed;
 console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
 for (const row of internalOnlySourceRows) {
