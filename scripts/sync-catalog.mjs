@@ -1257,7 +1257,8 @@ async function main() {
   // Grupos/categorias de outras fontes permanecem intactos.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
-      const grupoImarat = categoriasImarat.has(norm(g.cat)) && marcasImaratAtuais.has(norm(g.brand));
+      const marcaGrupo = norm(g.brand);
+      const grupoImarat = categoriasImarat.has(norm(g.cat)) && marcaGrupo !== 'outros' && marcaGrupo !== 'outra' && marcasImaratAtuais.has(marcaGrupo);
       g.items = (g.items || []).filter(item => {
         const fonteImarat = String(item.fonte || '').toLowerCase() === 'imarat';
         if (!fonteImarat && !grupoImarat) return true;
