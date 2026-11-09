@@ -159,15 +159,19 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         const stableOriginRef = originRef(item?.fonte || publicSource(line, group?.cat), item?.id_origem, group?.brand);
         if (stableOriginRef) safeItem.origin_ref = stableOriginRef;
         else if (/^o_[a-f0-9]{24}$/.test(String(item?.origin_ref || ""))) safeItem.origin_ref = String(item.origin_ref);
+        const existingStockRef = /^s_[a-f0-9]{24}$/.test(String(item?.stock_ref || ""))
+          ? String(item.stock_ref) : "";
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
-        if (liveRef) {
+        if (existingStockRef) {
+          // stock_ref público já validado é a referência canônica do catálogo;
+          // não a regenere apenas porque o ID da fonte foi corrigido.
+          safeItem.stock_ref = existingStockRef;
+          if (["a", "b"].includes(item?.stock_route)) safeItem.stock_route = item.stock_route;
+        } else if (liveRef) {
           safeItem.stock_ref = liveRef;
           if (publicSource(line, group?.cat) === "roupas") {
             safeItem.stock_route = String(item?.id_origem || "").toLowerCase().startsWith("franny-") ? "b" : "a";
           }
-        } else if (/^s_[a-f0-9]{24}$/.test(String(item?.stock_ref || ""))) {
-          safeItem.stock_ref = String(item.stock_ref);
-          if (["a", "b"].includes(item?.stock_route)) safeItem.stock_route = item.stock_route;
         }
         safeItem.fonte = publicSource(line, group?.cat);
         if (Array.isArray(safeItem.fotos)) {
