@@ -1,6 +1,12 @@
 name: Testes de correspondência Imarat
 
 on:
+  push:
+    branches: [fix/imarat-final-name-cleanup]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - "scripts/imarat-source-guard.test.mjs"
+      - ".github/workflows/test-imarat-matching.yml"
   pull_request:
     paths:
       - "scripts/sync-catalog.mjs"
