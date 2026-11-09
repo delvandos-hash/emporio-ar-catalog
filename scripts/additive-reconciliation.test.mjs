@@ -113,3 +113,10 @@ test("publicação aditiva não duplica item com stock_ref já presente no Gist"
   assert.match(apply, /duplicateSourceKeys/);
   assert.match(apply, /DUPLICATE_SOURCE_REPRESENTATIONS_SKIPPED/);
 });
+
+test("preserva o public_id canônico do Gist e confirma grupos Brand permitidos", () => {
+  assert.match(restore, /if \(publicItem\.public_id\) target\.public_id = publicItem\.public_id/);
+  assert.match(audit, /KNOWN_BRAND_GROUPS/);
+  assert.match(audit, /effectiveAdditiveSource\(row\)/);
+  assert.match(apply, /effectiveAdditiveSource\(rows\[0\]\)/);
+});
