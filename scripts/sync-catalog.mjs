@@ -42,15 +42,19 @@ function publicPriceNumber(value) {
 function publicBaseIdentity(line, group, item) {
   return [norm(line), norm(group?.brand), norm(group?.cat), norm(item?.nome), volumeMatch(item?.volume, item?.nome)].join("|");
 }
+function publicPhotoFingerprint(item) {
+  const list = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
+  return [...new Set(list.map(x => String(x || "").trim()).filter(Boolean))].sort().join("~");
+}
+function publicLooseIdentity(group, item) {
+  return [norm(group?.brand), norm(item?.nome)].join("|");
+}
 function publicVariantMatch(item, publicItem) {
-  const photos = value => {
-    const list = Array.isArray(value?.fotos) && value.fotos.length ? value.fotos : (value?.foto ? [value.foto] : []);
-    return [...new Set(list.map(x => String(x || "").trim()).filter(Boolean))].sort().join("~");
-  };
+  const photos = publicPhotoFingerprint(item);
   return norm(item?.nome) === norm(publicItem?.nome) &&
     volumeMatch(item?.volume, item?.nome) === volumeMatch(publicItem?.volume, publicItem?.nome) &&
-    photos(item) !== "" &&
-    photos(item) === photos(publicItem);
+    photos !== "" &&
+    photos === publicPhotoFingerprint(publicItem);
 }
 function preserveLivePublicFields(DATA, liveDATA) {
   if (!liveDATA) return { matched: 0, prices: 0, photos: 0, ambiguous: 0 };
@@ -59,6 +63,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
   const liveByStockRef = new Map();
   const liveByOriginRef = new Map();
   const liveByBase = new Map();
+  const liveByLooseIdentity = new Map();
   const used = new Set();
   for (const [line, groups] of Object.entries(liveDATA)) {
     for (const group of Array.isArray(groups) ? groups : []) {
@@ -79,6 +84,9 @@ function preserveLivePublicFields(DATA, liveDATA) {
         const key = publicBaseIdentity(line, group, item);
         if (!liveByBase.has(key)) liveByBase.set(key, []);
         liveByBase.get(key).push(item);
+        const looseKey = publicLooseIdentity(group, item);
+        if (!liveByLooseIdentity.has(looseKey)) liveByLooseIdentity.set(looseKey, []);
+        liveByLooseIdentity.get(looseKey).push(item);
       }
     }
   }
@@ -123,6 +131,16 @@ function preserveLivePublicFields(DATA, liveDATA) {
             else ambiguous++;
           }
         }
+        if (!liveItem) {
+          const looseCandidates = (liveByLooseIdentity.get(publicLooseIdentity(group, item)) || []).filter(x => !used.has(x));
+          if (looseCandidates.length === 1) liveItem = looseCandidates[0];
+          else if (looseCandidates.length > 1) {
+            const photo = publicPhotoFingerprint(publicItem);
+            const byPhoto = photo ? looseCandidates.filter(x => publicPhotoFingerprint(x) === photo) : [];
+            if (byPhoto.length === 1) liveItem = byPhoto[0];
+            else ambiguous++;
+          }
+        }
         if (!liveItem) continue;
         used.add(liveItem);
         matched++;
@@ -158,7 +176,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
         if (!item.stock_ref && liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
         if (!item.stock_route && liveItem.stock_route) item.stock_route = liveItem.stock_route;
-        if (!item.public_id && liveItem.public_id) item.public_id = liveItem.public_id;
+        if (liveItem.public_id && item.public_id !== liveItem.public_id) item.public_id = liveItem.public_id;
       }
     }
   }
@@ -1467,9 +1485,11 @@ async function main() {
       throw new Error("GIST_TOKEN ausente; sincronização de produção bloqueada antes de qualquer publicação.");
     }
     if (process.env.GIST_TOKEN) {
-      const internalBaseline = countCatalogPublicIds(DATA);
       const liveDATA = await fetchLiveGistBaseline();
       LIVE_GIST_DATA = liveDATA;
+      const preSyncPreservation = preserveLivePublicFields(DATA, liveDATA);
+      console.log(`LIVE_PUBLIC_PRE_SYNC_MATCHED=${preSyncPreservation.matched} LIVE_PUBLIC_PRE_SYNC_AMBIGUOUS=${preSyncPreservation.ambiguous}`);
+      const internalBaseline = countCatalogPublicIds(DATA);
       const liveBaseline = countCatalogPublicIds(liveDATA, true);
       const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
       const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
