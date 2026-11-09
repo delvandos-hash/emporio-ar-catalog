@@ -82,7 +82,7 @@ function isMini(item, group) {
 const localDataText = readFileSync(new URL("../js/data.js", import.meta.url), "utf8");
 const dataMarker = "export const DATA = ";
 const dataStart = localDataText.indexOf(dataMarker);
-const dataEnd = localDataText.indexOf(";\\nexport const WHATSAPP", dataStart);
+const dataEnd = localDataText.indexOf(";\nexport const WHATSAPP", dataStart);
 if (dataStart < 0 || dataEnd < 0) throw new Error("Não foi possível ler DATA interno de js/data.js.");
 const INTERNAL_DATA = JSON.parse(localDataText.slice(dataStart + dataMarker.length, dataEnd));
 const internalIndex = new Map();
