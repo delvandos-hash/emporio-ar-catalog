@@ -22,7 +22,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Auditar snapshot público (somente leitura)
+      - name: Auditar snapshot e regras de preço (somente leitura)
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
         run: node scripts/audit-miniaturas-imarat.mjs
