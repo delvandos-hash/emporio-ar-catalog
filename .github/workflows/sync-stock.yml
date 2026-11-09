@@ -20,7 +20,6 @@ jobs:
         env:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
-          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
