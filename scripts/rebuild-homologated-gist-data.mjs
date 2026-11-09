@@ -7,21 +7,31 @@ const imageOptions = {
   cdnFallbackBase: process.env.CDN_IMAGE_FALLBACK_BASE_URL || "https://acdn-us.mitiendanube.com/",
   productBase: process.env.IMARAT_ORIGIN_URL || "https://imaratperfumaria.com/"
 };
-const safe = toPublicCatalog(DATA, imageOptions);
-const groups = Object.values(safe).flat();
+const publicData = toPublicCatalog(DATA, imageOptions);
+const payload = {
+  DATA: publicData,
+  WHATSAPP: "5562991134488",
+  BRAND: { name: "Empório A.R", phone: "(62) 99113-4488" },
+  ultimaAtualizacao: "2026-11-08T02:19:18.000Z"
+};
+const groups = Object.values(publicData).flat();
 const products = groups.flatMap(g => Array.isArray(g.items) ? g.items : []);
+const photos = products.flatMap(p => [...(p.foto ? [p.foto] : []), ...(Array.isArray(p.fotos) ? p.fotos : [])]);
 const report = {
   sourceCommit: "471dcd18817239069df7311418548a3b6909b8ee",
   groupCount: groups.length,
   productCount: products.length,
   productsWithPhoto: products.filter(p => p.foto || (p.fotos || []).length).length,
   productsWithoutPhoto: products.filter(p => !p.foto && !(p.fotos || []).length).length,
-  photoUrlCount: products.reduce((n,p) => n + (p.foto ? 1 : 0) + (Array.isArray(p.fotos) ? p.fotos.length : 0), 0),
+  photoUrlCount: photos.length,
+  invalidPhotoUrlCount: photos.filter(u => !/^\\/api\\/product-image\\?source=[abp]&path=/.test(u)).length,
+  metadata: { WHATSAPP: payload.WHATSAPP, BRAND: payload.BRAND, ultimaAtualizacao: payload.ultimaAtualizacao },
   imageOptions
 };
+if (!products.length || !report.productsWithPhoto || report.invalidPhotoUrlCount) {
+  throw new Error("Snapshot inválido; Gist não será atualizado: " + JSON.stringify(report));
+}
 fs.mkdirSync("rebuild-output", { recursive: true });
-fs.writeFileSync("rebuild-output/DATA-homologada.json", JSON.stringify(safe));
+fs.writeFileSync("rebuild-output/catalogo.json", JSON.stringify(payload));
 fs.writeFileSync("rebuild-output/relatorio-validacao.json", JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
-if (!products.length) throw new Error("Base homologada vazia: artefato não será considerado válido.");
-if (!report.productsWithPhoto) throw new Error("Nenhuma foto foi preservada; artefato inválido.");
