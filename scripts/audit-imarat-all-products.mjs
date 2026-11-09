@@ -137,6 +137,12 @@ for(const [actual,expected,label] of checks) {
   if(actual!==expected) throw new Error(`Falha no teste ${label}: esperado "${expected}", recebido "${actual}"`);
 }
 
+const onlyYouMiniKey=miniIdentityKey("Only You","Mini Marshmellow","30ml");
+const armafMiniKey=miniIdentityKey("Armaf","Mini Marshmellow","30ml");
+if(onlyYouMiniKey===armafMiniKey) throw new Error("Colisão indevida: marcas diferentes não podem compartilhar a chave de miniatura.");
+if(onlyYouMiniKey!==miniIdentityKey("ONLY YOU","Mini Marshmellow","30ml")) throw new Error("Normalização de marca inconsistente na chave de miniatura.");
+if(onlyYouMiniKey===miniIdentityKey("Only You","Mini Marshmellow","15ml")) throw new Error("Volumes diferentes não podem compartilhar a chave de miniatura.");
+
 const INTERNAL_DATA=parseInternalData();
 const internalIndex=new Map();
 for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
@@ -208,13 +214,16 @@ function sourceIdentity(p) {
   if(slug) return "slug|"+slug;
   return "key|"+norm(p.brand)+"|"+sourceTitleKey(p.name,p.categoria_nome||p.categoria,p.brand)+"|"+volumeFrom(p.sizeMl,p.name);
 }
+function miniIdentityKey(brand,name,volume) {
+  return "mini|"+norm(brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volumeFrom(volume,name);
+}
 function apiDuplicateKey(p) {
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   return mini
-    ? "mini|"+norm(p.brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volume
+    ? miniIdentityKey(p.brand,name,volume)
     : "normal|"+norm(p.brand||"outros")+"|"+limparParaComparacao(name)+"|"+volume;
 }
 const matchedCatalog=catalog.map(item=>({...item,matchedSource:matchSourceForCatalog(item)}));
@@ -244,7 +253,7 @@ const miniGlobalGroups=new Map();
 for(const item of matchedCatalog) {
   if(!item.matchedSource) continue;
   if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
-  const key=[norm(item.brand),chaveComparacaoMini(item.name),volumeFrom(item.volume,item.name)].join("|");
+  const key=miniIdentityKey(item.brand,item.name,item.volume);
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
@@ -271,7 +280,7 @@ for(const item of catalog) {
   normalIndex.add(limparParaComparacao(item.name));
   normalIndex.add(`${limparParaComparacao(item.name)}|${norm(item.brand)}`);
   if(isMiniatura(item.name,item.volume,item.category)&&!isOleo(item.name))
-    miniIndex.add([norm(item.brand),chaveComparacaoMini(item.name),volumeFrom(item.volume,item.name)].join("|"));
+    miniIndex.add(miniIdentityKey(item.brand,item.name,item.volume));
 }
 const initialNormalIndex=new Set(normalIndex);
 const initialMiniIndex=new Set(miniIndex);
@@ -287,7 +296,7 @@ for(const p of source) {
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   const normalKey=limparParaComparacao(name);
   const miniKey=chaveComparacaoMini(name);
-  const miniIdentity=[norm(brand),miniKey,volume].join("|");
+  const miniIdentity=miniIdentityKey(brand,name,volume);
   const duplicate=mini
     ? miniIndex.has(miniIdentity)
     : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
