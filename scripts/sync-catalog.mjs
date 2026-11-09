@@ -1254,37 +1254,38 @@ async function main() {
   const imaratList = await fetchImaratList();
   console.log(`Imarat: ${imaratList.length} produtos`);
 
-  const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
   let produtosImaratForaDoSiteRaizRemovidos = 0;
   let titulosImaratCorrigidosPeloSiteRaiz = 0;
   const relatorioImaratNomesRemovidos = [];
   const relatorioImaratNomesCorrigidos = [];
 
-  // As categorias Perfumes, Miniaturas e Óleos são abastecidas pela Imarat.
-  // Também considera itens com fonte Imarat confirmada em outras categorias.
-  // Quando o produto existe, o título é substituído pelo texto exato da origem.
+  // A categoria não comprova a origem: Perfumes, Miniaturas e Óleos podem
+  // conter produtos de outros fornecedores. Só audita/exclui quando o próprio
+  // registro traz fonte Imarat confirmada.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
-      const grupoImarat = categoriasImarat.has(norm(g.cat));
       g.items = (g.items || []).filter(item => {
-        const fonteImarat = String(item.fonte || '').toLowerCase() === 'imarat';
-        if (!fonteImarat && !grupoImarat) return true;
-
+        const fonteImarat = norm(item.fonte) === 'imarat';
         const nomeNormalizado = norm(item.nome);
+        const legadoArabiyatPrestige =
+          norm(g.brand).includes('arabiyat') && nomeNormalizado.startsWith('prestige ');
+        const legadoMiniaturaAfeer =
+          norm(g.cat) === 'miniaturas' && norm(g.brand).includes('afeer') &&
+          nomeNormalizado.includes('atheri afeer');
+        if (!fonteImarat && !legadoArabiyatPrestige && !legadoMiniaturaAfeer) return true;
+
         let hit = imaratList.find(p => norm(p.name) === nomeNormalizado);
 
-        // Compatibilidade histórica: "PRESTIGE Noiré Absolu" foi salvo com
-        // a marca no título; na origem, marca = Arabiyat Prestige e produto = Noiré Absolu.
-        if (!hit && norm(g.brand).includes('arabiyat') && nomeNormalizado.startsWith('prestige ')) {
+        // Compatibilidade histórica: a marca foi incluída indevidamente no título.
+        if (!hit && legadoArabiyatPrestige) {
           const nomeSemPrefixo = nomeNormalizado.slice('prestige '.length);
           hit = imaratList.find(p =>
             norm(p.name) === nomeSemPrefixo && norm(p.brand).includes('arabiyat prestige')
           );
         }
 
-        // Grafia antiga da miniatura Afeer: o título correto é Atherri.
-        if (!hit && norm(g.cat) === 'miniaturas' && norm(g.brand).includes('afeer') &&
-            nomeNormalizado.includes('atheri afeer')) {
+        // Grafia antiga da miniatura Afeer: só corrige com confirmação da origem.
+        if (!hit && legadoMiniaturaAfeer) {
           hit = imaratList.find(p =>
             norm(p.name) === 'miniatura atherri afeer' && norm(p.brand).includes('afeer')
           );
@@ -1299,9 +1300,12 @@ async function main() {
             item.nome = hit.name;
             titulosImaratCorrigidosPeloSiteRaiz++;
           }
-          item.fonte = 'imarat';
+          if (fonteImarat || legadoArabiyatPrestige || legadoMiniaturaAfeer) item.fonte = 'imarat';
           return true;
         }
+
+        // Registros sem procedência explícita nunca são excluídos por falha de correspondência.
+        if (!fonteImarat) return true;
 
         produtosImaratForaDoSiteRaizRemovidos++;
         relatorioImaratNomesRemovidos.push({
