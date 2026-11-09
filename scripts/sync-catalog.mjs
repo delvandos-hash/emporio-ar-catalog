@@ -294,6 +294,9 @@ async function fetchImaratList() {
     if (fetched >= total || products.length < 60) break;
     page++;
   }
+  if (total && fetched < total) {
+    throw new Error(`Paginação Imarat incompleta: recebidos ${fetched} de ${total} produtos. Sincronização interrompida para evitar limpeza com lista parcial.`);
+  }
   console.log(`Prefixos de marca removidos do nome Imarat (Arabiyat Prestige): ${prefixosMarcaRemovidos}`);
   return all;
 }
@@ -1253,8 +1256,10 @@ async function main() {
         if (it.notas) it.notas = limparTexto(it.notas);
 
         const n = norm(it.nome); const b = norm(g.brand);
-        
-        const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
+        // Compatibilidade para registros antigos com o prefixo redundante "Prestige"
+        // no nome, quando a marca do grupo confirma Arabiyat Prestige.
+        const nomeSemPrefixoPrestige = b.includes('arabiyat prestige') ? n.replace(/^prestige\\s+/, '') : n;
+        const hit = imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige);
         if (!hit) continue;
 
         // Identifica a origem para a limpeza global de duplicatas históricas Imarat.
