@@ -28,3 +28,7 @@ jobs:
           path: rebuild-output/
           if-no-files-found: error
           retention-days: 7
+      - name: Atualizar Gist com a base homologada
+        run: node scripts/publish-homologated-gist.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
