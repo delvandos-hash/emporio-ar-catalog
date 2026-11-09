@@ -1,0 +1,20 @@
+name: Validar imagens sem publicar catálogo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar imagens publicadas pela prévia
+        run: node scripts/validate-public-images.mjs
+        env:
+          NETLIFY_PREVIEW_URL: https://deploy-preview-10--catalogoemporio.netlify.app
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
