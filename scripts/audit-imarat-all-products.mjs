@@ -325,7 +325,7 @@ for (const row of internalOnlySourceRows) {
   const item = row.row?.item || {};
   const group = row.row?.group || {};
   console.log("ADDITIVE SOURCE ITEM " + JSON.stringify({
-    key: row.key, fonte: item.fonte || "", id_origem: item.id_origem || "",
+    key: row.key, linha: row.row?.line || "", categoria: group.cat || "", fonte: item.fonte || "", id_origem: item.id_origem || "",
     marca: group.brand || "", nome: item.nome || "", precoManual: item.precoManual || false
   }));
 }
