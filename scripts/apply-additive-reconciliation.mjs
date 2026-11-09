@@ -147,10 +147,16 @@ function collectInternalIndex(DATA) {
 function rekeyLiveVariants(liveDATA, internalIndex) {
   const internalByBase = new Map();
   const internalByOriginRef = new Map();
+  const internalByPublicId = new Map();
   for (const rows of internalIndex.values()) for (const row of rows) {
     const base = identity(row.publicLine, row.publicGroup, row.publicItem);
     if (!internalByBase.has(base)) internalByBase.set(base, []);
     internalByBase.get(base).push(row);
+    const publicId = String(row.publicItem?.public_id || "").trim();
+    if (publicId) {
+      if (!internalByPublicId.has(publicId)) internalByPublicId.set(publicId, []);
+      internalByPublicId.get(publicId).push(row);
+    }
     const originRef = String(row.publicItem?.origin_ref || "").trim();
     if (originRef) {
       if (!internalByOriginRef.has(originRef)) internalByOriginRef.set(originRef, []);
@@ -165,6 +171,9 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
         const base = identity(line, group, item);
         const fingerprint = publicFingerprint(item);
         const candidates = (internalByBase.get(base) || []).filter(row => !used.has(row.publicItem.public_id));
+        const byGlobalId = item.public_id
+          ? (internalByPublicId.get(String(item.public_id)) || []).filter(row => !used.has(row.publicItem.public_id))
+          : [];
         const byExistingId = item.public_id
           ? candidates.filter(row => row.publicItem.public_id === item.public_id)
           : [];
@@ -174,9 +183,11 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
         const photoFingerprint = publicPhotoFingerprint(item);
         const byPhoto = photoFingerprint !== "[]" ? candidates.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
         const byExactContent = candidates.filter(row => publicFingerprint(row.publicItem) === fingerprint);
-        const match = byExistingId.length === 1
-          ? byExistingId[0]
-          : byOriginRef.length === 1
+        const match = byGlobalId.length === 1
+          ? byGlobalId[0]
+          : byExistingId.length === 1
+            ? byExistingId[0]
+            : byOriginRef.length === 1
             ? byOriginRef[0]
             : byPhoto.length === 1
             ? byPhoto[0]
@@ -185,7 +196,7 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
               : candidates.length === 1
                 ? candidates[0]
                 : null;
-        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (candidatas=${candidates.length}, origin_ref=${byOriginRef.length}, fotosCompatíveis=${byPhoto.length}, conteúdoExato=${byExactContent.length})`);
+        if (!match) throw new Error(`Variante atual do Gist sem correspondência inequívoca na base: ${base} / ${item.nome} (public_id_global=${byGlobalId.length}, candidatas=${candidates.length}, origin_ref=${byOriginRef.length}, fotosCompatíveis=${byPhoto.length}, conteúdoExato=${byExactContent.length})`);
         used.add(match.publicItem.public_id);
         if (item.public_id !== match.publicItem.public_id) {
           item.public_id = match.publicItem.public_id;
