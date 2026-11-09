@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
+import { normalProductKey, miniIdentityBaseKey, miniIdentityKey } from './catalog-identity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1672,46 +1673,24 @@ async function main() {
 
   // Deduplicação segura: o mesmo nome-base só é duplicata quando a marca
   // também coincide. IDs iguais são consolidados depois pela identidade da origem.
-  // Marca diferente nunca é removida por semelhança de título; óleos ficam fora.
-  const miniaturasGlobaisVistas = new Set();
-  let miniaturasDuplicadasRemovidas = 0;
-  for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line] || []) {
-      g.items = (g.items || []).filter(item => {
-        if (String(item.fonte || '').toLowerCase() !== 'imarat' || !isMiniatura(item.nome, item.volume, g.cat) || isOleo(item.nome)) return true;
-        const idOrigem = String(item.id_origem || '').trim();
-        const chave = idOrigem
-          ? `marca|${norm(g.brand)}|id|${idOrigem}`
-          : `marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}`;
-        if (!chave || chave.endsWith('|')) return true;
-        if (miniaturasGlobaisVistas.has(chave)) {
-          miniaturasDuplicadasRemovidas++;
-          return false;
-        }
-        miniaturasGlobaisVistas.add(chave);
-        return true;
-      });
-    }
-  }
-  console.log(`Miniaturas Imarat duplicadas removidas por ID ou marca/nome/volume: ${miniaturasDuplicadasRemovidas}`);
+  // A base homologada é preservada: esta etapa não apaga produtos existentes.
+  // Duplicidades antigas serão apenas auditadas; nenhuma remoção por aproximação.
+  console.log('Deduplicação destrutiva desativada: todos os registros existentes foram preservados.');
 
-  // Índice de identidade: marca + nome normalizado + volume.
-  // Nomes iguais de marcas diferentes e apresentações distintas coexistem.
   const indexNormal = new Set();
   const indexNameVolume = new Set();
-  const indexMiniImarat = new Set();
-  const indexMiniNameVolume = new Set();
+  const indexMiniByBase = new Map();
   for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
-      for (const it of g.items) {
+    for (const g of DATA[line] || []) {
+      for (const it of g.items || []) {
         const volumeKey = volumeMatch(it.volume, it.nome);
         const nomeKey = limparParaComparacao(it.nome);
         indexNormal.add(`${norm(g.brand)}|${nomeKey}|${volumeKey}`);
-        indexNameVolume.add(`${nomeKey}|${volumeKey}`);
+        indexNameVolume.add(normalProductKey(it.nome, it.volume));
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
-          const chaveMini = chaveComparacaoMini(it.nome);
-          indexMiniImarat.add(`${norm(g.brand)}|${chaveMini}|${volumeKey}`);
-          indexMiniNameVolume.add(`${chaveMini}|${volumeKey}`);
+          const baseKey = miniIdentityBaseKey(it, g.brand);
+          if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, new Set());
+          indexMiniByBase.get(baseKey).add(miniIdentityKey(it, g.brand));
         }
       }
     }
@@ -1727,34 +1706,47 @@ async function main() {
       const categoria = p.categoria_nome || p.categoria || '';
       const ehOleo = isOleo(nome);
       const ehMini = isMiniatura(nome, volume, categoria) && !ehOleo;
-      let duplicado;
+      const precoVarejoOrig = (p.priceCents || 0) / 100;
+      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
+      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+      let detail = null;
+      let imgsNew = imaratImagesFrom(p, null);
+      let duplicado = false;
+      let miniBaseKey = '';
+      let miniFullKey = '';
+
       if (ehMini) {
-        const chave = chaveComparacaoMini(nome);
-        const volumeKey = volumeMatch(volume, nome);
-        const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeKey}`;
-        duplicado = indexMiniImarat.has(chaveComIdentidade)
-          || (!marcaConhecida && indexMiniNameVolume.has(`${chave}|${volumeKey}`));
+        const candidate = {
+          nome, volume, varejo: prices.varejo, atacado: prices.atacado,
+          foto: imgsNew[0] || '', fotos: imgsNew,
+        };
+        miniBaseKey = miniIdentityBaseKey(candidate, brand);
+        const existing = indexMiniByBase.get(miniBaseKey);
+        if (existing) {
+          // Só busca detalhes quando há uma identidade candidata; compara a galeria
+          // completa antes de bloquear a inclusão.
+          if (p.slug && !SYNC_SKIP_DETAILS) detail = await fetchImaratDetail(p.slug);
+          imgsNew = imaratImagesFrom(p, detail);
+          candidate.foto = imgsNew[0] || '';
+          candidate.fotos = imgsNew;
+          miniFullKey = miniIdentityKey(candidate, brand);
+          duplicado = existing.has(miniFullKey);
+        } else {
+          miniFullKey = miniIdentityKey(candidate, brand);
+        }
       } else {
-        const nomeKey = limparParaComparacao(nome);
-        const volumeKey = volumeMatch(volume, nome);
-        duplicado = indexNormal.has(`${norm(brand)}|${nomeKey}|${volumeKey}`)
-          || (!marcaConhecida && indexNameVolume.has(`${nomeKey}|${volumeKey}`));
+        // Perfumes: comparação global por nome exato normalizado + volume.
+        // Não usa substring, similaridade aproximada ou marca como chave.
+        duplicado = indexNameVolume.has(normalProductKey(nome, volume));
       }
       if (duplicado) continue;
 
       let notas = '';
-      let detail = null;
-      if (p.slug && !SYNC_SKIP_DETAILS) {
-        detail = await fetchImaratDetail(p.slug);
-        if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
-      }
+      if (p.slug && !SYNC_SKIP_DETAILS && !detail) detail = await fetchImaratDetail(p.slug);
+      if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
       notas = sanitizarNotas(notas);
-      const imgsNew = imaratImagesFrom(p, detail);
+      imgsNew = imaratImagesFrom(p, detail);
       const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : '');
-      
-      const precoVarejoOrig = (p.priceCents || 0) / 100; 
-      const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
-      const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       
       const line = genderLine(p.gender); 
       const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : ''); 
@@ -1777,11 +1769,13 @@ async function main() {
       const nomeKey = limparParaComparacao(nome);
       const volumeKey = volumeMatch(volume, nome);
       indexNormal.add(`${norm(brand)}|${nomeKey}|${volumeKey}`);
-      indexNameVolume.add(`${nomeKey}|${volumeKey}`);
+      indexNameVolume.add(normalProductKey(nome, volume));
       if (ehMini) {
-        const chave = chaveComparacaoMini(nome);
-        indexMiniImarat.add(`${norm(brand)}|${chave}|${volumeKey}`);
-        indexMiniNameVolume.add(`${chave}|${volumeKey}`);
+        const actualMini = { nome, volume, varejo: prices.varejo, atacado: prices.atacado, foto, fotos: imgsNew };
+        const baseKey = miniIdentityBaseKey(actualMini, brand);
+        const fullKey = miniIdentityKey(actualMini, brand);
+        if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, new Set());
+        indexMiniByBase.get(baseKey).add(fullKey);
       }
       addedImarat++;
     }
