@@ -1,8 +1,8 @@
 name: Reconciliação completa em dry-run (sem publicar)
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [fix/preserve-public-prices-on-recovery]
     paths:
       - "scripts/sync-catalog.mjs"
       - "scripts/audit-imarat-all-products.mjs"
@@ -18,14 +18,14 @@ concurrency:
 
 jobs:
   reconcile:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/preserve-public-prices-on-recovery'
+    if: github.ref_name == 'fix/preserve-public-prices-on-recovery'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Baixar branch de correção
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.ref_name }}
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
@@ -93,4 +93,4 @@ jobs:
             exit 0
           fi
           git commit -m "chore: reconcile internal catalog with live sources"
-          git push origin HEAD:${{ github.head_ref }}
+          git push origin HEAD:${{ github.ref_name }}
