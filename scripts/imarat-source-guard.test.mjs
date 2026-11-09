@@ -173,3 +173,12 @@ test("fallback de marca ausente consulta também o Gist vivo para não importar 
   assert.match(source, /'sem marca', 'sem marca definida'/);
   assert.match(audit, /"sem marca","sem marca definida"/);
 });
+
+test("preserva roupas Empório A.R ainda presentes no Gist antes de calcular o baseline", () => {
+  assert.match(source, /function preserveLegacyClothingFromGist\(DATA, liveDATA\)/);
+  assert.match(source, /norm\(line\) !== 'roupas'/);
+  assert.match(source, /norm\(group\?\.brand\) !== 'emporio a r'/);
+  assert.match(source, /fonte: 'legacy-gist'/);
+  assert.match(source, /preserveLegacyClothingFromGist\(DATA, liveDATA\)/);
+  assert.match(source, /const internalBaseline = countCatalogIdentity\(DATA\)/);
+});
