@@ -114,17 +114,13 @@ async function main() {
 
   const checkPublic = toPublicCatalog(DATA);
   const checkIds = new Set();
-  const checkStockRefs = new Set();
   for (const groups of Object.values(checkPublic)) for (const group of groups || []) {
-    for (const item of group.items || []) {
-      if (item.public_id) checkIds.add(item.public_id);
-      if (item.stock_ref) checkStockRefs.add(item.stock_ref);
-    }
+    for (const item of group.items || []) if (item.public_id) checkIds.add(item.public_id);
   }
   const missing = [];
   for (const [line, groups] of Object.entries(liveDATA)) for (const group of groups || []) {
     for (const item of group.items || []) {
-      if (item.public_id && !checkIds.has(item.public_id) && !(item.stock_ref && checkStockRefs.has(item.stock_ref))) {
+      if (item.public_id && !checkIds.has(item.public_id)) {
         missing.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, public_id: item.public_id, stock_ref: item.stock_ref || "" });
       }
     }
