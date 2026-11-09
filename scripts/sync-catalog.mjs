@@ -1337,30 +1337,23 @@ async function main() {
   // Correção nominal específica validada pelo responsável do catálogo:
   // Atheri é a grafia incorreta; Atherri é a grafia correta da miniatura Afeer.
   // Só atua na categoria Miniaturas e no grupo da marca Afeer.
-  const nomeMiniAfeerErrado = 'miniatura atheri afeer';
-  const nomeMiniAfeerCorreto = 'miniatura atherri afeer';
-  const miniAfeerCorretaNaApi = imaratList.some(p =>
-    norm(p.name) === nomeMiniAfeerCorreto && norm(p.brand || '').includes('afeer')
-  );
-  const miniAfeerCorretaNoSnapshot = Object.keys(DATA).some(line =>
-    (DATA[line] || []).some(g =>
-      norm(g.cat).includes('miniatura') &&
-      norm(g.brand).includes('afeer') &&
-      (g.items || []).some(item => norm(item.nome) === nomeMiniAfeerCorreto)
-    )
-  );
-  let miniAfeerGrafiaErradaRemovida = 0;
-  if (miniAfeerCorretaNaApi || miniAfeerCorretaNoSnapshot) {
-    for (const line of Object.keys(DATA)) {
-      for (const g of DATA[line] || []) {
-        if (!norm(g.cat).includes('miniatura') || !norm(g.brand).includes('afeer')) continue;
-        const antes = (g.items || []).length;
-        g.items = (g.items || []).filter(item => norm(item.nome) !== nomeMiniAfeerErrado);
-        miniAfeerGrafiaErradaRemovida += antes - g.items.length;
+  const nomeMiniAfeerErrado = 'atheri afeer';
+  const nomeMiniAfeerCorreto = 'Miniatura Atherri Afeer';
+  let miniAfeerGrafiaCorrigida = 0;
+  // Correção nominal confirmada: dentro de Miniaturas / Afeer, "Atheri" é erro;
+  // o título comercial correto é exatamente "Miniatura Atherri Afeer".
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      if (!norm(g.cat).includes('miniatura') || !norm(g.brand).includes('afeer')) continue;
+      for (const item of (g.items || [])) {
+        if (norm(item.nome).includes(nomeMiniAfeerErrado)) {
+          item.nome = nomeMiniAfeerCorreto;
+          miniAfeerGrafiaCorrigida++;
+        }
       }
     }
   }
-  console.log(`Miniatura Atheri Afeer (grafia incorreta) removida: ${miniAfeerGrafiaErradaRemovida}`);
+  console.log(`Miniaturas Afeer com grafia corrigida para Atherri: ${miniAfeerGrafiaCorrigida}`);
 
   // Filtro de segurança: duplicatas exatas dentro de cada grupo.
   for (const line of Object.keys(DATA)) {
