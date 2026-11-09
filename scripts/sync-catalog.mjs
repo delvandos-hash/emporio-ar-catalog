@@ -57,6 +57,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
   const publicData = toPublicCatalog(DATA);
   const liveByPublicId = new Map();
   const liveByStockRef = new Map();
+  const liveByOriginRef = new Map();
   const liveByBase = new Map();
   const used = new Set();
   for (const [line, groups] of Object.entries(liveDATA)) {
@@ -70,6 +71,10 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (item.stock_ref) {
           if (!liveByStockRef.has(String(item.stock_ref))) liveByStockRef.set(String(item.stock_ref), []);
           liveByStockRef.get(String(item.stock_ref)).push(item);
+        }
+        if (item.origin_ref) {
+          if (!liveByOriginRef.has(String(item.origin_ref))) liveByOriginRef.set(String(item.origin_ref), []);
+          liveByOriginRef.get(String(item.origin_ref)).push(item);
         }
         const key = publicBaseIdentity(line, group, item);
         if (!liveByBase.has(key)) liveByBase.set(key, []);
@@ -96,7 +101,12 @@ function preserveLivePublicFields(DATA, liveDATA) {
         const publicItem = publicQueues.get(key)?.shift();
         if (!publicItem) continue;
         let liveItem = null;
-        if (item.public_id) {
+        if (publicItem.origin_ref) {
+          const origins = (liveByOriginRef.get(String(publicItem.origin_ref)) || []).filter(x => !used.has(x));
+          if (origins.length === 1) liveItem = origins[0];
+          else if (origins.length > 1) ambiguous++;
+        }
+        if (!liveItem && item.public_id) {
           const publicMatches = (liveByPublicId.get(String(item.public_id)) || []).filter(x => !used.has(x));
           if (publicMatches.length === 1) liveItem = publicMatches[0];
         }
