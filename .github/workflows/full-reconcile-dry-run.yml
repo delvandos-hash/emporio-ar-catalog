@@ -1,0 +1,89 @@
+name: Reconciliação completa em dry-run (sem publicar)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - "scripts/audit-imarat-all-products.mjs"
+      - ".github/workflows/full-reconcile-dry-run.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: full-reconcile-dry-run-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/preserve-public-prices-on-recovery'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Baixar branch de correção
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxe e testes
+        run: |
+          node --check scripts/sync-catalog.mjs
+          node --test scripts/imarat-source-guard.test.mjs
+      - name: Gerar snapshot interno completo sem publicar
+        run: node scripts/sync-catalog.mjs
+        env:
+          SYNC_DRY_RUN: "1"
+          SYNC_SKIP_DETAILS: "1"
+          SYNC_IMARAT_ONLY: "0"
+          SYNC_DANDE_ONLY: "0"
+          ADD_IMARAT_NEW: "1"
+          ADD_BRAND_NEW: "1"
+          ADD_ROUPAS: "1"
+          ADD_FRANNY: "1"
+          ADD_ACESSORIOS: "1"
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+      - name: Auditar snapshot gerado contra Gist (somente leitura)
+        run: |
+          node scripts/audit-imarat-all-products.mjs | tee /tmp/reconcile-audit.log
+          if grep -q 'publicação permitida=true' /tmp/reconcile-audit.log; then
+            echo "BASELINE_OK=true" >> "$GITHUB_ENV"
+            echo "Baseline reconciliada dentro do limite de segurança." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "BASELINE_OK=false" >> "$GITHUB_ENV"
+            echo "Baseline ainda divergente; nenhum commit será feito." >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+      - name: Guardar snapshot para revisão
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-reconcile-data-js-${{ github.run_id }}
+          path: js/data.js
+          retention-days: 7
+      - name: Persistir snapshot reconciliado somente se baseline passar
+        if: env.BASELINE_OK == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/data.js
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração em data.js para registrar."
+            exit 0
+          fi
+          git commit -m "chore: reconcile internal catalog with live sources"
+          git push origin HEAD:${{ github.head_ref }}
