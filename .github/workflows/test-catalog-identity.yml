@@ -1,0 +1,31 @@
+name: Testes de identidade e deduplicação do catálogo
+on:
+  push:
+    branches: [fix/dedupe-conservadora-backup-aprovado]
+    paths:
+      - "scripts/catalog-identity.mjs"
+      - "scripts/catalog-identity.test.mjs"
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/test-catalog-identity.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/catalog-identity.mjs"
+      - "scripts/catalog-identity.test.mjs"
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/test-catalog-identity.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxe do sincronizador
+        run: node --check scripts/sync-catalog.mjs
+      - name: Testar regras de identidade
+        run: node --test scripts/catalog-identity.test.mjs
