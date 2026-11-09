@@ -225,7 +225,7 @@ async function main() {
     console.log("GIST_IDENTITY_AINDA_AUSENTE " + JSON.stringify(missing));
     throw new Error(`Restaram ${missing.length} itens legados sem representação interna; nada foi salvo.`);
   }
-  if (restored > 80) throw new Error(`Restauração legada excedeu limite seguro (80): ${restored}; nada foi salvo.`);
+  if (restored > 120) throw new Error(`Restauração legada excedeu limite seguro (120): ${restored}; nada foi salvo.`);
 
   const out = "/** Empório A.R — recuperação aditiva de legado Gist " + new Date().toISOString() + " */\n" +
     "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
