@@ -38,6 +38,7 @@ jobs:
         env:
           SYNC_DRY_RUN: "1"
           SYNC_SKIP_DETAILS: "1"
+          SYNC_IMARAT_ONLY: "1"
           SYNC_DANDE_ONLY: "0"
           ADD_IMARAT_NEW: "1"
           ADD_BRAND_NEW: "1"
