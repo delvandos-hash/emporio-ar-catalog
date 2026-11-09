@@ -1,5 +1,5 @@
 const PROXY_ORIGIN = "https://catalogo-interno.invalid";
-const IMAGE_SOURCES = new Set(["a", "b", "p"]);
+const IMAGE_SOURCES = new Set(["a", "b", "p", "d"]);
 
 function safeBase(value) {
   if (!value) return null;
@@ -29,6 +29,7 @@ export function sanitizePublicImageUrl(value, options = {}) {
   const primary = safeBase(options.cdnBase ?? process.env.CDN_IMAGE_BASE_URL ?? "");
   const secondary = safeBase(options.cdnFallbackBase ?? process.env.CDN_IMAGE_FALLBACK_BASE_URL ?? "");
   const product = safeBase(options.productBase ?? process.env.IMARAT_ORIGIN_URL ?? "");
+  const dande = safeBase(options.dandeBase ?? process.env.DANDE_BASE_URL ?? "");
   try {
     const raw = value.trim();
     const existing = new URL(raw, PROXY_ORIGIN);
@@ -48,7 +49,7 @@ export function sanitizePublicImageUrl(value, options = {}) {
     else if (primary) url = new URL(raw, primary);
     else return "";
     if (url.protocol !== "https:" || url.username || url.password || url.hash) return "";
-    for (const [source, base] of [["p", product], ["a", primary], ["b", secondary]]) {
+    for (const [source, base] of [["p", product], ["d", dande], ["a", primary], ["b", secondary]]) {
       if (!base || url.origin !== base.origin) continue;
       const path = normalizePublicImagePath(url.pathname);
       if (!path || (source === "p" && !path.startsWith("/uploads/products/"))) return "";

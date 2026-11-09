@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
+import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -282,7 +283,7 @@ function imaratImagesFrom(p, detail) {
     if (!u) return;
     let s = String(u.url || u.src || u || '').trim();
     if (!s) return;
-    if (!s.startsWith('http')) s = IMARAT_ORIGIN + (s.startsWith('/') ? s : '/' + s);
+    if (!s.startsWith('http')) s = resolveImaratImageUrl(s, IMARAT_ORIGIN);
     if (!out.includes(s)) out.push(s);
   };
   if (detail && Array.isArray(detail.images)) detail.images.forEach(push);
@@ -1119,7 +1120,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
 
 
 async function main() {
-  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
+  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
   const missingSources = requiredSources.filter((key) => !process.env[key]);
   if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Carregando data.js...');
@@ -1258,14 +1259,14 @@ async function main() {
       }
       notas = sanitizarNotas(notas);
       const imgsNew = imaratImagesFrom(p, detail);
-      const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : '');
+      const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : '');
       
       const precoVarejoOrig = (p.priceCents || 0) / 100; 
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       
       const line = genderLine(p.gender); 
-      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : IMARAT_ORIGIN + p.image) : ''); 
+      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : ''); 
       const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
       
       const group = ensureBrandGroup(DATA, line, brand, cat);

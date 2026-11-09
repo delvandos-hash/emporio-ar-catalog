@@ -4,7 +4,8 @@ const MAX_BYTES = 8 * 1024 * 1024;
 function sourceBase(source) {
   const value = source === "a" ? process.env.CDN_IMAGE_BASE_URL
     : source === "b" ? process.env.CDN_IMAGE_FALLBACK_BASE_URL
-    : source === "p" ? process.env.IMARAT_ORIGIN_URL : "";
+    : source === "p" ? process.env.IMARAT_ORIGIN_URL
+    : source === "d" ? process.env.DANDE_BASE_URL : "";
   if (!value) return null;
   try {
     const base = new URL(value);
@@ -34,7 +35,7 @@ export default async req => {
     const requestUrl = new URL(req.url);
     const source = requestUrl.searchParams.get("source") || "";
     const path = normalizePublicImagePath(requestUrl.searchParams.get("path") || "");
-    if (!["a", "b", "p"].includes(source) || !path || (source === "p" && !path.startsWith("/uploads/products/"))) {
+    if (!["a", "b", "p", "d"].includes(source) || !path || (source === "p" && !path.startsWith("/uploads/products/"))) {
       return new Response("Requisição inválida", { status: 400, headers });
     }
     const base = sourceBase(source);
