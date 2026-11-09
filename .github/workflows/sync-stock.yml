@@ -1,11 +1,6 @@
 name: Sync catálogo (estoque + novos produtos)
 
 on:
-  # Gatilho temporário para publicar a normalização final de marcas.
-  push:
-    branches: [main]
-    paths:
-      - "scripts/sync-catalog.mjs"
   schedule:
     # 08:00 e 20:00 horário de Brasília (UTC-3) → 11:00 e 23:00 UTC
     - cron: '0 11 * * *'
