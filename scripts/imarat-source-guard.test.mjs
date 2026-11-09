@@ -8,6 +8,8 @@ const auditMiniSource = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs",
 const auditAllSource = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
 const audit = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
+const restoreLegacy = fs.readFileSync(new URL("./restore-gist-only-legacy.mjs", import.meta.url), "utf8");
+const additivePublish = fs.readFileSync(new URL("./apply-additive-reconciliation.mjs", import.meta.url), "utf8");
 
 test("limpeza de títulos só pode excluir produto com procedência Imarat explícita", () => {
   assert.match(source, /const fonteImarat = norm\(item\.fonte\) === 'imarat';/);
@@ -181,4 +183,15 @@ test("preserva roupas Empório A.R ainda presentes no Gist antes de calcular o b
   assert.match(source, /fonte: 'legacy-gist'/);
   assert.match(source, /preserveLegacyClothingFromGist\(DATA, liveDATA\)/);
   assert.match(source, /const internalBaseline = countCatalogIdentity\(DATA\)/);
+});
+
+test("reconciliação aditiva preserva todos os itens públicos e só publica fontes confirmadas", () => {
+  assert.match(audit, /ADDITIVE_RECONCILIATION_SAFE=/);
+  assert.match(audit, /allowedAdditiveSources/);
+  assert.match(restoreLegacy, /precoManual: true/);
+  assert.match(restoreLegacy, /disponivel: "Não"/);
+  assert.match(additivePublish, /missingFromInternal\.length/);
+  assert.match(additivePublish, /ALLOWED_SOURCES/);
+  assert.match(additivePublish, /GIST será atualizado somente com itens novos/);
+  assert.match(additivePublish, /GIST_RECONCILIATION_VERIFIED=true/);
 });
