@@ -9,3 +9,9 @@ test("limpeza de títulos só pode excluir produto com procedência Imarat expl�
   assert.match(source, /if \(!fonteImarat\) return true;/);
   assert.doesNotMatch(source, /categoriasImarat\s*=\s*new Set/);
 });
+
+test("Arabiyat Prestige permanece no campo de marca, separado do nome do produto", () => {
+  assert.match(source, /const marcaCorreta = marcaPublicaImarat\(hit\.brand\)\.toUpperCase\(\);/);
+  assert.match(source, /ensureBrandGroup\(DATA, line, marcaCorreta, g\.cat\)/);
+  assert.match(source, /MARCA ARABIYAT PRESTIGE CORRIGIDA/);
+});

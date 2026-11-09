@@ -1268,17 +1268,22 @@ async function main() {
       g.items = (g.items || []).filter(item => {
         const fonteImarat = norm(item.fonte) === 'imarat';
         const nomeNormalizado = norm(item.nome);
+        const marcaArabiyatPrestige = norm(g.brand).includes('arabiyat prestige');
         const legadoArabiyatPrestige =
-          norm(g.brand).includes('arabiyat') && nomeNormalizado.startsWith('prestige ');
+          (norm(g.brand) === 'arabiyat' && nomeNormalizado.startsWith('prestige ')) ||
+          marcaArabiyatPrestige;
         const legadoMiniaturaAfeer =
           norm(g.cat) === 'miniaturas' && norm(g.brand).includes('afeer') &&
           nomeNormalizado.includes('atheri afeer');
         if (!fonteImarat && !legadoArabiyatPrestige && !legadoMiniaturaAfeer) return true;
 
-        let hit = imaratList.find(p => norm(p.name) === nomeNormalizado);
+        let hit = imaratList.find(p =>
+          norm(p.name) === nomeNormalizado &&
+          (!marcaArabiyatPrestige || norm(p.brand).includes('arabiyat prestige'))
+        );
 
         // Compatibilidade histórica: a marca foi incluída indevidamente no título.
-        if (!hit && legadoArabiyatPrestige) {
+        if (!hit && legadoArabiyatPrestige && nomeNormalizado.startsWith('prestige ')) {
           const nomeSemPrefixo = nomeNormalizado.slice('prestige '.length);
           hit = imaratList.find(p =>
             norm(p.name) === nomeSemPrefixo && norm(p.brand).includes('arabiyat prestige')
@@ -1301,7 +1306,22 @@ async function main() {
             item.nome = hit.name;
             titulosImaratCorrigidosPeloSiteRaiz++;
           }
-          if (fonteImarat || legadoArabiyatPrestige || legadoMiniaturaAfeer) item.fonte = 'imarat';
+          item.fonte = 'imarat';
+
+          // Marca e produto são campos separados: move apenas os itens confirmados
+          // pela origem para o grupo Arabiyat Prestige, sem renomear os demais.
+          if (norm(hit.brand).includes('arabiyat prestige')) {
+            const marcaCorreta = marcaPublicaImarat(hit.brand).toUpperCase();
+            if (norm(g.brand) !== norm(marcaCorreta)) {
+              const destino = ensureBrandGroup(DATA, line, marcaCorreta, g.cat);
+              destino.items.push(item);
+              console.log('MARCA ARABIYAT PRESTIGE CORRIGIDA: ' + JSON.stringify({
+                linha: line, marcaAnterior: g.brand, marcaCorreta,
+                nomeProduto: item.nome
+              }));
+              return false;
+            }
+          }
           return true;
         }
 
@@ -1320,6 +1340,9 @@ async function main() {
   console.log(`Títulos Imarat corrigidos para a grafia exata do site raiz: ${titulosImaratCorrigidosPeloSiteRaiz}`);
   for (const corrigido of relatorioImaratNomesCorrigidos) {
     console.log('TÍTULO IMARAT CORRIGIDO PELO SITE RAIZ: ' + JSON.stringify(corrigido));
+  }
+  for (const line of Object.keys(DATA)) {
+    DATA[line] = (DATA[line] || []).filter(g => (g.items || []).length > 0);
   }
   console.log(`Produtos Imarat removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
   for (const removido of relatorioImaratNomesRemovidos) {
