@@ -131,7 +131,7 @@ test("deduplicação geral preserva nomes iguais entre marcas e volumes diferent
   assert.ok(source.includes("`produto|\u0024{norm(g.brand)}|\u0024{limparParaComparacao(item.nome)}|\u0024{volume}`"));
   assert.ok(source.includes("indexNormal.add(`\u0024{norm(g.brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
   assert.ok(!source.includes("indexNormal.add(limparParaComparacao(it.nome))"));
-  assert.ok(source.includes("duplicado = indexNormal.has(`\u0024{norm(brand)}|\u0024{limparParaComparacao(nome)}|\u0024{volumeMatch(volume, nome)}`)"));
+  assert.ok(source.includes("duplicado = indexNormal.has(`\u0024{norm(brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
 });
 
 test("marca ausente não pode criar duplicata ambígua em outra marca", () => {
