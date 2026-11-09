@@ -1238,8 +1238,18 @@ async function main() {
         if (it.notas) it.notas = limparTexto(it.notas);
 
         const n = norm(it.nome); const b = norm(g.brand);
-        
-        const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
+        const miniaturaExistente = isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome);
+        const candidatos = imaratList.filter((p) => norm(p.name) === n);
+        const correspondeMarca = (p) => {
+          const marcaOrigem = norm(p.brand);
+          return Boolean(marcaOrigem && b && (
+            marcaOrigem === b || marcaOrigem.includes(b) || b.includes(marcaOrigem)
+          ));
+        };
+        const hit = candidatos.find(correspondeMarca)
+          || (miniaturaExistente
+            ? (['outros', 'outra'].includes(b) ? candidatos.find((p) => !norm(p.brand)) : null)
+            : candidatos[0]);
         if (!hit) continue;
         
         it.nome = hit.name; 
@@ -1297,16 +1307,22 @@ async function main() {
     }
   }
 
-  // Filtro de segurança (remove duplicatas exatas dentro do mesmo grupo)
+  // Filtro de segurança: só remove repetição com mesmo nome, volume e preço.
+  // Volumes diferentes e preços manuais distintos permanecem preservados.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
-        const vistos = new Set();
-        g.items = g.items.filter(item => {
-            const chave = limparParaComparacao(item.nome); 
-            if (vistos.has(chave)) return false;
-            vistos.add(chave);
-            return true;
-        });
+      const vistos = new Set();
+      g.items = g.items.filter(item => {
+        const volumeKey = norm(item.volume && item.volume !== '—' ? item.volume : volumeFrom(null, item.nome)) || 'sem-volume';
+        const nomeKey = isMiniatura(item.nome, item.volume, g.cat) && !isOleo(item.nome)
+          ? chaveComparacaoMini(item.nome, item.volume)
+          : `${limparParaComparacao(item.nome)}|${volumeKey}`;
+        const precoKey = `${String(item.varejo)}|${String(item.atacado)}`;
+        const chave = `${nomeKey}|${precoKey}`;
+        if (vistos.has(chave)) return false;
+        vistos.add(chave);
+        return true;
+      });
     }
   }
 
