@@ -303,7 +303,11 @@ async function main() {
   if (missingFromInternal.length) {
     throw new Error(`Publicação bloqueada: ${missingFromInternal.length} IDs atuais do Gist ainda não estão representados na base. Nenhum dado foi enviado.`);
   }
-  if (!additions.length || additions.length > 80) {
+  if (!additions.length) {
+    console.log("ADDITIVE_RECONCILIATION_NOOP=true; nenhum item novo; Gist já reconciliado; nenhuma gravação necessária.");
+    return;
+  }
+  if (additions.length > 80) {
     throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=80).`);
   }
 
