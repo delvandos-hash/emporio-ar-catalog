@@ -231,3 +231,34 @@ test("gera referência opaca e estável da origem sem expor o ID interno", () =>
   assert.equal(item.id_origem, undefined);
   assert.equal(toPublicCatalog(DATA).masculino[0].items[0].origin_ref, item.origin_ref);
 });
+
+test("IDs públicos permanecem globais e distintos para IDs de origem diferentes", () => {
+  const DATA = {
+    acessorios: [
+      { brand: "Empório A.R", cat: "Lançamentos", items: [
+        { nome: "Colar Coração Vazado Semijoia Italiana", id_origem: "362483462", fonte: "acessorios", public_id: "p_d18982fe0d395bd8e799" }
+      ] },
+      { brand: "Empório A.R", cat: "Semijoia Italiana", items: [
+        { nome: "Colar Coração Vazado Semijoia Italiana", id_origem: "313263798", fonte: "acessorios", public_id: "p_d18982fe0d395bd8e799" }
+      ] }
+    ]
+  };
+  const out = toPublicCatalog(DATA);
+  const ids = out.acessorios.flatMap(g => g.items.map(i => i.public_id));
+  assert.equal(new Set(ids).size, 2);
+});
+test("mesmo ID de origem repetido em categorias distintas conserva uma única identidade pública", () => {
+  const DATA = {
+    roupas: [
+      { brand: "Empório A.R", cat: "CALÇA/SHORT", items: [
+        { nome: "Calça Cargo", id_origem: "4239995", fonte: "roupas" }
+      ] },
+      { brand: "Empório A.R", cat: "URBANA JEANS", items: [
+        { nome: "Calça Cargo", id_origem: "4239995", fonte: "roupas" }
+      ] }
+    ]
+  };
+  const out = toPublicCatalog(DATA);
+  const ids = out.roupas.flatMap(g => g.items.map(i => i.public_id));
+  assert.equal(new Set(ids).size, 1);
+});
