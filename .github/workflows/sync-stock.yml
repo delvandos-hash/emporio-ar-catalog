@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '22'
       - name: Testar sanitização do catálogo público
-        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/imarat-image-url.test.mjs
+        run: node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/imarat-image-url.test.mjs scripts/imarat-source-guard.test.mjs
         env:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
