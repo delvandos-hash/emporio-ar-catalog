@@ -195,15 +195,18 @@ async function fetchLiveGistBaseline() {
   return DATA;
 }
 
-function countCatalogIdentity(DATA) {
+function countCatalogPublicIds(DATA) {
+  // A identidade comercial (nome/categoria) pode mudar sem que o produto seja outro.
+  // A proteção de publicação compara IDs públicos estáveis, gerados pela mesma projeção da vitrine.
+  const publicDATA = toPublicCatalog(DATA || {});
   const keys = new Set();
   let count = 0;
-  for (const [line, groups] of Object.entries(DATA || {})) {
+  for (const groups of Object.values(publicDATA || {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
-        if (!item?.nome) continue;
+        if (!item?.nome || !item?.public_id) continue;
         count++;
-        keys.add([norm(line), norm(group.brand), norm(group.cat), norm(item.nome), volumeMatch(item.volume, item.nome)].join("|"));
+        keys.add(String(item.public_id));
       }
     }
   }
@@ -1462,17 +1465,17 @@ async function main() {
       throw new Error("GIST_TOKEN ausente; sincronização de produção bloqueada antes de qualquer publicação.");
     }
     if (process.env.GIST_TOKEN) {
-      const internalBaseline = countCatalogIdentity(DATA);
+      const internalBaseline = countCatalogPublicIds(DATA);
       const liveDATA = await fetchLiveGistBaseline();
       LIVE_GIST_DATA = liveDATA;
-      const liveBaseline = countCatalogIdentity(liveDATA);
+      const liveBaseline = countCatalogPublicIds(liveDATA);
       const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
       const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
-      console.log(`BASELINE INTERNA × GIST VIVO: data.js=${internalBaseline.count}; Gist=${liveBaseline.count}; só data.js=${onlyInternal}; só Gist=${onlyLive}`);
-      if (!SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25 || Math.abs(liveBaseline.count - internalBaseline.count) > 25)) {
-        throw new Error("SINCRONIZAÇÃO BLOQUEADA: data.js interno diverge do Gist vivo. Reconcilie a base antes de publicar para evitar perda de produtos e ajustes.");
+      console.log(`BASELINE POR PUBLIC_ID: data.js=${internalBaseline.count}; Gist=${liveBaseline.count}; IDs só no data.js=${onlyInternal}; IDs só no Gist=${onlyLive}`);
+      if (!SYNC_DRY_RUN && (onlyLive > 0 || onlyInternal > 80 || Math.abs(liveBaseline.count - internalBaseline.count) > 80)) {
+        throw new Error("SINCRONIZAÇÃO BLOQUEADA: há IDs públicos do Gist sem representação interna ou excesso de novos IDs. Reconcilie a base antes de publicar para evitar perda de produtos e ajustes.");
       }
-      if (SYNC_DRY_RUN && (onlyLive > 25 || onlyInternal > 25)) {
+      if (SYNC_DRY_RUN && (onlyLive > 0 || onlyInternal > 80)) {
         console.log("⚠️ Base divergente detectada; dry-run permitido apenas para diagnóstico. Nenhuma publicação será feita.");
       }
     } else {
