@@ -112,13 +112,12 @@ test("restauração Only You é append-only, respeita preço manual e valida ant
   assert.doesNotMatch(restoreOnlyYouSource, /group\.items\s*=\s*group\.items\.filter/);
 });
 
-test("deduplicação de miniaturas exige identidade exata, marca, volume, preço e fotos", () => {
+test("miniaturas usam ID de origem e fallback conservador por marca, nome e volume", () => {
   assert.ok(source.includes("miniIdentityBaseKey(it, g.brand)"));
-  assert.ok(source.includes("miniIdentityKey(it, g.brand)"));
-  assert.ok(source.includes("const existing = indexMiniByBase.get(miniBaseKey)"));
-  assert.ok(source.includes("duplicado = existing.has(miniFullKey)"));
-  assert.ok(source.includes("candidate.fotos = imgsNew"));
+  assert.ok(source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? \"\" )") || source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? \"\""));
   assert.ok(source.includes("!marcaConhecida && indexMiniNameVolume.has(miniIdentityNameVolumeKey(candidate))"));
+  assert.ok(source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\" ) })") || source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\""));
+  assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
 });
 
 test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
