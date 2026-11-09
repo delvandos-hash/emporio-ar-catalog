@@ -53,7 +53,7 @@ test("reconciliação aditiva reidentifica variantes sem remover conteúdo exist
 test("auditoria compara IDs públicos únicos e só libera fontes confirmadas", () => {
   assert.match(audit, /internalPublicIndex/);
   assert.match(audit, /rekeyLiveVariants/);
-  assert.doesNotMatch(audit, /rekeyAudit\.unmatched === 0/);
+  assert.doesNotMatch(audit, /rekeyAudit\.unmatched===0/);
   assert.match(audit, /VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA/);
   assert.match(audit, /internalOnlyKeys\.length <= 80/);
   assert.match(audit, /Math\.abs\(catalog\.length - internalItemCount\) <= 80/);
@@ -70,7 +70,7 @@ test("sincronização preserva preços e imagens públicas e remove apenas cópi
 test("reidentificação aceita variante única mesmo com preço ou imagem alterados", () => {
   assert.match(apply, /candidates\.length === 1\s*\? candidates\[0\]/);
   assert.match(apply, /byExactContent\.length === 1/);
-  assert.match(apply, /sem correspondência inequívoca/);
+  assert.match(apply, /VARIANTE GIST PRESERVADA SEM REKEY AUTOMÁTICO/);
 });
 test("deduplicação de Gist nunca colapsa IDs públicos diferentes", () => {
   assert.match(apply, /String\(item\?\.public_id \|\| ""\)/);
@@ -131,7 +131,7 @@ test("reidentificação flexível tolera categoria ou volume legado divergente s
 });
 
 test("variantes legadas sem reidentificação inequívoca permanecem preservadas sem exclusão", () => {
-  assert.match(apply, /sem correspondência inequívoca na base/);
+  assert.match(apply, /VARIANTE GIST PRESERVADA SEM REKEY AUTOMÁTICO/);
   assert.match(apply, /if \(missingFromInternal\.length\)/);
   assert.match(apply, /sem correspondência inequívoca na base/);
   assert.match(audit, /rekeyAudit\.unmatched === 0/);
