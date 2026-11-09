@@ -1446,6 +1446,20 @@ async function main() {
               volumeMatch(it.volume, it.nome) === volumeMatch(p.sizeMl, p.name))
           );
         }
+        if (!hit && b === 'ard al zaafaran' && n === 'oleo durrat al aroos') {
+          hit = imaratList.find(p =>
+            norm(p.name) === 'durrat al aroos' && norm(p.brand) === 'ard al zaafaran' &&
+            volumeMatch(it.volume, it.nome) === '20ml' &&
+            (!volumeMatch(p.sizeMl, p.name) || volumeMatch(p.sizeMl, p.name) === '20ml')
+          );
+        }
+        if (!hit && b === 'ard al zaafaran' && n === 'oleo shagaf al ward') {
+          hit = imaratList.find(p =>
+            norm(p.name) === 'shagaf al ward' && norm(p.brand) === 'ard al zaafaran' &&
+            volumeMatch(it.volume, it.nome) === '20ml' &&
+            (!volumeMatch(p.sizeMl, p.name) || volumeMatch(p.sizeMl, p.name) === '20ml')
+          );
+        }
         // Corrige títulos legados somente com marca compatível, volume compatível
         // e correspondência textual forte e sem ambiguidade.
         if (!hit && !['outros', 'outra', 'emporio a r'].includes(b)) {
