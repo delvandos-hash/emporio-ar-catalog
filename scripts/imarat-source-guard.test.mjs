@@ -164,3 +164,7 @@ test("variantes preservadas recebem public_id único e reconciliação reidentif
   assert.match(additiveSource, /rekeyLiveVariants/);
   assert.match(additiveSource, /GIST_VARIANTS_REKEYED/);
 });
+
+test("IDs de origem diferentes nunca são colapsados só por nome e volume iguais", () => {
+  assert.match(auditAllSource, /if\(id\) return "source-id\|"\+norm\(p\.brand\|\|"outros"\)\+"\|"\+id/);
+});
