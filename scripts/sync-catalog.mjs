@@ -1306,13 +1306,23 @@ async function main() {
     }
   }
 
+  // Índice convencional global: nome sem volume e nome+marca, conforme regra homologada.
+  // A chave sem marca impede reimportação quando a fonte muda a marca ou o grupo.
   const indexNormal = new Set();
   const indexMiniImarat = new Set();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       for (const it of g.items) {
         indexNormal.add(`${limparParaComparacao(it.nome)}|${norm(g.brand)}`);
-        if (isMiniatura(it.nome, it.volume, g.cat)) indexMiniImarat.add(`${chaveComparacaoMini(it.nome)}|${norm(g.brand)}`);
+        // Regra global homologada: bloqueia reimportação mesmo se a marca/grupo mudar.
+        indexNormal.add(limparParaComparacao(it.nome));
+        if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
+          const chaveMini = chaveComparacaoMini(it.nome);
+          // Regra homologada: comparação global por nome-base, sem prefixo e sem volume,
+          // exclusiva para miniaturas Imarat. Mantém o bloqueio entre marcas/grupos.
+          indexMiniImarat.add(chaveMini);
+          indexMiniImarat.add(`${chaveMini}|${norm(g.brand)}`);
+        }
       }
     }
   }
@@ -1371,6 +1381,7 @@ async function main() {
       }, true));
       
       indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
+      indexNormal.add(limparParaComparacao(nome));
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
         indexMiniImarat.add(chave);

@@ -1,0 +1,41 @@
+name: Auditoria somente leitura — todos os produtos Imarat
+
+on:
+  push:
+    branches: [fix/imarat-global-duplicate-prevention]
+    paths:
+      - "scripts/audit-miniaturas-imarat.mjs"
+      - "scripts/audit-imarat-all-products.mjs"
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/audit-miniaturas-imarat.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/audit-miniaturas-imarat.mjs"
+      - "scripts/audit-imarat-all-products.mjs"
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/audit-miniaturas-imarat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-miniaturas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Auditar duplicidades de todos os produtos Imarat (somente leitura)
+        env:
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+        run: node scripts/audit-imarat-all-products.mjs
+      - name: Auditar miniaturas e regras de preço (somente leitura)
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+        run: node scripts/audit-miniaturas-imarat.mjs
