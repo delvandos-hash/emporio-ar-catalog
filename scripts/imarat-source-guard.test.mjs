@@ -8,6 +8,8 @@ const auditMiniSource = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs",
 const auditAllSource = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
 const audit = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
+const additiveSource = fs.readFileSync(new URL("./apply-additive-reconciliation.mjs", import.meta.url), "utf8");
+const publicCatalogSource = fs.readFileSync(new URL("./public-catalog.mjs", import.meta.url), "utf8");
 
 test("limpeza de títulos só pode excluir produto com procedência Imarat explícita", () => {
   assert.match(source, /const fonteImarat = norm\(item\.fonte\) === 'imarat';/);
@@ -152,4 +154,13 @@ test("perfumes de marcas diferentes com nome e volume iguais não são deduplica
   assert.match(source, /normalProductKey\(nome, volume, brand\)/);
   assert.match(source, /!marcaConhecida && indexNameVolume\.has\(normalProductNameVolumeKey\(nome, volume\)\)/);
   assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
+});
+
+test("variantes preservadas recebem public_id único e reconciliação reidentifica itens existentes", () => {
+  assert.match(publicCatalogSource, /identityGroups/);
+  assert.match(publicCatalogSource, /publicVariantToken/);
+  assert.match(publicCatalogSource, /suppliedPublicId/);
+  assert.match(additiveSource, /item\.public_id \|\| identity/);
+  assert.match(additiveSource, /rekeyLiveVariants/);
+  assert.match(additiveSource, /GIST_VARIANTS_REKEYED/);
 });
