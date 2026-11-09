@@ -1,3 +1,4 @@
+# A validação é disparada automaticamente quando a PR é aberta, atualizada ou reaberta.
 name: Validar imagens públicas sem publicar catálogo
 
 on:
