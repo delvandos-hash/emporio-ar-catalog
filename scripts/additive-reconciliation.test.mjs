@@ -73,7 +73,8 @@ test("reidentificação aceita variante única mesmo com preço ou imagem altera
   assert.match(apply, /VARIANTE GIST PRESERVADA SEM REKEY AUTOMÁTICO/);
 });
 test("deduplicação de Gist nunca colapsa IDs públicos diferentes", () => {
-  assert.match(apply, /String\(item\?\.public_id \|\| ""\)/);
+  assert.match(apply, /const contentKey = identity\(line, group, item\) \+ "\\|" \+ publicFingerprint\(item\)/);
+  assert.match(apply, /occurrence=/);
   assert.match(apply, /GIST_EXACT_DUPLICATES_REMOVED/);
 });
 
