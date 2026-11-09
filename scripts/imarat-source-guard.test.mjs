@@ -126,9 +126,9 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
 });
 
 test("deduplicação geral preserva nomes iguais entre marcas e volumes diferentes", () => {
-  assert.match(source, /const chave = id \? `id\|\$\{norm\(g\.brand\)\}\|\$\{id\}`/);
-  assert.match(source, /produto\|\$\{norm\(g\.brand\)\}\|\$\{limparParaComparacao\(item\.nome\)\}\|\$\{volume\}/);
-  assert.match(source, /indexNormal\.add\(`\$\{norm\(g\.brand\)\}\|\$\{limparParaComparacao\(it\.nome\)\}\|\$\{volumeMatch\(it\.volume, it\.nome\)\}`)/);
-  assert.doesNotMatch(source, /indexNormal\.add\(limparParaComparacao\(it\.nome\)\)/);
-  assert.match(source, /duplicado = indexNormal\.has\(`\$\{norm\(brand\)\}\|\$\{limparParaComparacao\(nome\)\}\|\$\{volumeMatch\(volume, nome\)\}`)/);
+  assert.ok(source.includes("const chave = id ? `id|\u0024{norm(g.brand)}|\u0024{id}`"));
+  assert.ok(source.includes("`produto|\u0024{norm(g.brand)}|\u0024{limparParaComparacao(item.nome)}|\u0024{volume}`"));
+  assert.ok(source.includes("indexNormal.add(`\u0024{norm(g.brand)}|\u0024{limparParaComparacao(it.nome)}|\u0024{volumeMatch(it.volume, it.nome)}`)"));
+  assert.ok(!source.includes("indexNormal.add(limparParaComparacao(it.nome))"));
+  assert.ok(source.includes("duplicado = indexNormal.has(`\u0024{norm(brand)}|\u0024{limparParaComparacao(nome)}|\u0024{volumeMatch(volume, nome)}`)"));
 });
