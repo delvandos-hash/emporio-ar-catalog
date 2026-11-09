@@ -41,13 +41,41 @@ function stockRef(source, originId) {
   if (!originId || !["roupas", "acessorios"].includes(source)) return "";
   return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
 }
-function publicId(line, group, item) {
-  const identity = [line, group?.brand, group?.cat, item?.nome, item?.volume, ].map(x => String(x || "").trim().toLowerCase()).join("|");
-  return "p_" + createHash("sha256").update(identity).digest("hex").slice(0, 20);
+function publicIdentityBase(line, group, item) {
+  return [line, group?.brand, group?.cat, item?.nome, item?.volume]
+    .map(x => String(x || "").trim().toLowerCase()).join("|");
+}
+function publicId(line, group, item, variantToken = "") {
+  const identity = publicIdentityBase(line, group, item);
+  const material = variantToken ? identity + "|variant|" + variantToken : identity;
+  return "p_" + createHash("sha256").update(material).digest("hex").slice(0, 20);
+}
+function publicVariantToken(item, index) {
+  const images = Array.isArray(item?.fotos) && item.fotos.length
+    ? item.fotos
+    : (item?.foto ? [item.foto] : []);
+  const media = [...new Set(images.map(x => String(x || "").trim()).filter(Boolean))].sort().join("~");
+  return [
+    String(item?.id_origem || "").trim(),
+    String(item?.varejo ?? "").trim(),
+    String(item?.atacado ?? "").trim(),
+    media,
+    String(index)
+  ].join("|");
 }
 export function toPublicCatalog(DATA, imageOptions = {}) {
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("DATA inválido para publicação");
   const publicData = {};
+  const identityCounts = new Map();
+  for (const [line, groups] of Object.entries(DATA)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const key = publicIdentityBase(line, group, item);
+        identityCounts.set(key, (identityCounts.get(key) || 0) + 1);
+      }
+    }
+  }
+  const identityIndexes = new Map();
   for (const [line, groups] of Object.entries(DATA)) {
     if (!Array.isArray(groups)) continue;
     const safeLine = publicLine(line, groups);
@@ -56,7 +84,11 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       const safeGroup = pick(group, GROUP_FIELDS);
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
-        safeItem.public_id = publicId(line, group, item);
+        const identityKey = publicIdentityBase(line, group, item);
+        const occurrence = identityIndexes.get(identityKey) || 0;
+        identityIndexes.set(identityKey, occurrence + 1);
+        const isVariant = (identityCounts.get(identityKey) || 0) > 1 && occurrence > 0;
+        safeItem.public_id = publicId(line, group, item, isVariant ? publicVariantToken(item, occurrence) : "");
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
         if (liveRef) {
           safeItem.stock_ref = liveRef;
