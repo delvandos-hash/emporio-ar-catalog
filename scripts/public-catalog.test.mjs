@@ -186,3 +186,97 @@ test("não preserva nomes de origem em chaves de linha públicas", () => {
   assert.deepEqual(Object.keys(result), ["outros"]);
   assert.equal(JSON.stringify(result).includes("fornecedor-privado"), false);
 });
+
+test("gera public_id distinto para variantes do mesmo nome, mantendo a URL antiga no item canônico", () => {
+  const source = {
+    feminino: [{ brand: "Afeer", cat: "Miniaturas", items: [
+      { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "95,00", atacado: "65,00", foto: "https://products.example/a.webp", id_origem: "1474", fonte: "imarat" },
+      { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "105,00", atacado: "75,00", foto: "https://products.example/b.webp", id_origem: "1481", fonte: "imarat" }
+    ]}]
+  };
+  const first = toPublicCatalog(source).feminino[0].items;
+  const second = toPublicCatalog(source).feminino[0].items;
+  assert.notEqual(first[0].public_id, first[1].public_id);
+  assert.equal(first[0].public_id, second[0].public_id);
+  assert.equal(first[1].public_id, second[1].public_id);
+  assert.equal(JSON.stringify(first).includes("1474"), false);
+  assert.equal(JSON.stringify(first).includes("1481"), false);
+});
+
+test("public_id legado é reservado antes de gerar IDs de variantes", () => {
+  const single = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "Roupas", items: [
+      { nome: "Calça Resinada", varejo: "99,90", atacado: "69,90", foto: "https://img.example/a.webp" }
+    ]}]
+  });
+  const legacyId = single.roupas[0].items[0].public_id;
+  const mixed = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "Roupas", items: [
+      { nome: "Calça Resinada", varejo: "109,90", atacado: "79,90", foto: "https://img.example/b.webp" },
+      { public_id: legacyId, nome: "Calça Resinada", varejo: "99,90", atacado: "69,90", foto: "https://img.example/a.webp" }
+    ]}]
+  });
+  const items = mixed.roupas[0].items;
+  assert.equal(items[1].public_id, legacyId);
+  assert.notEqual(items[0].public_id, legacyId);
+  assert.notEqual(items[0].public_id, items[1].public_id);
+});
+
+test("gera referência opaca e estável da origem sem expor o ID interno", () => {
+  const DATA = { masculino: [{ brand: "Lattafa", cat: "Miniaturas", items: [
+    { nome: "Mini Asad", volume: "30ml", id_origem: "1157", fonte: "imarat" }
+  ] }] };
+  const item = toPublicCatalog(DATA).masculino[0].items[0];
+  assert.match(item.origin_ref, /^o_[a-f0-9]{24}$/);
+  assert.equal(item.id_origem, undefined);
+  assert.equal(toPublicCatalog(DATA).masculino[0].items[0].origin_ref, item.origin_ref);
+});
+
+test("IDs públicos permanecem globais e distintos para IDs de origem diferentes", () => {
+  const DATA = {
+    acessorios: [
+      { brand: "Empório A.R", cat: "Lançamentos", items: [
+        { nome: "Colar Coração Vazado Semijoia Italiana", id_origem: "362483462", fonte: "acessorios", public_id: "p_d18982fe0d395bd8e799" }
+      ] },
+      { brand: "Empório A.R", cat: "Semijoia Italiana", items: [
+        { nome: "Colar Coração Vazado Semijoia Italiana", id_origem: "313263798", fonte: "acessorios", public_id: "p_d18982fe0d395bd8e799" }
+      ] }
+    ]
+  };
+  const out = toPublicCatalog(DATA);
+  const ids = out.acessorios.flatMap(g => g.items.map(i => i.public_id));
+  assert.equal(new Set(ids).size, 2);
+});
+test("mesmo ID de origem repetido em categorias distintas conserva uma única identidade pública", () => {
+  const DATA = {
+    roupas: [
+      { brand: "Empório A.R", cat: "CALÇA/SHORT", items: [
+        { nome: "Calça Cargo", id_origem: "4239995", fonte: "roupas" }
+      ] },
+      { brand: "Empório A.R", cat: "URBANA JEANS", items: [
+        { nome: "Calça Cargo", id_origem: "4239995", fonte: "roupas" }
+      ] }
+    ]
+  };
+  const out = toPublicCatalog(DATA);
+  const ids = out.roupas.flatMap(g => g.items.map(i => i.public_id));
+  assert.equal(new Set(ids).size, 1);
+});
+
+test("marcas ONLY YOU e MAIS YOU permanecem separadas mesmo com nomes semelhantes", () => {
+  const DATA = {
+    feminino: [
+      { brand: "ONLY YOU", cat: "Miniaturas", items: [
+        { nome: "Mini Onlyyou 212", volume: "30ml", id_origem: "only-212", fonte: "imarat" }
+      ] },
+      { brand: "MAIS YOU", cat: "Miniaturas", items: [
+        { nome: "Mini Onlyyou 212", volume: "30ml", id_origem: "mais-212", fonte: "imarat" }
+      ] }
+    ]
+  };
+  const out = toPublicCatalog(DATA);
+  assert.equal(out.feminino.length, 2);
+  assert.deepEqual(out.feminino.map(group => group.brand), ["ONLY YOU", "MAIS YOU"]);
+  const ids = out.feminino.map(group => group.items[0].public_id);
+  assert.equal(new Set(ids).size, 2);
+});

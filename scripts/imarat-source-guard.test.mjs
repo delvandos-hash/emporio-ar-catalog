@@ -8,6 +8,8 @@ const auditMiniSource = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs",
 const auditAllSource = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
 const audit = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
+const additiveSource = fs.readFileSync(new URL("./apply-additive-reconciliation.mjs", import.meta.url), "utf8");
+const publicCatalogSource = fs.readFileSync(new URL("./public-catalog.mjs", import.meta.url), "utf8");
 
 test("limpeza de títulos só pode excluir produto com procedência Imarat explícita", () => {
   assert.match(source, /const fonteImarat = norm\(item\.fonte\) === 'imarat';/);
@@ -134,8 +136,9 @@ test("perfumes exigem marca, nome exato e volume; semelhanças entre marcas são
   assert.ok(source.includes("Nomes iguais em marcas diferentes coexistem"));
 });
 
-test("sincronização não remove produtos já existentes automaticamente", () => {
-  assert.match(source, /Deduplicação destrutiva desativada: todos os registros existentes foram preservados/);
+test("sincronização remove somente cópias integralmente idênticas", () => {
+  assert.match(source, /exactCatalogFingerprint\(item, group\.brand, item\.fonte, line, group\.cat\)/);
+  assert.match(source, /Duplicatas integralmente idênticas removidas/);
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
   assert.doesNotMatch(source, /miniaturasDuplicadasRemovidas\+\+/);
 });
@@ -144,11 +147,20 @@ test("auditorias distinguem miniaturas por marca e ID de origem", () => {
   assert.ok(auditMiniSource.includes("key: source"));
   assert.ok(auditMiniSource.includes('norm(group.brand) + "|source|" + String(source.id || source.productId || source.slug || "")'));
   assert.ok(auditMiniSource.includes('norm(group.brand) + "|" + name + "|" + volumeOf(item)'));
-  assert.ok(auditAllSource.includes('mini|\u0024{norm(brand||"outros")}|\u0024{chaveComparacaoMini(nome)}|\u0024{volumeMatch(volume,nome)}'));
+  assert.match(auditAllSource, /return `mini\\|\$\{norm\(brand\|\|"outros"\)\}\|/);
 });
 
 test("perfumes de marcas diferentes com nome e volume iguais não são deduplicados", () => {
   assert.match(source, /normalProductKey\(nome, volume, brand\)/);
   assert.match(source, /!marcaConhecida && indexNameVolume\.has\(normalProductNameVolumeKey\(nome, volume\)\)/);
-  assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}/);
+  assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
+});
+
+test("variantes preservadas recebem public_id único e reconciliação reidentifica itens existentes", () => {
+  assert.match(publicCatalogSource, /identityGroups/);
+  assert.match(publicCatalogSource, /publicVariantToken/);
+  assert.match(publicCatalogSource, /supplied/);
+  assert.match(additiveSource, /item\.public_id \|\| identity/);
+  assert.match(additiveSource, /rekeyLiveVariants/);
+  assert.match(additiveSource, /GIST_VARIANTS_REKEYED/);
 });

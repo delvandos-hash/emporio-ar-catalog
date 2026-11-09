@@ -58,3 +58,37 @@ export function isDuplicateMiniSource(existingItems, candidateOriginId) {
   // Se algum registro legado não tem ID, aplica o fallback marca + nome + volume.
   return existingIds.some(id => !id);
 }
+
+function normalizedPrice(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const parsed = Number(raw.includes(",") ? raw.replace(/\\./g, "").replace(",", ".") : raw);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : normalizeIdentity(raw);
+}
+
+function normalizedImages(item) {
+  const images = Array.isArray(item?.fotos) && item.fotos.length
+    ? item.fotos
+    : (item?.foto ? [item.foto] : []);
+  return [...new Set(images.map(x => String(x ?? "").trim()).filter(Boolean))].sort().join("~");
+}
+
+function stableFingerprintValue(value) {
+  if (Array.isArray(value)) return value.map(stableFingerprintValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableFingerprintValue(value[key])]));
+  }
+  return value;
+}
+
+// Só remove uma cópia quando todos os campos do produto e seu contexto são idênticos.
+// Marca, linha, categoria, ID, estoque, preço, imagens ou qualquer metadado diferente preservam o registro.
+export function exactCatalogFingerprint(item, brand, source, line = "", category = "") {
+  return JSON.stringify({
+    line: normalizeIdentity(line),
+    category: normalizeIdentity(category),
+    brand: normalizeIdentity(brand),
+    source: normalizeIdentity(source || item?.fonte || ""),
+    item: stableFingerprintValue(item || {}),
+  });
+}

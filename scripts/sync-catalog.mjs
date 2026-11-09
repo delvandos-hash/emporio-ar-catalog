@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
-import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource } from './catalog-identity.mjs';
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint } from './catalog-identity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -32,6 +32,139 @@ const SYNC_SKIP_DETAILS = process.env.SYNC_SKIP_DETAILS === '1';
 const SYNC_IMARAT_ONLY = process.env.SYNC_IMARAT_ONLY === '1';
 const SYNC_DANDE_ONLY = process.env.SYNC_DANDE_ONLY === '1';
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
+let LIVE_GIST_DATA = null;
+
+function publicPriceNumber(value) {
+  const raw = String(value ?? "").trim().replace(/[^0-9,.-]/g, "");
+  if (!raw) return NaN;
+  return Number(raw.includes(",") ? raw.replaceAll(".", "").replace(",", ".") : raw);
+}
+function publicBaseIdentity(line, group, item) {
+  return [norm(line), norm(group?.brand), norm(group?.cat), norm(item?.nome), volumeMatch(item?.volume, item?.nome)].join("|");
+}
+function publicVariantMatch(item, publicItem) {
+  const photos = value => {
+    const list = Array.isArray(value?.fotos) && value.fotos.length ? value.fotos : (value?.foto ? [value.foto] : []);
+    return [...new Set(list.map(x => String(x || "").trim()).filter(Boolean))].sort().join("~");
+  };
+  return norm(item?.nome) === norm(publicItem?.nome) &&
+    volumeMatch(item?.volume, item?.nome) === volumeMatch(publicItem?.volume, publicItem?.nome) &&
+    photos(item) !== "" &&
+    photos(item) === photos(publicItem);
+}
+function preserveLivePublicFields(DATA, liveDATA) {
+  if (!liveDATA) return { matched: 0, prices: 0, photos: 0, ambiguous: 0 };
+  const publicData = toPublicCatalog(DATA);
+  const liveByPublicId = new Map();
+  const liveByStockRef = new Map();
+  const liveByOriginRef = new Map();
+  const liveByBase = new Map();
+  const used = new Set();
+  for (const [line, groups] of Object.entries(liveDATA)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        if (item.public_id) {
+          const id = String(item.public_id);
+          if (!liveByPublicId.has(id)) liveByPublicId.set(id, []);
+          liveByPublicId.get(id).push(item);
+        }
+        if (item.stock_ref) {
+          if (!liveByStockRef.has(String(item.stock_ref))) liveByStockRef.set(String(item.stock_ref), []);
+          liveByStockRef.get(String(item.stock_ref)).push(item);
+        }
+        if (item.origin_ref) {
+          if (!liveByOriginRef.has(String(item.origin_ref))) liveByOriginRef.set(String(item.origin_ref), []);
+          liveByOriginRef.get(String(item.origin_ref)).push(item);
+        }
+        const key = publicBaseIdentity(line, group, item);
+        if (!liveByBase.has(key)) liveByBase.set(key, []);
+        liveByBase.get(key).push(item);
+      }
+    }
+  }
+  const publicQueues = new Map();
+  for (const [line, groups] of Object.entries(publicData)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const key = publicBaseIdentity(line, group, item);
+        if (!publicQueues.has(key)) publicQueues.set(key, []);
+        publicQueues.get(key).push(item);
+      }
+    }
+  }
+
+  let matched = 0, prices = 0, photos = 0, ambiguous = 0;
+  for (const [line, groups] of Object.entries(DATA)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const key = publicBaseIdentity(line, group, item);
+        const publicItem = publicQueues.get(key)?.shift();
+        if (!publicItem) continue;
+        let liveItem = null;
+        if (publicItem.origin_ref) {
+          const origins = (liveByOriginRef.get(String(publicItem.origin_ref)) || []).filter(x => !used.has(x));
+          if (origins.length === 1) liveItem = origins[0];
+          else if (origins.length > 1) ambiguous++;
+        }
+        if (!liveItem && item.public_id) {
+          const publicMatches = (liveByPublicId.get(String(item.public_id)) || []).filter(x => !used.has(x));
+          if (publicMatches.length === 1) liveItem = publicMatches[0];
+        }
+        if (!liveItem && publicItem.stock_ref) {
+          const refs = (liveByStockRef.get(String(publicItem.stock_ref)) || []).filter(x => !used.has(x));
+          if (refs.length === 1) liveItem = refs[0];
+        }
+        if (!liveItem) {
+          const candidates = (liveByBase.get(key) || []).filter(x => !used.has(x));
+          if (candidates.length === 1) liveItem = candidates[0];
+          else if (candidates.length > 1) {
+            const exact = candidates.filter(x => publicVariantMatch(publicItem, x));
+            if (exact.length === 1) liveItem = exact[0];
+            else ambiguous++;
+          }
+        }
+        if (!liveItem) continue;
+        used.add(liveItem);
+        matched++;
+
+        if (!(item.precoManual === true || item.precoManual === "true" || item.precoManual === 1)) {
+          const liveRetail = publicPriceNumber(liveItem.varejo);
+          const liveWholesale = publicPriceNumber(liveItem.atacado);
+          const currentRetail = publicPriceNumber(item.varejo);
+          const currentWholesale = publicPriceNumber(item.atacado);
+          if (Number.isFinite(liveRetail) && Number.isFinite(liveWholesale) &&
+              (liveRetail !== currentRetail || liveWholesale !== currentWholesale)) {
+            item.varejo = liveItem.varejo;
+            item.atacado = liveItem.atacado;
+            item.precoManual = true;
+            prices++;
+          }
+        }
+
+        const existingPhotos = [
+          ...(Array.isArray(item.fotos) ? item.fotos : []), item.foto || ""
+        ];
+        const livePhotos = [
+          ...(Array.isArray(liveItem.fotos) ? liveItem.fotos : []), liveItem.foto || ""
+        ];
+        const mergedPhotos = [...new Set([...existingPhotos, ...livePhotos]
+          .map(sanitizePublicImageUrl).filter(Boolean))];
+        if (mergedPhotos.length > existingPhotos.filter(Boolean).length) photos++;
+        if (mergedPhotos.length) item.fotos = mergedPhotos;
+        if (liveItem.foto) item.foto = sanitizePublicImageUrl(liveItem.foto) || item.foto;
+        if (liveItem.notas) item.notas = liveItem.notas;
+        if (liveItem.badge) item.badge = liveItem.badge;
+        if (liveItem.novoDesde) item.novoDesde = liveItem.novoDesde;
+        if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
+        if (!item.stock_ref && liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
+        if (!item.stock_route && liveItem.stock_route) item.stock_route = liveItem.stock_route;
+        if (!item.public_id && liveItem.public_id) item.public_id = liveItem.public_id;
+      }
+    }
+  }
+  console.log(`LIVE_PUBLIC_MATCHED=${matched} LIVE_PUBLIC_PRICES_PROTECTED=${prices} LIVE_PUBLIC_GALLERIES_MERGED=${photos} LIVE_PUBLIC_AMBIGUOUS=${ambiguous}`);
+  return { matched, prices, photos, ambiguous };
+}
 
 async function fetchLiveGistBaseline() {
   const token = process.env.GIST_TOKEN;
@@ -70,7 +203,7 @@ function countCatalogIdentity(DATA) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
         if (!item?.nome) continue;
         count++;
-        keys.add([norm(line), norm(group.brand), norm(item.nome), volumeMatch(item.volume, item.nome)].join("|"));
+        keys.add([norm(line), norm(group.brand), norm(group.cat), norm(item.nome), volumeMatch(item.volume, item.nome)].join("|"));
       }
     }
   }
@@ -1331,6 +1464,7 @@ async function main() {
     if (process.env.GIST_TOKEN) {
       const internalBaseline = countCatalogIdentity(DATA);
       const liveDATA = await fetchLiveGistBaseline();
+      LIVE_GIST_DATA = liveDATA;
       const liveBaseline = countCatalogIdentity(liveDATA);
       const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
       const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
@@ -1671,9 +1805,30 @@ async function main() {
     }
   }
 
-  // A base homologada é preservada: esta etapa não apaga produtos existentes.
-  // Duplicidades antigas serão apenas auditadas; nenhuma remoção por aproximação.
-  console.log('Deduplicação destrutiva desativada: todos os registros existentes foram preservados.');
+  // Remove somente cópias integralmente idênticas. Qualquer diferença de marca,
+  // volume, ID de origem, preço, fotos ou metadados mantém os dois registros.
+  let exactDuplicatesRemoved = 0;
+  const exactSeen = new Set();
+  for (const [line, groups] of Object.entries(DATA)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const kept = [];
+      for (const item of Array.isArray(group.items) ? group.items : []) {
+        const fingerprint = exactCatalogFingerprint(item, group.brand, item.fonte, line, group.cat);
+        if (exactSeen.has(fingerprint)) {
+          exactDuplicatesRemoved++;
+          console.log('CÓPIA EXATA REMOVIDA: ' + JSON.stringify({
+            marca: group.brand, nome: item.nome, volume: item.volume,
+            idOrigem: item.id_origem || ''
+          }));
+          continue;
+        }
+        exactSeen.add(fingerprint);
+        kept.push(item);
+      }
+      group.items = kept;
+    }
+  }
+  console.log(`Duplicatas integralmente idênticas removidas: ${exactDuplicatesRemoved}`);
 
   const indexNormal = new Set();
   const indexNameVolume = new Set();
@@ -1813,6 +1968,8 @@ async function main() {
   }
 
   
+  // Em reconciliação restrita à Imarat, não altere disponibilidade de Brand.
+  if (!SYNC_IMARAT_ONLY) {
   // Brand: itens do catálogo que não existem mais na loja → esgotado
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
@@ -1829,6 +1986,8 @@ async function main() {
         }
       }
     }
+  }
+
   }
 
   if (ADD_BRAND_NEW) {
@@ -2234,6 +2393,11 @@ async function main() {
         }
       }
     }
+  }
+
+  const livePreservation = preserveLivePublicFields(DATA, LIVE_GIST_DATA);
+  if (livePreservation.ambiguous) {
+    throw new Error(`Preservação de dados públicos ambígua em ${livePreservation.ambiguous} variantes; publicação bloqueada.`);
   }
 
   const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount}+${frannyCount} Roupas +${acessoriosCount} Acc | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
