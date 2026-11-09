@@ -17,7 +17,6 @@ assert.match(
   "A validação deve apontar exclusivamente para um Deploy Preview do projeto catalogoemporio"
 );
 
-const sourceOrigins = new Map();
 for (const [key, source] of Object.entries(SOURCES)) {
   const raw = process.env[source.env];
   assert.ok(raw, `Variável ausente: ${source.env}`);
@@ -27,7 +26,6 @@ for (const [key, source] of Object.entries(SOURCES)) {
   assert.equal(origin.password, "", `${source.env} não pode conter credenciais`);
   assert.equal(origin.search, "", `${source.env} não pode conter query string`);
   assert.equal(origin.hash, "", `${source.env} não pode conter fragmento`);
-  sourceOrigins.set(key, origin.origin);
   console.log(`Origem configurada: source=${key} (${source.label}) → ${origin.hostname}`);
 }
 
@@ -51,7 +49,8 @@ if (!snapshot && file.raw_url) {
   snapshot = await rawResponse.text();
 }
 assert.ok(snapshot, "O conteúdo do catálogo não foi disponibilizado pelo Gist");
-const catalog = JSON.parse(snapshot.replace(/^\\uFEFF/, ""));
+const cleanSnapshot = snapshot.charCodeAt(0) === 0xFEFF ? snapshot.slice(1) : snapshot;
+const catalog = JSON.parse(cleanSnapshot);
 
 const pathsBySource = new Map(Object.keys(SOURCES).map(key => [key, new Set()]));
 function visit(value) {
