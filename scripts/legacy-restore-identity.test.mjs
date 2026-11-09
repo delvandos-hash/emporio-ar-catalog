@@ -16,3 +16,8 @@ test("não escolhe variante quando a correspondência continua ambígua", () => 
   const a=row("p_a","foto-igual"), b=row("p_b","foto-igual");
   assert.equal(resolveLegacyStockMatch([a,b],[a,b],{public_id:"legacy",foto:"foto-igual"}),null);
 });
+
+test("resolve identidade única mesmo quando não existe stock_ref", () => {
+  const a=row("p_a","foto-a");
+  assert.equal(resolveLegacyStockMatch([],[a],{public_id:"legacy",foto:"foto-a"}),a);
+});
