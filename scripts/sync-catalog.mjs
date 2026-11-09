@@ -1270,7 +1270,7 @@ async function main() {
         // Compatibilidade histórica: "PRESTIGE Noiré Absolu" foi salvo com
         // a marca no título; na origem, marca = Arabiyat Prestige e produto = Noiré Absolu.
         if (!hit && norm(g.brand).includes('arabiyat') && nomeNormalizado.startsWith('prestige ')) {
-          const nomeSemPrefixo = nomeNormalizado.replace(/^prestige\\s+/, '');
+          const nomeSemPrefixo = nomeNormalizado.slice('prestige '.length);
           hit = imaratList.find(p =>
             norm(p.name) === nomeSemPrefixo && norm(p.brand).includes('arabiyat prestige')
           );
