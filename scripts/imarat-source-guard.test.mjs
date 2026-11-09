@@ -159,7 +159,7 @@ test("perfumes de marcas diferentes com nome e volume iguais não são deduplica
 test("variantes preservadas recebem public_id único e reconciliação reidentifica itens existentes", () => {
   assert.match(publicCatalogSource, /identityGroups/);
   assert.match(publicCatalogSource, /publicVariantToken/);
-  assert.match(publicCatalogSource, /suppliedPublicId/);
+  assert.match(publicCatalogSource, /supplied/);
   assert.match(additiveSource, /item\.public_id \|\| identity/);
   assert.match(additiveSource, /rekeyLiveVariants/);
   assert.match(additiveSource, /GIST_VARIANTS_REKEYED/);
