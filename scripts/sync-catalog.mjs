@@ -63,7 +63,11 @@ function preserveLivePublicFields(DATA, liveDATA) {
   for (const [line, groups] of Object.entries(liveDATA)) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
-        if (item.public_id) liveByPublicId.set(String(item.public_id), item);
+        if (item.public_id) {
+          const id = String(item.public_id);
+          if (!liveByPublicId.has(id)) liveByPublicId.set(id, []);
+          liveByPublicId.get(id).push(item);
+        }
         if (item.stock_ref) {
           if (!liveByStockRef.has(String(item.stock_ref))) liveByStockRef.set(String(item.stock_ref), []);
           liveByStockRef.get(String(item.stock_ref)).push(item);
@@ -92,8 +96,11 @@ function preserveLivePublicFields(DATA, liveDATA) {
         const key = publicBaseIdentity(line, group, item);
         const publicItem = publicQueues.get(key)?.shift();
         if (!publicItem) continue;
-        let liveItem = item.public_id ? liveByPublicId.get(String(item.public_id)) : null;
-        if (liveItem && used.has(liveItem)) liveItem = null;
+        let liveItem = null;
+        if (item.public_id) {
+          const publicMatches = (liveByPublicId.get(String(item.public_id)) || []).filter(x => !used.has(x));
+          if (publicMatches.length === 1) liveItem = publicMatches[0];
+        }
         if (!liveItem && publicItem.stock_ref) {
           const refs = (liveByStockRef.get(String(publicItem.stock_ref)) || []).filter(x => !used.has(x));
           if (refs.length === 1) liveItem = refs[0];
@@ -131,10 +138,11 @@ function preserveLivePublicFields(DATA, liveDATA) {
         const livePhotos = [
           ...(Array.isArray(liveItem.fotos) ? liveItem.fotos : []), liveItem.foto || ""
         ];
-        const mergedPhotos = [...new Set([...existingPhotos, ...livePhotos].map(x => String(x || "").trim()).filter(Boolean))];
+        const mergedPhotos = [...new Set([...existingPhotos, ...livePhotos]
+          .map(sanitizePublicImageUrl).filter(Boolean))];
         if (mergedPhotos.length > existingPhotos.filter(Boolean).length) photos++;
         if (mergedPhotos.length) item.fotos = mergedPhotos;
-        if (!item.foto && liveItem.foto) item.foto = liveItem.foto;
+        if (!item.foto && liveItem.foto) item.foto = sanitizePublicImageUrl(liveItem.foto) || item.foto;
         if (!item.notas && liveItem.notas) item.notas = liveItem.notas;
         if (!item.badge && liveItem.badge) item.badge = liveItem.badge;
         if (!item.novoDesde && liveItem.novoDesde) item.novoDesde = liveItem.novoDesde;
