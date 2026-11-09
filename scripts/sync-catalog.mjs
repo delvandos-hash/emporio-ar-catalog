@@ -70,7 +70,7 @@ function countCatalogIdentity(DATA) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
         if (!item?.nome) continue;
         count++;
-        keys.add([norm(line), norm(group.brand), norm(item.nome), volumeMatch(item.volume, item.nome)].join("|"));
+        keys.add([norm(line), norm(group.brand), norm(group.cat), norm(item.nome), volumeMatch(item.volume, item.nome)].join("|"));
       }
     }
   }
