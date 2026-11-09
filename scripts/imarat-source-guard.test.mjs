@@ -127,11 +127,11 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
   assert.ok(auditMiniSource.includes(".replace(/['’]s"));
 });
 
-test("perfumes usam nome normalizado exato e volume, sem similaridade aproximada", () => {
-  assert.ok(source.includes("indexNameVolume.add(normalProductNameVolumeKey(it.nome, it.volume))"));
-  assert.ok(source.includes("duplicado = indexNameVolume.has(normalProductKey(nome, volume))"));
-  assert.ok(source.includes("Não usa substring, similaridade aproximada ou marca como chave."));
-  assert.ok(source.includes("indexNormal.add(`${norm(brand)}|${nomeKey}|${volumeKey}`)"));
+test("perfumes exigem marca, nome exato e volume; semelhanças entre marcas são preservadas", () => {
+  assert.ok(source.includes("indexNormal.add(normalProductKey(it.nome, it.volume, g.brand))"));
+  assert.ok(source.includes("duplicado = indexNormal.has(normalProductKey(nome, volume, brand))"));
+  assert.ok(source.includes("!marcaConhecida && indexNameVolume.has(normalProductNameVolumeKey(nome, volume))"));
+  assert.ok(source.includes("Nomes iguais em marcas diferentes coexistem"));
 });
 
 test("sincronização não remove produtos já existentes automaticamente", () => {
@@ -140,8 +140,9 @@ test("sincronização não remove produtos já existentes automaticamente", () =
   assert.doesNotMatch(source, /miniaturasDuplicadasRemovidas\+\+/);
 });
 
-test("auditorias não classificam miniaturas de marcas diferentes como duplicatas", () => {
-  assert.match(auditMiniSource, /key: norm\(line\) \+ "\|" \+ norm\(group\.brand\) \+ "\|" \+ name/);
+test("auditorias distinguem miniaturas por marca e ID de origem", () => {
+  assert.match(auditMiniSource, /key: source[\\s\\S]*norm\(group\.brand\)[\\s\\S]*source\.id/);
+  assert.match(auditMiniSource, /norm\(group\.brand\) \+ "\\|" \+ name \+ "\\|" \+ volumeOf\(item\)/);
   assert.match(auditAllSource, /mini\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{chaveComparacaoMini\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
 });
 
