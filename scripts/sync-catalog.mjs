@@ -1310,6 +1310,45 @@ async function main() {
   const relatorioImaratNomesRemovidos = [];
   const relatorioImaratNomesCorrigidos = [];
 
+  // Remove apenas quatro registros legados identificados na auditoria completa:
+  // três miniaturas sem correspondência e uma cópia duplicada em OUTROS.
+  // Antes de excluir, confirma novamente que título, marca e volume não existem na API atual.
+  const itensLegadosForaDoSite = new Set([
+    'miniaturas|emporio a r|mini elysia|50ml',
+    'miniaturas|emporio a r|mini vulcan bale|30ml',
+    'miniaturas|emporio a r|mini vulcan sable|30ml',
+    'miniaturas|outros|mini vulcan sable 30ml|30ml',
+  ]);
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      g.items = (g.items || []).filter(item => {
+        const key = [
+          norm(g.cat), norm(g.brand), norm(item.nome),
+          volumeMatch(item.volume, item.nome)
+        ].join('|');
+        if (!itensLegadosForaDoSite.has(key)) return true;
+        const existeNaOrigem = imaratList.some(p => {
+          const marcaOrigem = norm(p.brand);
+          const marcaGrupo = norm(g.brand);
+          const marcaCompativel = marcaOrigem === marcaGrupo ||
+            (marcaOrigem === 'imarat' && marcaGrupo === 'emporio a r') ||
+            (!marcaOrigem && ['outros', 'outra'].includes(marcaGrupo));
+          const volumeItem = volumeMatch(item.volume, item.nome);
+          const volumeOrigem = volumeMatch(p.sizeMl, p.name);
+          return norm(p.name) === norm(item.nome) && marcaCompativel &&
+            (!volumeItem || !volumeOrigem || volumeItem === volumeOrigem);
+        });
+        if (existeNaOrigem) return true;
+        produtosImaratForaDoSiteRaizRemovidos++;
+        relatorioImaratNomesRemovidos.push({
+          linha: line, marca: g.brand, categoria: g.cat,
+          nome: item.nome, fonte: item.fonte || 'registro legado sem correspondência na origem Imarat'
+        });
+        return false;
+      });
+    }
+  }
+
   // A remoção é feita somente abaixo, quando a origem Imarat está confirmada no próprio item.
 
   // Sincronização final pós-auditoria: a origem deve ser confirmada no item.
