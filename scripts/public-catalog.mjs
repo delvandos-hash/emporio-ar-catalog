@@ -50,18 +50,26 @@ function publicId(line, group, item, variantToken = "") {
   const material = variantToken ? identity + "|variant|" + variantToken : identity;
   return "p_" + createHash("sha256").update(material).digest("hex").slice(0, 20);
 }
-function publicVariantToken(item, index) {
+function publicVariantToken(item) {
   const images = Array.isArray(item?.fotos) && item.fotos.length
     ? item.fotos
     : (item?.foto ? [item.foto] : []);
-  const media = [...new Set(images.map(x => String(x || "").trim()).filter(Boolean))].sort().join("~");
-  return [
-    String(item?.id_origem || "").trim(),
-    String(item?.varejo ?? "").trim(),
-    String(item?.atacado ?? "").trim(),
-    media,
-    String(index)
-  ].join("|");
+  const media = [...new Set(images.map(x => String(x || "").trim()).filter(Boolean))].sort();
+  return JSON.stringify({
+    id_origem: String(item?.id_origem || "").trim(),
+    fonte: String(item?.fonte || "").trim(),
+    varejo: String(item?.varejo ?? "").trim(),
+    atacado: String(item?.atacado ?? "").trim(),
+    foto: String(item?.foto || "").trim(),
+    fotos: media,
+    stock_ref: String(item?.stock_ref || "").trim(),
+    stock_route: String(item?.stock_route || "").trim(),
+    notas: String(item?.notas || ""),
+    badge: String(item?.badge || ""),
+    novoDesde: String(item?.novoDesde || ""),
+    disponivel: String(item?.disponivel || ""),
+    variacoes: item?.variacoes || []
+  });
 }
 export function toPublicCatalog(DATA, imageOptions = {}) {
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("DATA inválido para publicação");
@@ -96,11 +104,12 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       if (!used.has(baseId)) {
         nextId = baseId;
       } else {
-        nextId = publicId(record.line, record.group, record.item, publicVariantToken(record.item, index));
+        const token = publicVariantToken(record.item);
+        nextId = publicId(record.line, record.group, record.item, token);
       }
       let collision = 1;
       while (used.has(nextId)) {
-        nextId = publicId(record.line, record.group, record.item, publicVariantToken(record.item, index + collision));
+        nextId = publicId(record.line, record.group, record.item, publicVariantToken(record.item) + "|occurrence|" + collision);
         collision++;
       }
       publicIdByItem.set(record.item, nextId);
