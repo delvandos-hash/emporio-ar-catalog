@@ -246,6 +246,8 @@ function miniIdentityKey(brand,name,volume) {
   return "mini|"+norm(brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volumeFrom(volume,name);
 }
 function apiDuplicateKey(p) {
+  const id=String(p.id||p.productId||"").trim();
+  if(id) return "source-id|"+id;
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
@@ -281,7 +283,7 @@ const miniGlobalGroups=new Map();
 for(const item of matchedCatalog) {
   if(!item.matchedSource) continue;
   if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
-  const key=miniIdentityKey(item.brand,item.name,item.volume);
+  const key=sourceIdentity(item.matchedSource);
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
