@@ -259,7 +259,7 @@ function priceBrand(orig, isArabicMini, session) {
 
 async function fetchImaratList() {
   const all = [];
-  let page = 1, total = 0, fetched = 0;
+  let page = 1, total = 0, fetched = 0, prefixosMarcaRemovidos = 0;
   for (let g = 0; g < 40; g++) {
     const res = await fetch(`${IMARAT_API}?page=${page}&perPage=60`, {
       headers: { 'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8' },
@@ -273,6 +273,13 @@ async function fetchImaratList() {
     for (const p of products) {
         p.name = limparTexto(p.name);
         if (p.brand) p.brand = limparTexto(p.brand);
+        // O site raiz separa marca e nome comercial. Na linha Arabiyat Prestige,
+        // "Prestige" não integra o nome Noiré Absolu: remover apenas quando vier
+        // como prefixo redundante e a marca confirmar Arabiyat Prestige.
+        if (norm(p.brand).includes('arabiyat prestige') && /^prestige\\s+/i.test(String(p.name || ''))) {
+          p.name = String(p.name).replace(/^prestige\\s+/i, '').trim();
+          prefixosMarcaRemovidos++;
+        }
         if (p.shortDesc) p.shortDesc = limparTexto(p.shortDesc);
         if (p.description) p.description = limparTexto(p.description);
     }
@@ -281,6 +288,7 @@ async function fetchImaratList() {
     if (fetched >= total || products.length < 60) break;
     page++;
   }
+  console.log(`Prefixos de marca removidos do nome Imarat (Arabiyat Prestige): ${prefixosMarcaRemovidos}`);
   return all;
 }
 
