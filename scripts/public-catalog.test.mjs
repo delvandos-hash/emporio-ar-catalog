@@ -186,3 +186,38 @@ test("não preserva nomes de origem em chaves de linha públicas", () => {
   assert.deepEqual(Object.keys(result), ["outros"]);
   assert.equal(JSON.stringify(result).includes("fornecedor-privado"), false);
 });
+
+test("gera public_id distinto para variantes do mesmo nome, mantendo a URL antiga no item canônico", () => {
+  const source = {
+    feminino: [{ brand: "Afeer", cat: "Miniaturas", items: [
+      { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "95,00", atacado: "65,00", foto: "https://products.example/a.webp", id_origem: "1474", fonte: "imarat" },
+      { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "105,00", atacado: "75,00", foto: "https://products.example/b.webp", id_origem: "1481", fonte: "imarat" }
+    ]}]
+  };
+  const first = toPublicCatalog(source).feminino[0].items;
+  const second = toPublicCatalog(source).feminino[0].items;
+  assert.notEqual(first[0].public_id, first[1].public_id);
+  assert.equal(first[0].public_id, second[0].public_id);
+  assert.equal(first[1].public_id, second[1].public_id);
+  assert.equal(JSON.stringify(first).includes("1474"), false);
+  assert.equal(JSON.stringify(first).includes("1481"), false);
+});
+
+test("public_id legado é reservado antes de gerar IDs de variantes", () => {
+  const single = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "Roupas", items: [
+      { nome: "Calça Resinada", varejo: "99,90", atacado: "69,90", foto: "https://img.example/a.webp" }
+    ]}]
+  });
+  const legacyId = single.roupas[0].items[0].public_id;
+  const mixed = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "Roupas", items: [
+      { nome: "Calça Resinada", varejo: "109,90", atacado: "79,90", foto: "https://img.example/b.webp" },
+      { public_id: legacyId, nome: "Calça Resinada", varejo: "99,90", atacado: "69,90", foto: "https://img.example/a.webp" }
+    ]}]
+  });
+  const items = mixed.roupas[0].items;
+  assert.equal(items[1].public_id, legacyId);
+  assert.notEqual(items[0].public_id, legacyId);
+  assert.notEqual(items[0].public_id, items[1].public_id);
+});
