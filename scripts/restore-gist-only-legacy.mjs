@@ -102,8 +102,8 @@ async function main() {
   const liveDATA = await fetchGist(token);
 
   // O dry-run completo já consultou Sophia, Franny, Dande, Brand e Imarat.
-  // Só restauramos os seis registros legados de roupas ainda presentes no Gist,
-  // que não retornaram em nenhuma das fontes atuais.
+  // Restaura somente registros públicos cuja combinação completa de nome, preço,
+  // disponibilidade, fotos e referências de estoque ainda não existe na base.
   const currentPublic = toPublicCatalog(DATA);
   const currentFingerprints = buildPublicFingerprintIndex(currentPublic);
 
