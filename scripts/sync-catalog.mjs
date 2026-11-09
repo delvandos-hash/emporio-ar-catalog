@@ -1248,32 +1248,23 @@ async function main() {
   console.log(`Imarat: ${imaratList.length} produtos`);
 
   const imaratNomesAtuais = new Set(imaratList.map(p => norm(p.name)).filter(Boolean));
-  const marcasImaratAtuais = new Set(imaratList.map(p => {
-    const marca = limparTexto(p.brand || 'Outros');
-    return norm(marca) === 'imarat' ? norm('Empório A.R') : norm(marca);
-  }));
-  const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
   let produtosImaratForaDoSiteRaizRemovidos = 0;
   const relatorioImaratNomesRemovidos = [];
-  // Remove registros explicitamente Imarat e itens em grupos de marcas presentes
-  // na API Imarat quando o título não existe na listagem completa do site raiz.
-  // Grupos/categorias de outras fontes permanecem intactos.
+  // Exclusão exige procedência comprovada no próprio item. Marca/grupo isolado
+  // não prova origem: outras fontes podem vender marcas que também aparecem na Imarat.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
-      const marcaGrupo = norm(g.brand);
-      const grupoImarat = categoriasImarat.has(norm(g.cat)) && marcaGrupo !== 'outros' && marcaGrupo !== 'outra' && marcasImaratAtuais.has(marcaGrupo);
       g.items = (g.items || []).filter(item => {
-        const fonteImarat = String(item.fonte || '').toLowerCase() === 'imarat';
-        if (!fonteImarat && !grupoImarat) return true;
+        if (String(item.fonte || '').toLowerCase() !== 'imarat') return true;
         if (imaratNomesAtuais.has(norm(item.nome))) return true;
         produtosImaratForaDoSiteRaizRemovidos++;
-        relatorioImaratNomesRemovidos.push({ linha: line, marca: g.brand, categoria: g.cat, nome: item.nome, fonte: item.fonte || 'grupo de marca Imarat' });
+        relatorioImaratNomesRemovidos.push({ linha: line, marca: g.brand, categoria: g.cat, nome: item.nome, fonte: item.fonte });
         return false;
       });
     }
   }
-  console.log(`Produtos Imarat removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
-  for (const removido of relatorioImaratNomesRemovidos) console.log('TÍTULO FORA DO SITE RAIZ REMOVIDO: ' + JSON.stringify(removido));
+  console.log(`Produtos Imarat com procedência confirmada removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
+  for (const removido of relatorioImaratNomesRemovidos) console.log('TÍTULO IMARAT FORA DO SITE RAIZ REMOVIDO: ' + JSON.stringify(removido));
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
