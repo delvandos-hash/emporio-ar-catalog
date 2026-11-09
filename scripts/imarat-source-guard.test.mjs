@@ -168,3 +168,9 @@ test("variantes preservadas recebem public_id único e reconciliação reidentif
 test("IDs de origem diferentes nunca são colapsados só por nome e volume iguais", () => {
   assert.match(auditAllSource, /if\(id\) return "source-id\|"\+norm\(p\.brand\|\|"outros"\)\+"\|"\+id/);
 });
+
+test("deduplicação de perfumes usa IDs de origem e não apenas nome/volume", () => {
+  assert.match(source, /const indexNormal = new Map\(\)/);
+  assert.match(source, /isDuplicateMiniSource\(normalCandidates, candidateId\)/);
+  assert.match(source, /normalCandidates = indexNormal\.get/);
+});
