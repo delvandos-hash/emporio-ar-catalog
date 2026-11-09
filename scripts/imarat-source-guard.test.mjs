@@ -187,3 +187,8 @@ test("restaura procedência Imarat verificada de produtos Isis Makeup sem depend
   assert.match(source, /\["isis makeup\|esfoliante corporal pitaya", "830"\]/);
   assert.match(source, /restoreConfirmedImaratProvenance\(DATA\)/);
 });
+
+test("preserva a referência canônica de estoque do Gist mesmo quando a base interna difere", () => {
+  assert.match(source, /liveItem\.stock_ref && item\.stock_ref !== liveItem\.stock_ref/);
+  assert.match(source, /liveItem\.stock_route && item\.stock_route !== liveItem\.stock_route/);
+});
