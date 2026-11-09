@@ -114,6 +114,7 @@ for (const [line, groups] of Object.entries(INTERNAL_DATA)) {
   }
 }
 const duplicateOriginIds = [...byOriginId.entries()].filter(([, items]) => items.length > 1);
+function isOleoCliveDorris(name, brand) { return norm(brand).includes("clive") && norm(name).includes("oleo"); }
 function isKit2em1(name) { return norm(name).includes("kit 2 em 1"); }
 function isMiniaturaBolsa(name) { return norm(name).includes("bolsa"); }
 function isKitVulcanOuMiniatura9(name) {
