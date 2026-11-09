@@ -115,7 +115,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         used.add(supplied);
         globalUsedIds.add(supplied);
         const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
-        const stock = stockRef(source, record.item?.id_origem);
+        const stock = stockRef(source, record.item?.id_origem, record.group?.brand);
         const origin = originRef(source, record.item?.id_origem, record.group?.brand);
         const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
         if (stableKey) publicIdByStableOrigin.set(stableKey, supplied);
@@ -141,7 +141,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       used.add(nextId);
       globalUsedIds.add(nextId);
       const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
-      const stock = stockRef(source, record.item?.id_origem);
+      const stock = stockRef(source, record.item?.id_origem, record.group?.brand);
       const origin = originRef(source, record.item?.id_origem, record.group?.brand);
       const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
       if (stableKey) publicIdByStableOrigin.set(stableKey, nextId);
