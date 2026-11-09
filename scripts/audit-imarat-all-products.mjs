@@ -183,8 +183,19 @@ const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.name)
 const internalOnlyKeys=[...internalIndex.keys()].filter(key=>!liveKeySet.has(key));
 const liveOnlyKeys=[...liveKeySet].filter(key=>!internalIndex.has(key));
 console.log(`COMPARAÇÃO EXATA DO BLOQUEIO DE SYNC: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}; limite de publicação=25; publicação permitida=${internalOnlyKeys.length<=25&&liveOnlyKeys.length<=25&&Math.abs(catalog.length-internalItemCount)<=25}`);
-for(const key of internalOnlyKeys.slice(0,30)) console.log("SÓ NO DATA.JS "+key);
-for(const key of liveOnlyKeys.slice(0,30)) console.log("SÓ NO GIST "+key);
+const summarizeKeys=keys=>{
+  const byBrand=new Map();
+  for(const key of keys) {
+    const parts=key.split("|");
+    const brand=parts[1]||"sem marca";
+    byBrand.set(brand,(byBrand.get(brand)||0)+1);
+  }
+  return [...byBrand.entries()].sort((x,y)=>y[1]-x[1]).map(([brand,count])=>({brand,count}));
+};
+console.log("DIFERENÇAS AGRUPADAS — SÓ DATA.JS "+JSON.stringify(summarizeKeys(internalOnlyKeys)));
+console.log("DIFERENÇAS AGRUPADAS — SÓ GIST "+JSON.stringify(summarizeKeys(liveOnlyKeys)));
+for(const key of internalOnlyKeys) console.log("SÓ NO DATA.JS "+key);
+for(const key of liveOnlyKeys) console.log("SÓ NO GIST "+key);
 
 const {all:source,total,pages}=await fetchAllImarat();
 function volumeCompatible(left,right) {
