@@ -80,7 +80,7 @@ function publicFingerprint(item) {
     notas: String(item?.notas ?? ""), badge: String(item?.badge ?? ""),
     novoDesde: String(item?.novoDesde ?? ""), disponivel: String(item?.disponivel ?? ""),
     variacoes: item?.variacoes || [], stock_ref: String(item?.stock_ref ?? ""),
-    stock_route: String(item?.stock_route ?? ""), fonte: String(item?.fonte ?? "")
+    stock_route: String(item?.stock_route ?? "")
   });
 }
 
