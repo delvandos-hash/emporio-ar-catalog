@@ -199,17 +199,20 @@ async function main() {
 
   const internalDATA = parseInternal();
   const { snapshot, DATA: liveDATA } = await fetchLiveGist(token);
+  const originalLiveContentKeys = collectContentKeys(liveDATA);
+  const exactLiveDuplicatesRemoved = dedupeExactLiveVariants(liveDATA);
   const internalIndex = collectInternalIndex(internalDATA);
+  const rekeyedVariants = rekeyLiveVariants(liveDATA, internalIndex);
   const liveKeys = collectKeys(liveDATA);
   const internalKeys = new Set(internalIndex.keys());
   const missingFromInternal = [...liveKeys].filter(key => !internalKeys.has(key));
   const additions = [...internalKeys].filter(key => !liveKeys.has(key));
 
   if (missingFromInternal.length) {
-    throw new Error(`Publicação bloqueada: ${missingFromInternal.length} itens atuais do Gist ainda não estão no data.js. Nenhum dado foi enviado.`);
+    throw new Error(`Publicação bloqueada: ${missingFromInternal.length} IDs atuais do Gist ainda não estão representados na base. Nenhum dado foi enviado.`);
   }
-  if (!additions.length || additions.length > 60) {
-    throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=60).`);
+  if (!additions.length || additions.length > 80) {
+    throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=80).`);
   }
 
   for (const key of additions) {
@@ -227,40 +230,34 @@ async function main() {
   const mergedKeys = new Set(liveKeys);
   let appended = 0;
 
-  for (const [line, groups] of Object.entries(internalDATA)) {
-    for (const group of Array.isArray(groups) ? groups : []) {
-      for (const item of Array.isArray(group?.items) ? group.items : []) {
-        if (!item?.nome) continue;
-        const key = identity(line, group, item);
-        if (liveKeys.has(key)) continue;
-
-        const one = toPublicCatalog({ [line]: [{ brand: group.brand, cat: group.cat, items: [item] }] });
-        const publicLine = Object.keys(one)[0];
-        const publicGroup = one[publicLine]?.[0];
-        const publicItem = publicGroup?.items?.[0];
-        if (!publicLine || !publicGroup || !publicItem) throw new Error(`Falha ao sanitizar novo item: ${key}`);
-        const publicKey = identity(publicLine, publicGroup, publicItem);
-        if (publicKey !== key) throw new Error(`Identidade mudou durante sanitização: ${key} -> ${publicKey}`);
-        if (mergedKeys.has(publicKey)) continue;
-        addSafePublicItem(mergedPublic, publicLine, publicGroup, publicItem);
-        mergedKeys.add(publicKey);
-        appended++;
-      }
-    }
+  for (const key of additions) {
+    const rows = internalIndex.get(key) || [];
+    if (rows.length !== 1) throw new Error(`Identidade pública interna ambígua: ${key}`);
+    const row = rows[0];
+    addSafePublicItem(mergedPublic, row.publicLine, row.publicGroup, row.publicItem);
+    mergedKeys.add(key);
+    appended++;
   }
 
   if (appended !== additions.length) {
     throw new Error(`Quantidade adicionada diverge da auditoria: esperado=${additions.length}; adicionado=${appended}`);
   }
-  for (const key of liveKeys) if (!mergedKeys.has(key)) throw new Error(`Item atual do Gist seria removido: ${key}`);
+  const mergedContentKeys = collectContentKeys(mergedPublic);
+  const lostContent = [...originalLiveContentKeys].filter(key => !mergedContentKeys.has(key));
+  if (lostContent.length) {
+    throw new Error(`Itens atuais do Gist seriam perdidos: ${lostContent.length}. Nenhum dado foi enviado.`);
+  }
+  for (const key of internalKeys) if (!mergedKeys.has(key)) throw new Error(`Item interno não foi incluído: ${key}`);
 
   const nextSnapshot = snapshot.DATA
     ? { ...snapshot, DATA: mergedPublic, ultimaAtualizacao: new Date().toISOString() }
     : mergedPublic;
 
-  console.log(`GIST_EXISTING_PRESERVED=${liveKeys.size}`);
+  console.log(`GIST_EXISTING_PRESERVED=${originalLiveContentKeys.size}`);
+  console.log(`GIST_EXACT_DUPLICATES_REMOVED=${exactLiveDuplicatesRemoved}`);
+  console.log(`GIST_VARIANTS_REKEYED=${rekeyedVariants}`);
   console.log(`SOURCE_CONFIRMED_ADDITIONS=${appended}`);
-  console.log("GIST será atualizado somente com itens novos; registros atuais, preços e imagens existentes permanecem intactos.");
+  console.log("GIST mantém todos os conteúdos existentes; apenas IDs de variantes são separados e novos itens confirmados são adicionados.");
 
   if (process.env.APPLY_ADDITIVE_RECONCILIATION !== "1") {
     console.log("ADDITIVE_RECONCILIATION_DRY_RUN=true; Gist de produção não foi alterado.");
@@ -288,12 +285,13 @@ async function main() {
 
   const after = await fetchLiveGist(token);
   const afterKeys = collectKeys(after.DATA);
+  const afterContentKeys = collectContentKeys(after.DATA);
   const missingAfter = [...mergedKeys].filter(key => !afterKeys.has(key));
-  const lostBefore = [...liveKeys].filter(key => !afterKeys.has(key));
+  const lostBefore = [...originalLiveContentKeys].filter(key => !afterContentKeys.has(key));
   if (missingAfter.length || lostBefore.length) {
-    throw new Error(`Verificação pós-publicação falhou: faltando=${missingAfter.length}; removidos=${lostBefore.length}`);
+    throw new Error(`Verificação pós-publicação falhou: faltandoIDs=${missingAfter.length}; conteúdosPerdidos=${lostBefore.length}`);
   }
-  console.log(`GIST_RECONCILIATION_VERIFIED=true totalKeys=${afterKeys.size} additions=${appended} removed=0`);
+  console.log(`GIST_RECONCILIATION_VERIFIED=true totalIDs=${afterKeys.size} additions=${appended} variantsRekeyed=${rekeyedVariants} exactDuplicatesRemoved=${exactLiveDuplicatesRemoved}`);
 }
 
 main().catch(error => { console.error(error); process.exit(1); });
