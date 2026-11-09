@@ -161,7 +161,8 @@ function resolve(item, brand, map, byName) {
 }
 
 async function main() {
-  const missingSources = ['IMARAT_API_URL','BRAND_BASE_URL'].filter((key) => !process.env[key]);
+  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','DANDE_BASE_URL'];
+  const missingSources = requiredSources.filter((key) => !process.env[key]);
   if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Buscando Imarat...');
   const imarat = await fetchImarat();
