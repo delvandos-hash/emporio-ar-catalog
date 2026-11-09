@@ -1779,7 +1779,6 @@ async function main() {
       if (ehMini) {
         const actualMini = { nome, volume, varejo: prices.varejo, atacado: prices.atacado, foto, fotos: imgsNew };
         const baseKey = miniIdentityBaseKey(actualMini, brand);
-        const fullKey = miniIdentityKey(actualMini, brand);
         if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
         indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
         indexMiniNameVolume.add(miniIdentityNameVolumeKey(actualMini));
