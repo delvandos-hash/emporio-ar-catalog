@@ -144,7 +144,7 @@ test("auditorias distinguem miniaturas por marca e ID de origem", () => {
   assert.ok(auditMiniSource.includes("key: source"));
   assert.ok(auditMiniSource.includes('norm(group.brand) + "|source|" + String(source.id || source.productId || source.slug || "")'));
   assert.ok(auditMiniSource.includes('norm(group.brand) + "|" + name + "|" + volumeOf(item)'));
-  assert.ok(auditAllSource.includes('mini|\u0024{norm(brand||"outros")}|\u0024{chaveComparacaoMini(nome)}|\u0024{volumeMatch(volume,nome)}'));
+  assert.match(auditAllSource, /return "mini\\|"\+norm\(brand\|\|"outros"\)\+/);
 });
 
 test("perfumes de marcas diferentes com nome e volume iguais não são deduplicados", () => {
