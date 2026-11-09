@@ -53,7 +53,7 @@ async function fetchLiveGistBaseline() {
     if (!rawResponse.ok) throw new Error(`Falha ao baixar Gist vivo: HTTP ${rawResponse.status}`);
     raw = await rawResponse.text();
   }
-  const snapshot = JSON.parse(String(raw).replace(/^\\uFEFF/, ""));
+  const snapshot = JSON.parse(String(raw).replace(/^\uFEFF/, ""));
   const DATA = snapshot.DATA || snapshot;
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) {
     throw new Error("Estrutura DATA inválida no Gist vivo; sincronização bloqueada.");
