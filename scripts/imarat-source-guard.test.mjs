@@ -93,8 +93,8 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
 
 
 test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
-  assert.ok(source.includes(".replace(/['’]s\\\\b/gi, '')"));
-  assert.ok(auditAllSource.includes(`.replace(/['’]s\\\\b/gi, "")`));
-  assert.ok(auditSource.includes(`.replace(/['’]s\\\\b/gi, "")`));
-  assert.ok(auditMiniSource.includes(`.replace(/['’]s\\\\b/gi, "")`));
+  assert.ok(source.includes(".replace(/['’]s"));
+  assert.ok(auditAllSource.includes(".replace(/['’]s"));
+  assert.ok(auditSource.includes(".replace(/['’]s"));
+  assert.ok(auditMiniSource.includes(".replace(/['’]s"));
 });
