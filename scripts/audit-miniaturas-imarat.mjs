@@ -7,38 +7,45 @@ const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
 const token = process.env.GIST_TOKEN;
 if (!token) throw new Error("GIST_TOKEN não configurado.");
 
-const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-  headers: {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "EmporioAR-Miniature-Audit/1.0",
-  },
-});
+const headers = {
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+  "User-Agent": "EmporioAR-Miniature-Audit/1.0",
+};
+const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers });
 if (!response.ok) throw new Error(`Falha ao ler Gist: HTTP ${response.status}`);
 const gist = await response.json();
 const file = gist.files?.["catalogo.json"];
-if (!file?.content) throw new Error("Gist não contém catalogo.json com conteúdo disponível.");
-const snapshot = JSON.parse(file.content.replace(/^\\uFEFF/, ""));
+if (!file) throw new Error("Gist não contém catalogo.json.");
+let raw = file.content;
+if (file.truncated || !raw) {
+  if (!file.raw_url) throw new Error("Gist truncado e sem raw_url para leitura completa.");
+  const rawResponse = await fetch(file.raw_url, { headers });
+  if (!rawResponse.ok) throw new Error(`Falha ao baixar snapshot completo: HTTP ${rawResponse.status}`);
+  raw = await rawResponse.text();
+}
+if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+const snapshot = JSON.parse(raw);
 const DATA = snapshot.DATA || snapshot;
 if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("Estrutura DATA inválida.");
 
 const norm = (value) => String(value || "").toLowerCase()
-  .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
-  .replace(/[^a-z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 const brandsInName = [
   "armaf", "lattafa", "orientica", "afeer", "clive dorris",
   "french avenue", "maison alhambra", "al wataniah", "only you",
   "mais you", "meryam",
 ];
 function baseMiniName(name) {
-  let value = norm(name).replace(/\\s*\\d+\\s*(ml|g)\\b/gi, "").replace(/\\s+/g, " ").trim();
+  let value = norm(name).replace(/\s*\d+\s*(ml|g)\b/gi, "").replace(/\s+/g, " ").trim();
   const prefixes = ["miniatura armaf", "mini armaf", "miniatura", "mini"];
   for (const prefix of prefixes) {
     if (value.startsWith(prefix + " ")) { value = value.slice(prefix.length).trim(); break; }
     if (value === prefix) { value = ""; break; }
   }
-  for (const brand of brandsInName.sort((a,b) => b.length-a.length)) {
+  for (const brand of [...brandsInName].sort((a,b) => b.length-a.length)) {
     const b = norm(brand);
     if (value.startsWith(b + " ")) value = value.slice(b.length).trim();
     if (value.endsWith(" " + b)) value = value.slice(0, -(b.length + 1)).trim();
@@ -48,7 +55,7 @@ function baseMiniName(name) {
 function volumeOf(item) {
   const explicit = String(item?.volume || "").trim();
   if (explicit && explicit !== "—") return norm(explicit);
-  const match = String(item?.nome || "").match(/(\\d+(?:[.,]\\d+)?)\\s*(ml|g)\\b/i);
+  const match = String(item?.nome || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
   return match ? norm(match[1].replace(",", ".") + match[2]) : "sem-volume";
 }
 function isMini(item, group) {
@@ -74,7 +81,7 @@ for (const [line, groups] of Object.entries(DATA)) {
         name: String(item.nome || ""), volume: volumeOf(item),
         varejo: item.varejo ?? "não informado",
         atacado: item.atacado ?? "não informado",
-        key: name + "|" + volume,
+        key: name + "|" + volumeOf(item),
       });
     }
   }
