@@ -1,6 +1,12 @@
 name: Auditoria somente leitura — miniaturas Imarat
 
 on:
+  push:
+    branches: [fix/imarat-global-duplicate-prevention]
+    paths:
+      - "scripts/audit-miniaturas-imarat.mjs"
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/audit-miniaturas-imarat.yml"
   pull_request:
     branches: [main]
     paths:
