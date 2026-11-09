@@ -74,7 +74,8 @@ function visit(value) {
         const path = url.searchParams.get("path");
         if (!pathsBySource.has(source) || !path?.startsWith("/") || path.startsWith("//")) continue;
         if (source === "p" && !path.startsWith("/uploads/products/")) continue;
-        if (source === "d" && !path.startsWith("/products/")) continue;
+        // Para Dande, o proxy aceita qualquer caminho absoluto normalizado.
+        // Não impor um prefixo aqui evita descartar imagens válidas do snapshot.
         pathsBySource.get(source).add(path);
       } catch {
         // URLs malformadas são ignoradas; a função de proxy também as rejeita.
