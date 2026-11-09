@@ -166,3 +166,10 @@ test("variantes preservadas recebem public_id único e reconciliação reidentif
   assert.match(additiveSource, /rekeyLiveVariants/);
   assert.match(additiveSource, /GIST_VARIANTS_REKEYED/);
 });
+
+test("baseline reidentifica variante legada por marca, nome e foto antes de bloquear", () => {
+  assert.match(source, /function publicLooseIdentity\(group, item\)/);
+  assert.match(source, /liveByLooseIdentity/);
+  assert.match(source, /const preSyncPreservation = preserveLivePublicFields\(DATA, liveDATA\)/);
+  assert.match(source, /item\.public_id !== liveItem\.public_id/);
+});
