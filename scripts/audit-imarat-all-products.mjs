@@ -69,12 +69,10 @@ function isMiniatura(nome,volume,categoria) {
   }
   return false;
 }
-function syncKey(nome,volume,categoria,brand) {
+function syncKey(nome,volume,categoria) {
   const mini=isMiniatura(nome,volume,categoria)&&!isOleo(nome);
-  const base=mini
-    ? `mini|${norm(brand||"outros")}|${chaveComparacaoMini(nome)}|${volumeMatch(volume,nome)}`
-    : `normal|${norm(brand||"outros")}|${limparParaComparacao(nome)}|${volumeMatch(volume,nome)}`;
-  return base;
+  const base=mini?chaveComparacaoMini(nome):limparParaComparacao(nome);
+  return (mini?"mini|":"normal|")+base;
 }
 function parseInternalData() {
   const source=readFileSync(new URL("../js/data.js",import.meta.url),"utf8");
@@ -138,9 +136,9 @@ const checks=[
   [limparParaComparacao("Perfume Exemplo 100ml"),"perfume exemplo","normalização convencional"],
   [chaveComparacaoMini("Miniatura Lattafa Yara Candy 30ml"),"yara candy","chave miniatura com prefixo/marca"],
   [chaveComparacaoMini("Mini Yara Candy Only You 30ml"),"yara candy","chave miniatura com marca sufixada"],
-  [syncKey("Óleo Karseell Cabelo","50ml","Óleos","Karseell"),"normal|karseell|oleo karseell cabelo|50ml","óleo não deve entrar na chave de miniatura"],
-  [syncKey("Perfume Alfa","100ml","Perfumes","Marca A"),"normal|marca a|perfume alfa|100ml","produto convencional"],
-  [syncKey("Miniatura Alfa","30ml","Miniaturas","Lattafa"),"mini|lattafa|alfa|30ml","produto miniatura"],
+  [syncKey("Óleo Karseell Cabelo","50ml","Óleos"),"normal|oleo karseell cabelo","óleo não deve entrar na chave de miniatura"],
+  [syncKey("Perfume Alfa","100ml","Perfumes"),"normal|perfume alfa","produto convencional"],
+  [syncKey("Miniatura Alfa","30ml","Miniaturas"),"mini|alfa","produto miniatura"],
 ];
 for(const [actual,expected,label] of checks) {
   if(actual!==expected) throw new Error(`Falha no teste ${label}: esperado "${expected}", recebido "${actual}"`);
@@ -157,7 +155,7 @@ const internalIndex=new Map();
 for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
   if(!Array.isArray(groups)) continue;
   for(const group of groups) for(const item of (Array.isArray(group?.items)?group.items:[])) {
-    const key=[norm(line),norm(group.brand),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+    const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
     if(!internalIndex.has(key)) internalIndex.set(key,[]);
     internalIndex.get(key).push(item);
   }
@@ -170,21 +168,43 @@ for(const [line,groups] of Object.entries(DATA)) {
     const name=String(item.nome||"").trim();
     if(!name) continue;
     const volume=String(item.volume||volumeFrom(null,name));
-    const internalKey=[norm(line),norm(group.brand),norm(name),volumeMatch(volume,name)].join("|");
+    const internalKey=[norm(line),norm(group.brand),norm(group.cat),norm(name),volumeMatch(volume,name)].join("|");
     const internal=internalIndex.get(internalKey)?.[0];
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
       source:"",originId:"",manual:internal?.precoManual??false,
-      key:syncKey(name,volume,group.cat,group.brand),item
+      key:syncKey(name,volume,group.cat),item
     });
   }
 }
 const internalItemCount=[...internalIndex.values()].reduce((sum,items)=>sum+items.length,0);
-const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.name),volumeMatch(x.volume,x.name)].join("|")));
+const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.category),norm(x.name),volumeMatch(x.volume,x.name)].join("|")));
 const internalOnlyKeys=[...internalIndex.keys()].filter(key=>!liveKeySet.has(key));
 const liveOnlyKeys=[...liveKeySet].filter(key=>!internalIndex.has(key));
 console.log(`COMPARAÇÃO EXATA DO BLOQUEIO DE SYNC: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}; limite de publicação=25; publicação permitida=${internalOnlyKeys.length<=25&&liveOnlyKeys.length<=25&&Math.abs(catalog.length-internalItemCount)<=25}`);
+const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
+const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, items: internalIndex.get(key) || [] }));
+const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ items }) =>
+  items.length === 1 &&
+  allowedAdditiveSources.has(norm(items[0]?.fonte)) &&
+  (norm(items[0]?.fonte) === "brand" || Boolean(String(items[0]?.id_origem || "").trim()))
+);
+const additiveReconciliationSafe =
+  liveOnlyKeys.length === 0 &&
+  internalOnlyKeys.length > 0 &&
+  internalOnlyKeys.length <= 30 &&
+  Math.abs(catalog.length - internalItemCount) <= 30 &&
+  internalOnlySourceConfirmed;
+console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
+for (const row of internalOnlySourceRows) {
+  const item = row.items[0] || {};
+  console.log("ADDITIVE SOURCE ITEM " + JSON.stringify({
+    key: row.key, fonte: item.fonte || "", id_origem: item.id_origem || "",
+    nome: item.nome || "", precoManual: item.precoManual || false
+  }));
+}
+
 const summarizeKeys=keys=>{
   const byBrand=new Map();
   for(const key of keys) {
@@ -246,8 +266,6 @@ function miniIdentityKey(brand,name,volume) {
   return "mini|"+norm(brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volumeFrom(volume,name);
 }
 function apiDuplicateKey(p) {
-  const id=String(p.id||p.productId||"").trim();
-  if(id) return "source-id|"+id;
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
@@ -283,7 +301,7 @@ const miniGlobalGroups=new Map();
 for(const item of matchedCatalog) {
   if(!item.matchedSource) continue;
   if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
-  const key=sourceIdentity(item.matchedSource);
+  const key=miniIdentityKey(item.brand,item.name,item.volume);
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
@@ -332,7 +350,7 @@ for(const p of source) {
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
   const brand=String(p.brand||"Outros").toUpperCase();
-  const brandKnown=Boolean(String(p.brand||"").trim())&&!["outros","outra"].includes(norm(brand));
+  const brandKnown=Boolean(String(p.brand||"").trim())&&!["outros","outra","sem marca","sem marca definida","nao informado","n/a"].includes(norm(brand));
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   const normalKey=limparParaComparacao(name);
   const miniKey=chaveComparacaoMini(name);
