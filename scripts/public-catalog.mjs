@@ -66,16 +66,47 @@ function publicVariantToken(item, index) {
 export function toPublicCatalog(DATA, imageOptions = {}) {
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("DATA inválido para publicação");
   const publicData = {};
-  const identityCounts = new Map();
+  const identityGroups = new Map();
   for (const [line, groups] of Object.entries(DATA)) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
         const key = publicIdentityBase(line, group, item);
-        identityCounts.set(key, (identityCounts.get(key) || 0) + 1);
+        if (!identityGroups.has(key)) identityGroups.set(key, []);
+        identityGroups.get(key).push({ line, group, item });
       }
     }
   }
-  const identityIndexes = new Map();
+  const publicIdByItem = new Map();
+  for (const [identityKey, records] of identityGroups) {
+    const used = new Set();
+    // Primeiro reserva todos os IDs públicos explícitos, para que itens legados
+    // mantenham a referência que já existe no Gist.
+    for (const record of records) {
+      const supplied = String(record.item?.public_id || "").trim();
+      if (/^p_[a-f0-9]{20}$/.test(supplied) && !used.has(supplied)) {
+        publicIdByItem.set(record.item, supplied);
+        used.add(supplied);
+      }
+    }
+    const baseId = publicId(records[0].line, records[0].group, records[0].item);
+    for (let index = 0; index < records.length; index++) {
+      const record = records[index];
+      if (publicIdByItem.has(record.item)) continue;
+      let nextId;
+      if (!used.has(baseId)) {
+        nextId = baseId;
+      } else {
+        nextId = publicId(record.line, record.group, record.item, publicVariantToken(record.item, index));
+      }
+      let collision = 1;
+      while (used.has(nextId)) {
+        nextId = publicId(record.line, record.group, record.item, publicVariantToken(record.item, index + collision));
+        collision++;
+      }
+      publicIdByItem.set(record.item, nextId);
+      used.add(nextId);
+    }
+  }
   for (const [line, groups] of Object.entries(DATA)) {
     if (!Array.isArray(groups)) continue;
     const safeLine = publicLine(line, groups);
@@ -84,13 +115,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       const safeGroup = pick(group, GROUP_FIELDS);
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
-        const identityKey = publicIdentityBase(line, group, item);
-        const occurrence = identityIndexes.get(identityKey) || 0;
-        identityIndexes.set(identityKey, occurrence + 1);
-        const isVariant = (identityCounts.get(identityKey) || 0) > 1 && occurrence > 0;
-        const generatedPublicId = publicId(line, group, item, isVariant ? publicVariantToken(item, occurrence) : "");
-        const suppliedPublicId = String(item?.public_id || "").trim();
-        safeItem.public_id = /^p_[a-f0-9]{20}$/.test(suppliedPublicId) ? suppliedPublicId : generatedPublicId;
+        safeItem.public_id = publicIdByItem.get(item) || publicId(line, group, item);
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
         if (liveRef) {
           safeItem.stock_ref = liveRef;
