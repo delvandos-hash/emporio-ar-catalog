@@ -101,7 +101,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
         }
         if (item.origin_ref) {
           if (!liveByOriginRef.has(String(item.origin_ref))) liveByOriginRef.set(String(item.origin_ref), []);
-          liveByOriginRef.get(String(item.origin_ref)).push(item);
+          liveByOriginRef.get(String(item.origin_ref)).push({ item, group, line });
         }
         const key = publicBaseIdentity(line, group, item);
         if (!liveByBase.has(key)) liveByBase.set(key, []);
@@ -132,8 +132,13 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (!publicItem) continue;
         let liveItem = null;
         if (publicItem.origin_ref) {
-          const origins = (liveByOriginRef.get(String(publicItem.origin_ref)) || []).filter(x => !used.has(x));
-          if (origins.length === 1) liveItem = origins[0];
+          const origins = liveByOriginRef.get(String(publicItem.origin_ref)) || [];
+          // O mesmo produto pode aparecer legitimamente em mais de uma categoria.
+          // Reutiliza a representação viva apenas quando a marca também coincide;
+          // IDs/origens de marcas diferentes nunca são cruzados.
+          const sameBrandOrigins = origins.filter(row => norm(row.group?.brand) === norm(group?.brand));
+          if (sameBrandOrigins.length) liveItem = sameBrandOrigins[0].item;
+          else if (origins.length === 1) liveItem = origins[0].item;
           else if (origins.length > 1) ambiguous++;
         }
         if (!liveItem && item.public_id) {
