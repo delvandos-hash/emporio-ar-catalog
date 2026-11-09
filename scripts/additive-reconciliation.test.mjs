@@ -35,3 +35,9 @@ test("publicação aditiva não remove nem sobrescreve registros atuais do Gist"
 test("baseline do sincronizador usa a mesma identidade pública", () => {
   assert.match(sync, /keys\.add\(\[norm\(line\), norm\(group\.brand\), norm\(group\.cat\), norm\(item\.nome\)/);
 });
+
+test("limite aditivo permite até 60 itens somente com origem confirmada", () => {
+  assert.match(audit, /internalOnlyKeys\.length <= 60/);
+  assert.match(audit, /Math\.abs\(catalog\.length - internalItemCount\) <= 75/);
+  assert.match(apply, /additions\.length > 60/);
+});
