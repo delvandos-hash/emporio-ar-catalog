@@ -1313,6 +1313,34 @@ async function fetchDandeAcessorios(existingGroups = []) {
 }
 
 
+let LIVE_GIST_DATA = null;
+
+function findPublicCatalogMatch(DATA, brand, name, volume, mini) {
+  if (!DATA || typeof DATA !== 'object') return null;
+  const matches = [];
+  for (const groups of Object.values(DATA)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      if (norm(group.brand) !== norm(brand)) continue;
+      for (const item of Array.isArray(group.items) ? group.items : []) {
+        const sameName = mini
+          ? chaveComparacaoMini(item.nome) === chaveComparacaoMini(name)
+          : limparParaComparacao(item.nome) === limparParaComparacao(name);
+        if (!sameName) continue;
+        const existingVolume = volumeMatch(item.volume, item.nome);
+        if (volume && existingVolume && volume !== existingVolume) continue;
+        matches.push(item);
+      }
+    }
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function priceNumber(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return NaN;
+  return Number(raw.includes(',') ? raw.replace(/\\./g, '').replace(',', '.') : raw);
+}
+
 async function main() {
   const requiredSources = SYNC_DANDE_ONLY ? ['DANDE_BASE_URL'] : ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
   const missingSources = requiredSources.filter((key) => !process.env[key]);
@@ -1330,6 +1358,7 @@ async function main() {
     if (process.env.GIST_TOKEN) {
       const internalBaseline = countCatalogIdentity(DATA);
       const liveDATA = await fetchLiveGistBaseline();
+      LIVE_GIST_DATA = liveDATA;
       const liveBaseline = countCatalogIdentity(liveDATA);
       const onlyInternal = [...internalBaseline.keys].filter(key => !liveBaseline.keys.has(key)).length;
       const onlyLive = [...liveBaseline.keys].filter(key => !internalBaseline.keys.has(key)).length;
@@ -1755,21 +1784,29 @@ async function main() {
       const precoVarejoOrig = (p.priceCents || 0) / 100; 
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-      
-      const line = genderLine(p.gender); 
-      const foto = fotoGaleria || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : ''); 
+      const publicMatch = findPublicCatalogMatch(LIVE_GIST_DATA, brand, nome, volume, ehMini);
+      const publicHasPrices = publicMatch?.varejo != null && publicMatch?.atacado != null;
+      const publicPriceDiffers = publicHasPrices &&
+        (priceNumber(publicMatch.varejo) !== priceNumber(prices.varejo) ||
+         priceNumber(publicMatch.atacado) !== priceNumber(prices.atacado));
+      const varejoFinal = publicPriceDiffers ? publicMatch.varejo : prices.varejo;
+      const atacadoFinal = publicPriceDiffers ? publicMatch.atacado : prices.atacado;
+
+      const line = genderLine(p.gender);
+      const foto = fotoGaleria || publicMatch?.foto || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : '');
       const cat = ehOleo ? 'Óleos' : ehMini ? 'Miniaturas' : 'Perfumes';
-      
+
       const group = ensureBrandGroup(DATA, line, brand, cat);
-      group.items.push(stampNovoDesde({ 
-          nome, 
-          volume, 
-          varejo: prices.varejo, 
-          atacado: prices.atacado, 
-          disponivel: p.inStock === true ? 'Sim' : 'Não', 
-          notas: notas || '', 
+      group.items.push(stampNovoDesde({
+          nome,
+          volume,
+          varejo: varejoFinal,
+          atacado: atacadoFinal,
+          ...(publicPriceDiffers ? { precoManual: true } : {}),
+          disponivel: p.inStock === true ? 'Sim' : 'Não',
+          notas: notas || publicMatch?.notas || '',
           foto,
-          fotos: imgsNew.length ? imgsNew : (foto ? [foto] : []),
+          fotos: imgsNew.length ? imgsNew : (Array.isArray(publicMatch?.fotos) && publicMatch.fotos.length ? publicMatch.fotos : (foto ? [foto] : [])),
           fonte: 'imarat',
           id_origem: String(p.id ?? p.productId ?? ''),
       }, true));
