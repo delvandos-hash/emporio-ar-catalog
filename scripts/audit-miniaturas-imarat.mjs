@@ -68,7 +68,6 @@ function isOleo(name) {
   return n.startsWith("oleo") || n.includes(" oleo ");
 }
 function isMini(item, group) {
-  if (isOleo(item?.nome)) return false;
   const name = norm(item?.nome);
   const category = norm(group?.cat);
   const volume = volumeOf(item);
