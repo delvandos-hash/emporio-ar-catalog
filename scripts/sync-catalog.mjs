@@ -56,6 +56,28 @@ function publicVariantMatch(item, publicItem) {
     photos !== "" &&
     photos === publicPhotoFingerprint(publicItem);
 }
+const CONFIRMED_IMARAT_LEGACY_IDS = new Map([
+  ["isis makeup|body spray", "719"],
+  ["isis makeup|esfoliante corporal bum bum", "832"],
+  ["isis makeup|esfoliante corporal pitaya", "830"]
+]);
+function restoreConfirmedImaratProvenance(DATA) {
+  let restored = 0;
+  for (const groups of Object.values(DATA || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const key = [norm(group?.brand), norm(item?.nome)].join("|");
+        const id = CONFIRMED_IMARAT_LEGACY_IDS.get(key);
+        if (!id) continue;
+        item.fonte = "imarat";
+        item.id_origem = id;
+        restored++;
+      }
+    }
+  }
+  console.log(`IMARAT_PROVENANCE_RESTORED_FROM_VERIFIED_ALLOWLIST=${restored}`);
+  return restored;
+}
 function preserveLivePublicFields(DATA, liveDATA) {
   if (!liveDATA) return { matched: 0, prices: 0, photos: 0, ambiguous: 0 };
   const publicData = toPublicCatalog(DATA);
@@ -2437,6 +2459,7 @@ async function main() {
     }
   }
 
+  restoreConfirmedImaratProvenance(DATA);
   const livePreservation = preserveLivePublicFields(DATA, LIVE_GIST_DATA);
   if (livePreservation.ambiguous) {
     throw new Error(`Preservação de dados públicos ambígua em ${livePreservation.ambiguous} variantes; publicação bloqueada.`);
