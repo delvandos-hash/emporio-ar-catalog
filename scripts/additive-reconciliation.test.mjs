@@ -73,3 +73,11 @@ test("deduplicação de Gist nunca colapsa IDs públicos diferentes", () => {
   assert.match(apply, /String\(item\?\.public_id \|\| ""\)/);
   assert.match(apply, /GIST_EXACT_DUPLICATES_REMOVED/);
 });
+
+test("variantes com mesmo nome são reidentificadas por foto sem depender de preço", () => {
+  assert.match(apply, /publicPhotoFingerprint/);
+  assert.match(apply, /byPhoto\.length === 1/);
+  assert.match(apply, /fotosCompatíveis/);
+  assert.match(sync, /photos\(item\) !== ""/);
+  assert.doesNotMatch(sync, /publicPriceNumber\(item\?\.varejo\)[\s\S]*?publicPriceNumber\(publicItem\?\.atacado\)/);
+});
