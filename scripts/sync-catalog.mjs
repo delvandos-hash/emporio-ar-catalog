@@ -1254,21 +1254,19 @@ async function main() {
   const imaratList = await fetchImaratList();
   console.log(`Imarat: ${imaratList.length} produtos`);
 
-  const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
   let produtosImaratForaDoSiteRaizRemovidos = 0;
   let titulosImaratCorrigidosPeloSiteRaiz = 0;
   const relatorioImaratNomesRemovidos = [];
   const relatorioImaratNomesCorrigidos = [];
 
-  // As categorias Perfumes, Miniaturas e Óleos são abastecidas pela Imarat.
-  // Também considera itens com fonte Imarat confirmada em outras categorias.
-  // Quando o produto existe, o título é substituído pelo texto exato da origem.
+  // A categoria não comprova a origem: Perfumes, Miniaturas e Óleos podem
+  // conter produtos de outros fornecedores. Só audita/exclui quando o próprio
+  // registro traz fonte Imarat confirmada.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
-      const grupoImarat = categoriasImarat.has(norm(g.cat));
       g.items = (g.items || []).filter(item => {
-        const fonteImarat = String(item.fonte || '').toLowerCase() === 'imarat';
-        if (!fonteImarat && !grupoImarat) return true;
+        const fonteImarat = norm(item.fonte) === 'imarat';
+        if (!fonteImarat) return true;
 
         const nomeNormalizado = norm(item.nome);
         let hit = imaratList.find(p => norm(p.name) === nomeNormalizado);
