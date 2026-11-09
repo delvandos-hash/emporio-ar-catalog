@@ -122,13 +122,17 @@ async function main() {
 
   const checkPublic = toPublicCatalog(DATA);
   const checkIds = new Set();
+  const checkStockRefs = new Set();
   for (const groups of Object.values(checkPublic)) for (const group of groups || []) {
-    for (const item of group.items || []) if (item.public_id) checkIds.add(item.public_id);
+    for (const item of group.items || []) {
+      if (item.public_id) checkIds.add(item.public_id);
+      if (item.stock_ref) checkStockRefs.add(item.stock_ref);
+    }
   }
   const missing = [];
   for (const [line, groups] of Object.entries(liveDATA)) for (const group of groups || []) {
     for (const item of group.items || []) {
-      if (item.public_id && !checkIds.has(item.public_id)) missing.push(item.public_id);
+      if (item.public_id && !checkIds.has(item.public_id) && !(item.stock_ref && checkStockRefs.has(item.stock_ref))) missing.push(item.public_id);
     }
   }
   if (missing.length) throw new Error(`Restaram ${missing.length} public_id do Gist sem representação interna; nada foi salvo.`);
