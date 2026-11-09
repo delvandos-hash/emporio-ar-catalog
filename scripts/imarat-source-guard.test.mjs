@@ -62,7 +62,7 @@ test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompa
 });
 
 test("auditoria de miniaturas usa volume e categoria retornados pela Imarat", () => {
-  assert.match(auditMiniSource, /function volumeFrom\(value, name\)/);
+  assert.match(auditMiniSource, /norm\(line\) \+ "\\|" \+ norm\(group\.brand\) \+ "\\|" \+ name \+ "\\|" \+ volumeOf\(item\)/);
   assert.match(auditMiniSource, /const sourceCategory = String\(source\.categoria_nome \|\| source\.categoria \|\| ""\)/);
   assert.match(auditMiniSource, /automaticMiniPrice\(item\.nome, group\.brand, volumeOf\(item\), sourceCategory/);
   assert.match(auditMiniSource, /if \(isOleo\(item\?\.nome\)\) return false/);
@@ -112,11 +112,12 @@ test("restauração Only You é append-only, respeita preço manual e valida ant
   assert.doesNotMatch(restoreOnlyYouSource, /group\.items\s*=\s*group\.items\.filter/);
 });
 
-test("deduplicação de miniaturas exige marca e volume compatíveis", () => {
-  assert.ok(source.includes("marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}"));
-  assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeKey}`"));
-  assert.ok(source.includes("duplicado = indexMiniImarat.has(chaveComIdentidade)"));
-  assert.ok(!source.includes("indexMiniImarat.has(chave)"));
+test("miniaturas usam ID de origem e fallback conservador por marca, nome e volume", () => {
+  assert.ok(source.includes("miniIdentityBaseKey(it, g.brand)"));
+  assert.ok(source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? \"\""));
+  assert.ok(source.includes("!marcaConhecida && nameVolumeCandidates.length"));
+  assert.ok(source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\""));
+  assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
 });
 
 test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
@@ -126,19 +127,28 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
   assert.ok(auditMiniSource.includes(".replace(/['’]s"));
 });
 
-test("deduplicação geral preserva nomes iguais entre marcas e volumes diferentes", () => {
-  assert.ok(source.includes("const chave = id ? `id|\u0024{norm(g.brand)}|\u0024{id}`"));
-  assert.ok(source.includes("`produto|\u0024{norm(g.brand)}|\u0024{limparParaComparacao(item.nome)}|\u0024{volume}`"));
-  assert.ok(source.includes("indexNormal.add(`\u0024{norm(g.brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
-  assert.ok(!source.includes("indexNormal.add(limparParaComparacao(it.nome))"));
-  assert.ok(source.includes("duplicado = indexNormal.has(`\u0024{norm(brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
+test("perfumes exigem marca, nome exato e volume; semelhanças entre marcas são preservadas", () => {
+  assert.ok(source.includes("indexNormal.add(normalProductKey(it.nome, it.volume, g.brand))"));
+  assert.ok(source.includes("duplicado = indexNormal.has(normalProductKey(nome, volume, brand))"));
+  assert.ok(source.includes("!marcaConhecida && indexNameVolume.has(normalProductNameVolumeKey(nome, volume))"));
+  assert.ok(source.includes("Nomes iguais em marcas diferentes coexistem"));
 });
 
-test("marca ausente não pode criar duplicata ambígua em outra marca", () => {
-  assert.match(source, /const marcaConhecida = Boolean\(String\(p\.brand \|\| ''\)\.trim\(\)\)/);
-  assert.match(source, /!marcaConhecida && indexNameVolume\.has/);
-  assert.match(source, /!marcaConhecida && indexMiniNameVolume\.has/);
-  assert.match(audit, /const brandKnown=Boolean\(String\(p\.brand\|\|""\)\.trim\(\)\)/);
-  assert.match(audit, /!brandKnown&&normalNameVolumeIndex\.has/);
-  assert.match(audit, /!brandKnown&&miniNameVolumeIndex\.has/);
+test("sincronização não remove produtos já existentes automaticamente", () => {
+  assert.match(source, /Deduplicação destrutiva desativada: todos os registros existentes foram preservados/);
+  assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
+  assert.doesNotMatch(source, /miniaturasDuplicadasRemovidas\+\+/);
+});
+
+test("auditorias distinguem miniaturas por marca e ID de origem", () => {
+  assert.ok(auditMiniSource.includes("key: source"));
+  assert.ok(auditMiniSource.includes('norm(group.brand) + "|source|" + String(source.id || source.productId || source.slug || "")'));
+  assert.ok(auditMiniSource.includes('norm(group.brand) + "|" + name + "|" + volumeOf(item)'));
+  assert.ok(auditAllSource.includes('mini|\u0024{norm(brand||"outros")}|\u0024{chaveComparacaoMini(nome)}|\u0024{volumeMatch(volume,nome)}'));
+});
+
+test("perfumes de marcas diferentes com nome e volume iguais não são deduplicados", () => {
+  assert.match(source, /normalProductKey\(nome, volume, brand\)/);
+  assert.match(source, /!marcaConhecida && indexNameVolume\.has\(normalProductNameVolumeKey\(nome, volume\)\)/);
+  assert.match(auditAllSource, /normal\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{limparParaComparacao\(nome\)\}/);
 });

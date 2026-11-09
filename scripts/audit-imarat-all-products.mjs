@@ -69,10 +69,12 @@ function isMiniatura(nome,volume,categoria) {
   }
   return false;
 }
-function syncKey(nome,volume,categoria) {
+function syncKey(nome,volume,categoria,brand) {
   const mini=isMiniatura(nome,volume,categoria)&&!isOleo(nome);
-  const base=mini?chaveComparacaoMini(nome):limparParaComparacao(nome);
-  return (mini?"mini|":"normal|")+base;
+  const base=mini
+    ? `mini|${norm(brand||"outros")}|${chaveComparacaoMini(nome)}|${volumeMatch(volume,nome)}`
+    : `normal|${norm(brand||"outros")}|${limparParaComparacao(nome)}|${volumeMatch(volume,nome)}`;
+  return base;
 }
 function parseInternalData() {
   const source=readFileSync(new URL("../js/data.js",import.meta.url),"utf8");
@@ -136,9 +138,9 @@ const checks=[
   [limparParaComparacao("Perfume Exemplo 100ml"),"perfume exemplo","normalização convencional"],
   [chaveComparacaoMini("Miniatura Lattafa Yara Candy 30ml"),"yara candy","chave miniatura com prefixo/marca"],
   [chaveComparacaoMini("Mini Yara Candy Only You 30ml"),"yara candy","chave miniatura com marca sufixada"],
-  [syncKey("Óleo Karseell Cabelo","50ml","Óleos"),"normal|oleo karseell cabelo","óleo não deve entrar na chave de miniatura"],
-  [syncKey("Perfume Alfa","100ml","Perfumes"),"normal|perfume alfa","produto convencional"],
-  [syncKey("Miniatura Alfa","30ml","Miniaturas"),"mini|alfa","produto miniatura"],
+  [syncKey("Óleo Karseell Cabelo","50ml","Óleos","Karseell"),"normal|karseell|oleo karseell cabelo|50ml","óleo não deve entrar na chave de miniatura"],
+  [syncKey("Perfume Alfa","100ml","Perfumes","Marca A"),"normal|marca a|perfume alfa|100ml","produto convencional"],
+  [syncKey("Miniatura Alfa","30ml","Miniaturas","Lattafa"),"mini|lattafa|alfa|30ml","produto miniatura"],
 ];
 for(const [actual,expected,label] of checks) {
   if(actual!==expected) throw new Error(`Falha no teste ${label}: esperado "${expected}", recebido "${actual}"`);
@@ -174,7 +176,7 @@ for(const [line,groups] of Object.entries(DATA)) {
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
       source:"",originId:"",manual:internal?.precoManual??false,
-      key:syncKey(name,volume,group.cat),item
+      key:syncKey(name,volume,group.cat,group.brand),item
     });
   }
 }
@@ -244,6 +246,8 @@ function miniIdentityKey(brand,name,volume) {
   return "mini|"+norm(brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volumeFrom(volume,name);
 }
 function apiDuplicateKey(p) {
+  const id=String(p.id||p.productId||"").trim();
+  if(id) return "source-id|"+id;
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
@@ -279,7 +283,7 @@ const miniGlobalGroups=new Map();
 for(const item of matchedCatalog) {
   if(!item.matchedSource) continue;
   if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
-  const key=miniIdentityKey(item.brand,item.name,item.volume);
+  const key=sourceIdentity(item.matchedSource);
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
