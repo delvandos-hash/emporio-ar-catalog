@@ -7,7 +7,7 @@ if (!token || !IMARAT_API) throw new Error("GIST_TOKEN e IMARAT_API_URL são obr
 
 const norm = value => String(value || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-  .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+  .replace(/['’]s\b/gi, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 const publicBrand = value => norm(value) === "imarat" ? "emporio a r" : norm(value);
 function volume(value, name) {
   let raw = String(value || "").trim();
