@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { toPublicCatalog } from "./public-catalog.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
@@ -69,6 +70,43 @@ function isMiniatura(nome,volume,categoria) {
   }
   return false;
 }
+function publicFingerprint(item) {
+  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
+  return JSON.stringify({
+    nome: norm(item?.nome), volume: volumeMatch(item?.volume,item?.nome),
+    varejo: String(item?.varejo ?? "").trim(), atacado: String(item?.atacado ?? "").trim(),
+    foto: String(item?.foto ?? "").trim(),
+    fotos: [...new Set(photos.map(x=>String(x??"").trim()).filter(Boolean))].sort(),
+    notas: String(item?.notas ?? ""), badge: String(item?.badge ?? ""),
+    novoDesde: String(item?.novoDesde ?? ""), disponivel: String(item?.disponivel ?? ""),
+    variacoes: item?.variacoes || [], stock_ref: String(item?.stock_ref ?? ""),
+    stock_route: String(item?.stock_route ?? ""), fonte: String(item?.fonte ?? "")
+  });
+}
+
+function rekeyLiveVariants(liveDATA, internalPublic) {
+  const byBase = new Map();
+  for (const [line,groups] of Object.entries(internalPublic || {})) for (const group of groups || []) {
+    for (const item of group.items || []) {
+      const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+      if(!byBase.has(key)) byBase.set(key,[]);
+      byBase.get(key).push(item);
+    }
+  }
+  const used=new Set(); let rekeyed=0, unmatched=0;
+  for (const [line,groups] of Object.entries(liveDATA || {})) for (const group of groups || []) {
+    for (const item of group.items || []) {
+      const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+      const fp=publicFingerprint(item);
+      const match=(byBase.get(key)||[]).find(candidate=>!used.has(candidate.public_id)&&publicFingerprint(candidate)===fp);
+      if(!match){unmatched++;continue;}
+      used.add(match.public_id);
+      if(item.public_id!==match.public_id){item.public_id=match.public_id;rekeyed++;}
+    }
+  }
+  return {rekeyed,unmatched};
+}
+
 function syncKey(nome,volume,categoria,brand) {
   const mini=isMiniatura(nome,volume,categoria)&&!isOleo(nome);
   return mini
@@ -162,6 +200,21 @@ for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
   }
 }
 const DATA=await fetchLiveCatalog();
+const internalPublicData=toPublicCatalog(INTERNAL_DATA);
+const rekeyAudit=rekeyLiveVariants(DATA,internalPublicData);
+console.log(`GIST_VARIANTS_REKEYABLE=${rekeyAudit.rekeyed} unmatchedLiveVariants=${rekeyAudit.unmatched}`);
+const internalPublicIndex=new Map();
+const publicBuckets=new Map();
+for(const [line,groups] of Object.entries(internalPublicData)) for(const group of groups||[]) for(const item of group.items||[]) {
+  const base=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+  if(!publicBuckets.has(base)) publicBuckets.set(base,[]);
+  publicBuckets.get(base).push(item);
+}
+for(const [line,groups] of Object.entries(INTERNAL_DATA)) for(const group of groups||[]) for(const item of group.items||[]) {
+  const base=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
+  const publicItem=publicBuckets.get(base)?.shift();
+  if(publicItem?.public_id) internalPublicIndex.set(publicItem.public_id,{line,group,item,publicItem});
+}
 const catalog=[];
 for(const [line,groups] of Object.entries(DATA)) {
   if(!Array.isArray(groups)) continue;
@@ -179,23 +232,24 @@ for(const [line,groups] of Object.entries(DATA)) {
     });
   }
 }
-const internalItemCount=[...internalIndex.values()].reduce((sum,items)=>sum+items.length,0);
-const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.category),norm(x.name),volumeMatch(x.volume,x.name)].join("|")));
-const internalOnlyKeys=[...internalIndex.keys()].filter(key=>!liveKeySet.has(key));
-const liveOnlyKeys=[...liveKeySet].filter(key=>!internalIndex.has(key));
-console.log(`COMPARAÇÃO EXATA DO BLOQUEIO DE SYNC: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}; limite de publicação=25; publicação permitida=${internalOnlyKeys.length<=25&&liveOnlyKeys.length<=25&&Math.abs(catalog.length-internalItemCount)<=25}`);
+const internalItemCount=internalPublicIndex.size;
+const liveKeySet=new Set(catalog.map(x=>String(x.item.public_id||"")));
+const internalOnlyKeys=[...internalPublicIndex.keys()].filter(key=>!liveKeySet.has(key));
+const liveOnlyKeys=[...liveKeySet].filter(key=>!internalPublicIndex.has(key));
+console.log(`COMPARAÇÃO POR PUBLIC ID: data.js interno=${internalItemCount} IDs; Gist vivo=${catalog.length} itens; IDs só no data.js=${internalOnlyKeys.length}; IDs só no Gist=${liveOnlyKeys.length}; variantes sem correspondência=${rekeyAudit.unmatched}`);
 const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
-const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, items: internalIndex.get(key) || [] }));
-const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ items }) =>
-  items.length === 1 &&
-  allowedAdditiveSources.has(norm(items[0]?.fonte)) &&
-  (norm(items[0]?.fonte) === "brand" || Boolean(String(items[0]?.id_origem || "").trim()))
+const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, row: internalPublicIndex.get(key) }));
+const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ row }) =>
+  Boolean(row) &&
+  allowedAdditiveSources.has(norm(row.item?.fonte)) &&
+  (norm(row.item?.fonte) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
 );
 const additiveReconciliationSafe =
+  rekeyAudit.unmatched === 0 &&
   liveOnlyKeys.length === 0 &&
   internalOnlyKeys.length > 0 &&
-  internalOnlyKeys.length <= 60 &&
-  Math.abs(catalog.length - internalItemCount) <= 75 &&
+  internalOnlyKeys.length <= 80 &&
+  Math.abs(catalog.length - internalItemCount) <= 80 &&
   internalOnlySourceConfirmed;
 console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
 for (const row of internalOnlySourceRows) {
