@@ -102,29 +102,54 @@ function preserveLivePublicFields(DATA, liveDATA) {
         const publicItem = publicQueues.get(key)?.shift();
         if (!publicItem) continue;
         let liveItem = null;
-        if (publicItem.origin_ref) {
+        // stock_ref identifica a variante física e tem prioridade sobre origin_ref,
+        // que pode ser compartilhado por representações/categorias do mesmo produto.
+        if (publicItem.stock_ref) {
+          const stockKey = norm(group?.brand) + "|" + String(publicItem.stock_ref);
+          const refs = (liveByStockRef.get(stockKey) || []).filter(x => !used.has(x));
+          if (refs.length === 1) liveItem = refs[0];
+        }
+        if (!liveItem && publicItem.origin_ref) {
           const origins = (liveByOriginRef.get(String(publicItem.origin_ref)) || []).filter(x => !used.has(x));
           if (origins.length === 1) liveItem = origins[0];
           else if (origins.length > 1) {
-            ambiguous++;
-            console.log("LIVE_PUBLIC_AMBIGUOUS_ORIGIN " + JSON.stringify({
-              line, brand: group?.brand, category: group?.cat, name: item?.nome,
-              origin_ref: publicItem.origin_ref,
-              candidates: origins.slice(0, 12).map(x => ({
-                public_id: x.public_id, stock_ref: x.stock_ref, varejo: x.varejo, atacado: x.atacado,
-                foto: x.foto, fotos: Array.isArray(x.fotos) ? x.fotos.slice(0, 3) : []
-              }))
-            }));
+            const first = origins[0];
+            const sameRecord = origins.every(x =>
+              String(x.public_id || "") === String(first.public_id || "") &&
+              String(x.stock_ref || "") === String(first.stock_ref || "") &&
+              publicPriceNumber(x.varejo) === publicPriceNumber(first.varejo) &&
+              publicPriceNumber(x.atacado) === publicPriceNumber(first.atacado) &&
+              JSON.stringify(x.variacoes || []) === JSON.stringify(first.variacoes || [])
+            );
+            if (sameRecord) {
+              const mergedPhotos = [...new Set(origins.flatMap(x => [
+                ...(Array.isArray(x.fotos) ? x.fotos : []),
+                ...(x.foto ? [x.foto] : [])
+              ]).map(x => String(x || "").trim()).filter(Boolean))];
+              liveItem = first;
+              liveItem.fotos = mergedPhotos;
+              if (!liveItem.foto && mergedPhotos.length) liveItem.foto = mergedPhotos[0];
+              origins.forEach(x => used.add(x));
+              console.log("LIVE_PUBLIC_DUPLICATE_REPRESENTATIONS_MERGED " + JSON.stringify({
+                line, brand: group?.brand, name: item?.nome, count: origins.length,
+                public_id: first.public_id, stock_ref: first.stock_ref, photos: mergedPhotos.length
+              }));
+            } else {
+              ambiguous++;
+              console.log("LIVE_PUBLIC_AMBIGUOUS_ORIGIN " + JSON.stringify({
+                line, brand: group?.brand, category: group?.cat, name: item?.nome,
+                origin_ref: publicItem.origin_ref,
+                candidates: origins.slice(0, 12).map(x => ({
+                  public_id: x.public_id, stock_ref: x.stock_ref, varejo: x.varejo, atacado: x.atacado,
+                  foto: x.foto, fotos: Array.isArray(x.fotos) ? x.fotos.slice(0, 3) : []
+                }))
+              }));
+            }
           }
         }
         if (!liveItem && item.public_id) {
           const publicMatches = (liveByPublicId.get(String(item.public_id)) || []).filter(x => !used.has(x));
           if (publicMatches.length === 1) liveItem = publicMatches[0];
-        }
-        if (!liveItem && publicItem.stock_ref) {
-          const stockKey = norm(group?.brand) + "|" + String(publicItem.stock_ref);
-          const refs = (liveByStockRef.get(stockKey) || []).filter(x => !used.has(x));
-          if (refs.length === 1) liveItem = refs[0];
         }
         if (!liveItem) {
           const candidates = (liveByBase.get(key) || []).filter(x => !used.has(x));
