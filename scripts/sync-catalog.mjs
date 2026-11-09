@@ -1418,14 +1418,6 @@ async function main() {
         if (it.notas) it.notas = limparTexto(it.notas);
 
         const n = norm(it.nome); const b = norm(g.brand);
-        if (b === 'ard al zaafaran' && (n.includes('durrat al aroos') || n.includes('shagaf al ward'))) {
-          const candidatesDebug = imaratList.filter(p => norm(p.brand) === b &&
-            (norm(p.name).includes('durrat al aroos') || norm(p.name).includes('shagaf al ward')));
-          console.log('DEBUG OLEO IMARAT', JSON.stringify({
-            nome: it.nome, categoria: g.cat, marca: g.brand, volume: volumeMatch(it.volume, it.nome),
-            candidatos: candidatesDebug.map(p => ({ nome: p.name, marca: p.brand, volume: volumeMatch(p.sizeMl, p.name) }))
-          }));
-        }
         const nomeSemPrefixoPrestige = n.replace(/^prestige\s+/, '');
         const candidatosNomeExato = imaratList.filter(p => norm(p.name) === n);
         // Primeiro exige coincidência de marca, considerando Imarat → Empório A.R.
@@ -1452,20 +1444,6 @@ async function main() {
             norm(p.name) === 'miniatura sapatinho good girl' && norm(p.brand).includes('only you') &&
             (!volumeMatch(it.volume, it.nome) || !volumeMatch(p.sizeMl, p.name) ||
               volumeMatch(it.volume, it.nome) === volumeMatch(p.sizeMl, p.name))
-          );
-        }
-        if (!hit && b === 'ard al zaafaran' && n === 'oleo durrat al aroos') {
-          hit = imaratList.find(p =>
-            norm(p.name) === 'durrat al aroos' && norm(p.brand) === 'ard al zaafaran' &&
-            volumeMatch(it.volume, it.nome) === '20ml' &&
-            (!volumeMatch(p.sizeMl, p.name) || volumeMatch(p.sizeMl, p.name) === '20ml')
-          );
-        }
-        if (!hit && b === 'ard al zaafaran' && n === 'oleo shagaf al ward') {
-          hit = imaratList.find(p =>
-            norm(p.name) === 'shagaf al ward' && norm(p.brand) === 'ard al zaafaran' &&
-            volumeMatch(it.volume, it.nome) === '20ml' &&
-            (!volumeMatch(p.sizeMl, p.name) || volumeMatch(p.sizeMl, p.name) === '20ml')
           );
         }
         // Corrige títulos legados somente com marca compatível, volume compatível
