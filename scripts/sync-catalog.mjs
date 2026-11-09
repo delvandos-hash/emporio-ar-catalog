@@ -1246,14 +1246,21 @@ async function main() {
   console.log(`Imarat: ${imaratList.length} produtos`);
 
   const imaratNomesAtuais = new Set(imaratList.map(p => norm(p.name)).filter(Boolean));
+  const marcasImaratAtuais = new Set(imaratList.map(p => {
+    const marca = limparTexto(p.brand || 'Outros');
+    return norm(marca) === 'imarat' ? norm('Empório A.R') : norm(marca);
+  }));
+  const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
   let produtosImaratForaDoSiteRaizRemovidos = 0;
-  // Remove somente registros já identificados como origem Imarat cujo nome deixou
-  // de existir na listagem completa do site raiz. Nunca toca em outras fontes.
+  // Remove registros explicitamente Imarat e itens em grupos de marcas presentes
+  // na API Imarat quando o título não existe na listagem completa do site raiz.
+  // Grupos/categorias de outras fontes permanecem intactos.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
-      const antes = (g.items || []).length;
+      const grupoImarat = categoriasImarat.has(norm(g.cat)) && marcasImaratAtuais.has(norm(g.brand));
       g.items = (g.items || []).filter(item => {
-        if (String(item.fonte || '').toLowerCase() !== 'imarat') return true;
+        const fonteImarat = String(item.fonte || '').toLowerCase() === 'imarat';
+        if (!fonteImarat && !grupoImarat) return true;
         if (imaratNomesAtuais.has(norm(item.nome))) return true;
         produtosImaratForaDoSiteRaizRemovidos++;
         return false;
