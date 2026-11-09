@@ -262,3 +262,21 @@ test("mesmo ID de origem repetido em categorias distintas conserva uma única id
   const ids = out.roupas.flatMap(g => g.items.map(i => i.public_id));
   assert.equal(new Set(ids).size, 1);
 });
+
+test("marcas ONLY YOU e MAIS YOU permanecem separadas mesmo com nomes semelhantes", () => {
+  const DATA = {
+    feminino: [
+      { brand: "ONLY YOU", cat: "Miniaturas", items: [
+        { nome: "Mini Onlyyou 212", volume: "30ml", id_origem: "only-212", fonte: "imarat" }
+      ] },
+      { brand: "MAIS YOU", cat: "Miniaturas", items: [
+        { nome: "Mini Onlyyou 212", volume: "30ml", id_origem: "mais-212", fonte: "imarat" }
+      ] }
+    ]
+  };
+  const out = toPublicCatalog(DATA);
+  assert.equal(out.feminino.length, 2);
+  assert.deepEqual(out.feminino.map(group => group.brand), ["ONLY YOU", "MAIS YOU"]);
+  const ids = out.feminino.map(group => group.items[0].public_id);
+  assert.equal(new Set(ids).size, 2);
+});
