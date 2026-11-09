@@ -1698,15 +1698,20 @@ async function main() {
   // Índice de identidade: marca + nome normalizado + volume.
   // Nomes iguais de marcas diferentes e apresentações distintas coexistem.
   const indexNormal = new Set();
+  const indexNameVolume = new Set();
   const indexMiniImarat = new Set();
+  const indexMiniNameVolume = new Set();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       for (const it of g.items) {
-        indexNormal.add(`${norm(g.brand)}|${limparParaComparacao(it.nome)}|${volumeMatch(it.volume, it.nome)}`);
+        const volumeKey = volumeMatch(it.volume, it.nome);
+        const nomeKey = limparParaComparacao(it.nome);
+        indexNormal.add(`${norm(g.brand)}|${nomeKey}|${volumeKey}`);
+        indexNameVolume.add(`${nomeKey}|${volumeKey}`);
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const chaveMini = chaveComparacaoMini(it.nome);
-          // Marca e volume integram a chave; nomes parecidos de marcas diferentes coexistem.
-          indexMiniImarat.add(`${norm(g.brand)}|${chaveMini}|${volumeMatch(it.volume, it.nome)}`);
+          indexMiniImarat.add(`${norm(g.brand)}|${chaveMini}|${volumeKey}`);
+          indexMiniNameVolume.add(`${chaveMini}|${volumeKey}`);
         }
       }
     }
@@ -1716,6 +1721,7 @@ async function main() {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
       const marcaOrigem = limparTexto(p.brand || 'Outros').trim();
+      const marcaConhecida = Boolean(String(p.brand || '').trim()) && !['outros', 'outra'].includes(norm(marcaOrigem));
       const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
@@ -1724,10 +1730,15 @@ async function main() {
       let duplicado;
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
-        const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`;
-        duplicado = indexMiniImarat.has(chaveComIdentidade);
+        const volumeKey = volumeMatch(volume, nome);
+        const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeKey}`;
+        duplicado = indexMiniImarat.has(chaveComIdentidade)
+          || (!marcaConhecida && indexMiniNameVolume.has(`${chave}|${volumeKey}`));
       } else {
-        duplicado = indexNormal.has(`${norm(brand)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`);
+        const nomeKey = limparParaComparacao(nome);
+        const volumeKey = volumeMatch(volume, nome);
+        duplicado = indexNormal.has(`${norm(brand)}|${nomeKey}|${volumeKey}`)
+          || (!marcaConhecida && indexNameVolume.has(`${nomeKey}|${volumeKey}`));
       }
       if (duplicado) continue;
 
@@ -1763,10 +1774,14 @@ async function main() {
           id_origem: String(p.id ?? p.productId ?? ''),
       }, true));
       
-      indexNormal.add(`${norm(brand)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`);
+      const nomeKey = limparParaComparacao(nome);
+      const volumeKey = volumeMatch(volume, nome);
+      indexNormal.add(`${norm(brand)}|${nomeKey}|${volumeKey}`);
+      indexNameVolume.add(`${nomeKey}|${volumeKey}`);
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
-        indexMiniImarat.add(`${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`);
+        indexMiniImarat.add(`${norm(brand)}|${chave}|${volumeKey}`);
+        indexMiniNameVolume.add(`${chave}|${volumeKey}`);
       }
       addedImarat++;
     }
@@ -1828,7 +1843,11 @@ async function main() {
           foto,
           fonte: 'brand',
       }, true));
-      indexNormal.add(`${norm(session)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`); addedBrand++;
+      const nomeKey = limparParaComparacao(nome);
+      const volumeKey = volumeMatch(volume, nome);
+      indexNormal.add(`${norm(session)}|${nomeKey}|${volumeKey}`);
+      indexNameVolume.add(`${nomeKey}|${volumeKey}`);
+      addedBrand++;
     }
   }
 
