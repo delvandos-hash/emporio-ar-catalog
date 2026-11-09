@@ -45,6 +45,7 @@ jobs:
           ADD_ROUPAS: "0"
           ADD_FRANNY: "0"
           ADD_ACESSORIOS: "0"
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
           BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
