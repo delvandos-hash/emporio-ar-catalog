@@ -1363,12 +1363,24 @@ async function main() {
 
         const n = norm(it.nome); const b = norm(g.brand);
         const nomeSemPrefixoPrestige = n.replace(/^prestige\s+/, '');
-        const hit =
-          imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) ||
-          imaratList.find((p) => norm(p.name) === n) ||
-          // A marca Arabiyat Prestige pode estar agrupada historicamente como "ARABIYAT".
-          // Nesse caso, remove "Prestige" somente para localizar o produto na marca correta.
-          imaratList.find((p) => norm(p.brand).includes('arabiyat prestige') && norm(p.name) === nomeSemPrefixoPrestige);
+        const candidatosNomeExato = imaratList.filter(p => norm(p.name) === n);
+        // Primeiro exige coincidência de marca, considerando apenas a conversão pública
+        // Imarat → Empório A.R. Não basta o nome coincidir: isso confundia fornecedores.
+        let hit = candidatosNomeExato.find(p => norm(marcaPublicaImarat(p.brand)) === b);
+        // Exceção histórica comprovada: Arabiyat Prestige era agrupada como ARABIYAT.
+        if (!hit && b === 'arabiyat') {
+          hit = candidatosNomeExato.find(p => norm(p.brand).includes('arabiyat prestige'));
+        }
+        // Em grupos genéricos, só aceita associação se o nome for único em toda a API.
+        if (!hit && ['outros', 'outra', 'emporio a r'].includes(b) && candidatosNomeExato.length === 1) {
+          hit = candidatosNomeExato[0];
+        }
+        // Remove o prefixo redundante apenas na exceção Arabiyat Prestige comprovada.
+        if (!hit && b === 'arabiyat') {
+          hit = imaratList.find(p =>
+            norm(p.brand).includes('arabiyat prestige') && norm(p.name) === nomeSemPrefixoPrestige
+          );
+        }
         if (!hit) continue;
 
         // Identifica a origem e atualiza o título exatamente como consta na API raiz.
