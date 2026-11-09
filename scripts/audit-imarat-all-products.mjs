@@ -219,9 +219,11 @@ const sourceDistinctCollisions=catalogCollisionGroups.filter(([,items])=>{
 const unconfirmedNameCollisions=catalogCollisionGroups.filter(([,items])=>
   items.filter(x=>x.matchedSource).length<2
 );
-const categoryMismatches=matchedCatalog.filter(x=>
-  x.matchedSource && norm(x.category)!==norm(x.matchedSource.categoria_nome||x.matchedSource.categoria||"")
-);
+const categoryMismatches=matchedCatalog.filter(x=>{
+  if(!x.matchedSource) return false;
+  const sourceCategory=String(x.matchedSource.categoria_nome||x.matchedSource.categoria||"").trim();
+  return Boolean(sourceCategory) && norm(x.category)!==norm(sourceCategory);
+});
 // Simula, em memória, a ordem de importação da Imarat usando as mesmas chaves
 // e as mesmas atualizações de índice de sync-catalog.mjs. Não altera DATA/Gist.
 const normalIndex=new Set();
@@ -291,6 +293,7 @@ for(const [identity,items] of confirmedNormalDuplicates) {
     linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,
     varejo:x.retail,atacado:x.wholesale,marcaOrigem:x.matchedSource.brand||"sem marca",
     categoriaOrigem:x.matchedSource.categoria_nome||x.matchedSource.categoria||"não informada",
+    generoOrigem:x.matchedSource.gender||x.matchedSource.genero||"não informado",
     idOrigem:x.matchedSource.id||x.matchedSource.productId||x.matchedSource.slug||"sem id"
   }));
 }
@@ -320,6 +323,7 @@ for(const [key,items] of sourceDistinctCollisions) {
 for(const x of categoryMismatches) console.log("CATEGORIA DIVERGENTE "+JSON.stringify({
   linha:x.line,marca:x.brand,nome:x.name,volume:x.volume,
   categoriaCatalogo:x.category,categoriaOrigem:x.matchedSource.categoria_nome||x.matchedSource.categoria||"não informada",
+  generoOrigem:x.matchedSource.gender||x.matchedSource.genero||"não informado",
   marcaOrigem:x.matchedSource.brand||"sem marca",
   idOrigem:x.matchedSource.id||x.matchedSource.productId||x.matchedSource.slug||"sem id"
 }));
