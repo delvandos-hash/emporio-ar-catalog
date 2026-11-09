@@ -185,28 +185,12 @@ for(const p of source) {
     miniIndex.add(`${miniKey}|${norm(brand)}`);
   }
 }
-const apiAlreadyPresent=source.map(p=>{
-  const name=String(p.name||"").trim();
-  const volume=volumeFrom(p.sizeMl,name);
-  const key=syncKey(name,volume,p.categoria_nome||p.categoria||"");
-  return {p,key};
-}).filter(x=>catalogByKey.has(x.key));
-
-// Identifica os grupos relevantes à Imarat por fonte declarada, ID de origem ou
-// coincidência da chave exata que o sincronizador usa para bloquear reimportação.
-const imaratKeys=new Set(apiByKey.keys());
-const linkedCatalog=catalog.filter(x=>x.source.toLowerCase()==="imarat"||x.originId||imaratKeys.has(x.key));
-const linkedKeys=new Set(linkedCatalog.map(x=>x.key));
-const imaratDuplicateGroups=catalogDuplicateGroups.filter(([key,items])=>
-  items.some(x=>x.source.toLowerCase()==="imarat"||x.originId||imaratKeys.has(key))
-);
-
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
 console.log(`Produtos recebidos da API: ${source.length} | total informado: ${total||"não informado"} | páginas: ${pages}`);
 console.log(`Itens do catálogo cuja chave coincide com algum produto Imarat: ${linkedCatalog.length}`);
 console.log(`Grupos de colisão de chave no catálogo (2+ itens para chave Imarat): ${imaratDuplicateGroups.length}`);
 console.log(`Grupos duplicados na própria API Imarat: ${apiDuplicateGroups.length}`);
-console.log(`Produtos da API cuja chave já existe no catálogo (bloqueio esperado): ${apiAlreadyPresent.length}`);
+
 console.log(`Simulação do sincronizador: ${simulatedNew.length} novos produtos únicos | ${blockedByCatalog.length} bloqueados pelo catálogo atual | ${blockedWithinImarat.length} bloqueados por repetição na própria lista Imarat`);
 if(new Set(simulatedNew.map(x=>x.key)).size!==simulatedNew.length) throw new Error("Simulação detectou chave duplicada entre novos produtos: regra global falhou.");
 const imaratSourceCatalog=catalog.filter(x=>x.source.toLowerCase()==="imarat");
