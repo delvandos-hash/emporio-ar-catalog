@@ -157,7 +157,8 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
   
   if (b.includes('orientica')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
-  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 40), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
+  // Afeer pode vir sem a marca estruturada na API; reconhecer também pelo nome do produto.
+  if (b.includes('afeer') || n.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 40), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
   if (b.includes('clive')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('only')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('armaf')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
@@ -1282,7 +1283,7 @@ async function main() {
         if (it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1) {
           // mantém preços definidos manualmente
         } else {
-          const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+          const prices = calcularPrecoMiniatura(it.nome, hit.brand || g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
           if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
             it.varejo = prices.varejo;
             it.atacado = prices.atacado;
@@ -1293,18 +1294,39 @@ async function main() {
     }
   }
 
-  // Filtro de segurança (remove duplicatas exatas dentro do mesmo grupo)
+  // Filtro de segurança: duplicatas exatas dentro de cada grupo.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
-        const vistos = new Set();
-        g.items = g.items.filter(item => {
-            const chave = limparParaComparacao(item.nome); 
-            if (vistos.has(chave)) return false;
-            vistos.add(chave);
-            return true;
-        });
+      const vistos = new Set();
+      g.items = g.items.filter(item => {
+        const chave = limparParaComparacao(item.nome);
+        if (vistos.has(chave)) return false;
+        vistos.add(chave);
+        return true;
+      });
     }
   }
+
+  // Regra homologada da Imarat: miniaturas são únicas globalmente pelo nome-base,
+  // sem prefixo/marca/volume e independentemente de linha ou grupo. Óleos ficam fora.
+  const miniaturasGlobaisVistas = new Set();
+  let miniaturasDuplicadasRemovidas = 0;
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      g.items = (g.items || []).filter(item => {
+        if (!isMiniatura(item.nome, item.volume, g.cat) || isOleo(item.nome)) return true;
+        const chave = chaveComparacaoMini(item.nome);
+        if (!chave) return true;
+        if (miniaturasGlobaisVistas.has(chave)) {
+          miniaturasDuplicadasRemovidas++;
+          return false;
+        }
+        miniaturasGlobaisVistas.add(chave);
+        return true;
+      });
+    }
+  }
+  console.log(`Miniaturas Imarat duplicadas removidas do snapshot: ${miniaturasDuplicadasRemovidas}`);
 
   // Índice convencional global: nome sem volume e nome+marca, conforme regra homologada.
   // A chave sem marca impede reimportação quando a fonte muda a marca ou o grupo.
