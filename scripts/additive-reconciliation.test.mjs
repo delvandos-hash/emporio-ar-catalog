@@ -142,3 +142,11 @@ test("auditoria reconhece item Brand legado com mesmo nome-base e foto como já 
   assert.match(audit, /liveLoosePhotoKeys/);
   assert.match(apply, /rowCategory\.includes\("brand"\)/);
 });
+
+test("auditoria aceita reconciliação sem alterações quando todos os IDs já estão representados", () => {
+  assert.match(audit, /liveOnlyKeys\.length === 0/);
+  assert.match(audit, /eligibleInternalOnlyRows\.length <= 80/);
+  assert.doesNotMatch(audit, /eligibleInternalOnlyRows\.length > 0/);
+  assert.match(apply, /ADDITIVE_RECONCILIATION_NOOP=true/);
+  assert.doesNotMatch(apply, /if \(!additions\.length \|\| additions\.length > 80\)/);
+});
