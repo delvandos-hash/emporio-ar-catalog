@@ -41,3 +41,7 @@ export function miniIdentityBaseKey(item, brand) {
 export function miniIdentityKey(item, brand) {
   return [miniIdentityBaseKey(item, brand), String(item?.varejo ?? "").trim(), String(item?.atacado ?? "").trim(), imageFingerprint(item)].join("|");
 }
+
+export function miniIdentityNameVolumeKey(item) {
+  return [miniBaseName(item?.nome, ""), normalizedVolume(item?.volume)].join("|");
+}
