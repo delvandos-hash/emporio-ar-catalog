@@ -105,7 +105,10 @@ function buildIndexes(DATA) {
         if (!stockIndex.has(publicItem.stock_ref)) stockIndex.set(publicItem.stock_ref, []);
         stockIndex.get(publicItem.stock_ref).push(row);
       }
-      if (publicItem.public_id) publicIdIndex.set(publicItem.public_id, row);
+      if (publicItem.public_id) {
+        if (!publicIdIndex.has(publicItem.public_id)) publicIdIndex.set(publicItem.public_id, []);
+        publicIdIndex.get(publicItem.public_id).push(row);
+      }
     }
   }
   return { publicDATA, identityIndex, stockIndex, publicIdIndex };
@@ -165,51 +168,33 @@ async function main() {
   let restored = 0, merged = 0;
   const ambiguous = [];
 
-  // Recupera apenas roupas e acessórios Empório A.R que ainda estão no Gist.
-  // stock_ref identifica variantes distintas; sem stock_ref, exige identidade inequívoca.
+  // Recupera todos os registros legados do Gist em modo append-only.
+  // A identidade combina linha, marca, categoria, nome e volume; variantes são desambiguadas por ID/foto.
   for (const [line, groups] of Object.entries(liveDATA)) {
     for (const group of Array.isArray(groups) ? groups : []) {
-      const isEmporioLegacy = ["roupas", "acessorios"].includes(norm(line)) && norm(group?.brand) === "emporio a r";
-      const isBrandLegacy = norm(group?.cat) === "brand" || norm(group?.cat).includes("brand");
-      if (!isEmporioLegacy && !isBrandLegacy) continue;
+      // Nenhuma linha, marca ou categoria é descartada: Gist é a referência pública a preservar.
       for (const publicItem of Array.isArray(group?.items) ? group.items : []) {
         if (!publicItem?.nome) continue;
         const key = identity(line, group, publicItem);
         const stockRef = String(publicItem.stock_ref || "").trim();
         const stockMatches = stockRef ? (indexes.stockIndex.get(stockRef) || []) : [];
-        if (stockMatches.length === 1) {
-          mergePublicFields(stockMatches[0].item, publicItem);
+        const identityMatches = indexes.identityIndex.get(key) || [];
+        const publicIdMatches = String(publicItem.public_id || "").trim()
+          ? (indexes.publicIdIndex.get(String(publicItem.public_id).trim()) || [])
+          : [];
+        const candidates = [...new Set([...stockMatches, ...identityMatches, ...publicIdMatches])];
+        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches);
+        if (resolved) {
+          mergePublicFields(resolved.item, publicItem);
           merged++;
           continue;
         }
-        if (stockMatches.length > 1) {
-          const identityMatches = indexes.identityIndex.get(key) || [];
-          const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, publicItem);
-          if (resolved) {
-            mergePublicFields(resolved.item, publicItem);
-            merged++;
-            continue;
-          }
-          ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, stock_ref: stockRef, matches: stockMatches.length, identityMatches: identityMatches.length, reason: "sem correspondência inequívoca por public_id, identidade e fotografia" });
+        if (candidates.length) {
+          ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, stock_ref: stockRef, stockMatches: stockMatches.length, identityMatches: identityMatches.length, publicIdMatches: publicIdMatches.length, reason: "sem correspondência inequívoca por public_id, identidade e fotografia" });
           continue;
         }
-
-        const matches = indexes.identityIndex.get(key) || [];
-        if (matches.length === 1) {
-          const existingStockRef = String(matches[0].publicItem.stock_ref || "").trim();
-          if (!stockRef || !existingStockRef || stockRef === existingStockRef) {
-            mergePublicFields(matches[0].item, publicItem);
-            merged++;
-            continue;
-          }
-          // Mesmo nome, marca e categoria, mas stock_ref diferente: é outra variante.
-        } else if (matches.length > 1 && !stockRef) {
-          ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, matches: matches.length });
-          continue;
-        }
-        const legacy = addLegacy(DATA, line, group, publicItem);
+        addLegacy(DATA, line, group, publicItem);
         restored++;
-        // Atualiza índices para que uma segunda passagem veja a variante já preservada.
         indexes = buildIndexes(DATA);
       }
     }
@@ -224,9 +209,7 @@ async function main() {
   const missing = [];
   for (const [line, groups] of Object.entries(liveDATA)) {
     for (const group of groups || []) {
-      const isEmporioLegacy = ["roupas", "acessorios"].includes(norm(line)) && norm(group?.brand) === "emporio a r";
-      const isBrandLegacy = norm(group?.cat) === "brand" || norm(group?.cat).includes("brand");
-      if (!isEmporioLegacy && !isBrandLegacy) continue;
+      // Verifica todas as linhas e categorias contra o Gist.
       for (const item of group.items || []) {
         const stockRef = String(item.stock_ref || "").trim();
         const stockMatches = stockRef ? (check.stockIndex.get(stockRef) || []) : [];
@@ -248,6 +231,7 @@ async function main() {
     "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
   fs.writeFileSync(dataPath, out, "utf8");
   console.log(`LEGACY_GIST_RESTORED=${restored} LEGACY_GIST_MERGED=${merged}`);
+  console.log("LEGACY_GIST_PRESERVATION_SCOPE=all-lines-all-brands-all-categories");
   console.log("Todos os itens públicos Empório A.R de roupas e acessórios permanecem representados no data.js.");
 }
 main().catch(error => { console.error(error); process.exit(1); });
