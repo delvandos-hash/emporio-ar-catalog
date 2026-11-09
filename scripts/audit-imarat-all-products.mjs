@@ -161,20 +161,21 @@ const imaratDuplicateGroups=catalogDuplicateGroups.filter(([key,items])=>
 
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
 console.log(`Produtos recebidos da API: ${source.length} | total informado: ${total||"não informado"} | páginas: ${pages}`);
-console.log(`Produtos do catálogo vinculados à Imarat (fonte/ID/chave de sync): ${linkedCatalog.length}`);
-console.log(`Grupos duplicados no catálogo que envolvem chave Imarat: ${imaratDuplicateGroups.length}`);
+console.log(`Itens do catálogo cuja chave coincide com algum produto Imarat: ${linkedCatalog.length}`);
+console.log(`Grupos de colisão de chave no catálogo (2+ itens para chave Imarat): ${imaratDuplicateGroups.length}`);
 console.log(`Grupos duplicados na própria API Imarat: ${apiDuplicateGroups.length}`);
 console.log(`Produtos da API cuja chave já existe no catálogo (bloqueio esperado): ${apiAlreadyPresent.length}`);
-const repeatedOriginIds=[...new Set(catalog.filter(x=>x.originId).map(x=>x.originId))]
-  .filter(id=>catalog.filter(x=>x.originId===id).length>1);
-console.log(`IDs de origem repetidos no catálogo: ${repeatedOriginIds.length}`);
+const imaratSourceCatalog=catalog.filter(x=>x.source.toLowerCase()==="imarat");
+const repeatedOriginIds=[...new Set(imaratSourceCatalog.filter(x=>x.originId).map(x=>x.originId))]
+  .filter(id=>imaratSourceCatalog.filter(x=>x.originId===id).length>1);
+console.log(`IDs de origem repetidos em itens com fonte Imarat declarada: ${repeatedOriginIds.length}`);
 for(const id of repeatedOriginIds) {
   console.log("ID DE ORIGEM REPETIDO "+id);
-  for(const x of catalog.filter(item=>item.originId===id))
+  for(const x of imaratSourceCatalog.filter(item=>item.originId===id))
     console.log(JSON.stringify({linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,fonte:x.source||"não informada"}));
 }
 for(const [key,items] of imaratDuplicateGroups) {
-  console.log("DUPLICIDADE NO CATÁLOGO "+key);
+  console.log("COLISÃO DE CHAVE NO CATÁLOGO "+key);
   for(const x of items) console.log(JSON.stringify({
     linha:x.line,marca:x.brand,categoria:x.category,nome:x.name,volume:x.volume,
     varejo:x.retail,atacado:x.wholesale,fonte:x.source||"não informada",
