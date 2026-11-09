@@ -1247,24 +1247,72 @@ async function main() {
   const imaratList = await fetchImaratList();
   console.log(`Imarat: ${imaratList.length} produtos`);
 
-  const imaratNomesAtuais = new Set(imaratList.map(p => norm(p.name)).filter(Boolean));
+  const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
   let produtosImaratForaDoSiteRaizRemovidos = 0;
+  let titulosImaratCorrigidosPeloSiteRaiz = 0;
   const relatorioImaratNomesRemovidos = [];
-  // Exclusão exige procedência comprovada no próprio item. Marca/grupo isolado
-  // não prova origem: outras fontes podem vender marcas que também aparecem na Imarat.
+  const relatorioImaratNomesCorrigidos = [];
+
+  // As categorias Perfumes, Miniaturas e Óleos são abastecidas pela Imarat.
+  // Também considera itens com fonte Imarat confirmada em outras categorias.
+  // Quando o produto existe, o título é substituído pelo texto exato da origem.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
+      const grupoImarat = categoriasImarat.has(norm(g.cat));
       g.items = (g.items || []).filter(item => {
-        if (String(item.fonte || '').toLowerCase() !== 'imarat') return true;
-        if (imaratNomesAtuais.has(norm(item.nome))) return true;
+        const fonteImarat = String(item.fonte || '').toLowerCase() === 'imarat';
+        if (!fonteImarat && !grupoImarat) return true;
+
+        const nomeNormalizado = norm(item.nome);
+        let hit = imaratList.find(p => norm(p.name) === nomeNormalizado);
+
+        // Compatibilidade histórica: "PRESTIGE Noiré Absolu" foi salvo com
+        // a marca no título; na origem, marca = Arabiyat Prestige e produto = Noiré Absolu.
+        if (!hit && norm(g.brand).includes('arabiyat') && nomeNormalizado.startsWith('prestige ')) {
+          const nomeSemPrefixo = nomeNormalizado.slice('prestige '.length);
+          hit = imaratList.find(p =>
+            norm(p.name) === nomeSemPrefixo && norm(p.brand).includes('arabiyat prestige')
+          );
+        }
+
+        // Grafia antiga da miniatura Afeer: o título correto é Atherri.
+        if (!hit && norm(g.cat) === 'miniaturas' && norm(g.brand).includes('afeer') &&
+            nomeNormalizado.includes('atheri afeer')) {
+          hit = imaratList.find(p =>
+            norm(p.name) === 'miniatura atherri afeer' && norm(p.brand).includes('afeer')
+          );
+        }
+
+        if (hit) {
+          if (String(item.nome || '') !== String(hit.name || '')) {
+            relatorioImaratNomesCorrigidos.push({
+              linha: line, marca: g.brand, categoria: g.cat,
+              nomeAnterior: item.nome, nomeNoSiteRaiz: hit.name
+            });
+            item.nome = hit.name;
+            titulosImaratCorrigidosPeloSiteRaiz++;
+          }
+          item.fonte = 'imarat';
+          return true;
+        }
+
         produtosImaratForaDoSiteRaizRemovidos++;
-        relatorioImaratNomesRemovidos.push({ linha: line, marca: g.brand, categoria: g.cat, nome: item.nome, fonte: item.fonte });
+        relatorioImaratNomesRemovidos.push({
+          linha: line, marca: g.brand, categoria: g.cat,
+          nome: item.nome, fonte: item.fonte || 'categoria abastecida pela Imarat'
+        });
         return false;
       });
     }
   }
-  console.log(`Produtos Imarat com procedência confirmada removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
-  for (const removido of relatorioImaratNomesRemovidos) console.log('TÍTULO IMARAT FORA DO SITE RAIZ REMOVIDO: ' + JSON.stringify(removido));
+  console.log(`Títulos Imarat corrigidos para a grafia exata do site raiz: ${titulosImaratCorrigidosPeloSiteRaiz}`);
+  for (const corrigido of relatorioImaratNomesCorrigidos) {
+    console.log('TÍTULO IMARAT CORRIGIDO PELO SITE RAIZ: ' + JSON.stringify(corrigido));
+  }
+  console.log(`Produtos Imarat removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
+  for (const removido of relatorioImaratNomesRemovidos) {
+    console.log('TÍTULO IMARAT FORA DO SITE RAIZ REMOVIDO: ' + JSON.stringify(removido));
+  }
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
