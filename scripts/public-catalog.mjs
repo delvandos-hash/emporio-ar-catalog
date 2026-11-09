@@ -37,9 +37,9 @@ function publicLine(line, groups) {
   if (categories.some(cat => cat.includes("perf"))) return "perfumaria";
   return "outros";
 }
-function stockRef(source, originId, brand) {
+function stockRef(source, originId) {
   if (!originId || !["roupas", "acessorios"].includes(source)) return "";
-  return "s_" + createHash("sha256").update(source + "|" + String(brand || "").trim().toLowerCase() + "|" + String(originId)).digest("hex").slice(0, 24);
+  return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
 }
 function originRef(source, originId, brand) {
   if (!originId) return "";
@@ -97,9 +97,9 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
     // mais de uma categoria; isso evita criar uma segunda identidade para o mesmo item.
     for (const record of records) {
       const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
-      const stock = stockRef(source, record.item?.id_origem, record.group?.brand);
+      const stock = stockRef(source, record.item?.id_origem);
       const origin = originRef(source, record.item?.id_origem, record.group?.brand);
-      const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
+      const stableKey = stock ? "stock:" + String(record.group?.brand || "").trim().toLowerCase() + "|" + stock : (origin ? "origin:" + origin : "");
       if (stableKey && publicIdByStableOrigin.has(stableKey)) {
         const existingId = publicIdByStableOrigin.get(stableKey);
         publicIdByItem.set(record.item, existingId);
@@ -115,9 +115,9 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         used.add(supplied);
         globalUsedIds.add(supplied);
         const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
-        const stock = stockRef(source, record.item?.id_origem, record.group?.brand);
+        const stock = stockRef(source, record.item?.id_origem);
         const origin = originRef(source, record.item?.id_origem, record.group?.brand);
-        const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
+        const stableKey = stock ? "stock:" + String(record.group?.brand || "").trim().toLowerCase() + "|" + stock : (origin ? "origin:" + origin : "");
         if (stableKey) publicIdByStableOrigin.set(stableKey, supplied);
       }
     }
@@ -141,9 +141,9 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       used.add(nextId);
       globalUsedIds.add(nextId);
       const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
-      const stock = stockRef(source, record.item?.id_origem, record.group?.brand);
+      const stock = stockRef(source, record.item?.id_origem);
       const origin = originRef(source, record.item?.id_origem, record.group?.brand);
-      const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
+      const stableKey = stock ? "stock:" + String(record.group?.brand || "").trim().toLowerCase() + "|" + stock : (origin ? "origin:" + origin : "");
       if (stableKey) publicIdByStableOrigin.set(stableKey, nextId);
     }
   }
@@ -159,7 +159,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         const stableOriginRef = originRef(item?.fonte || publicSource(line, group?.cat), item?.id_origem, group?.brand);
         if (stableOriginRef) safeItem.origin_ref = stableOriginRef;
         else if (/^o_[a-f0-9]{24}$/.test(String(item?.origin_ref || ""))) safeItem.origin_ref = String(item.origin_ref);
-        const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem, group?.brand);
+        const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
         if (liveRef) {
           safeItem.stock_ref = liveRef;
           if (publicSource(line, group?.cat) === "roupas") {
