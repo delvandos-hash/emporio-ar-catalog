@@ -1120,7 +1120,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
 
 
 async function main() {
-  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
+  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
   const missingSources = requiredSources.filter((key) => !process.env[key]);
   if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Carregando data.js...');
