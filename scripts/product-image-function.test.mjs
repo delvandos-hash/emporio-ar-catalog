@@ -2,23 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import productImage from "../netlify/functions/product-image.mjs";
 const originalFetch = globalThis.fetch;
-const originalPrimary = process.env.CDN_IMAGE_BASE_URL;
-const originalSecondary = process.env.CDN_IMAGE_FALLBACK_BASE_URL;
-const originalProduct = process.env.IMARAT_ORIGIN_URL;
-const originalDande = process.env.DANDE_BASE_URL;
-async function runWith({ source = "p", path = "/uploads/products/test.webp", fetchImpl, primary = "https://primary.example/", secondary = "https://secondary.example/", product = "https://products.example/", dande = "https://dande.example/" } = {}) {
-  process.env.CDN_IMAGE_BASE_URL = primary;
-  process.env.CDN_IMAGE_FALLBACK_BASE_URL = secondary;
-  process.env.IMARAT_ORIGIN_URL = product;
-  process.env.DANDE_BASE_URL = dande;
+const envKeys = ["CDN_IMAGE_BASE_URL","CDN_IMAGE_FALLBACK_BASE_URL","IMARAT_ORIGIN_URL","DANDE_BASE_URL","DANDE_CDN_BASE_URL"];
+const originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
+async function runWith({ source = "p", path = "/uploads/products/test.webp", fetchImpl, primary = "https://primary.example/", secondary = "https://secondary.example/", product = "https://products.example/", dande = "https://dande.example/", dandeCdn = "https://dande-cdn.example/" } = {}) {
+  Object.assign(process.env, { CDN_IMAGE_BASE_URL: primary, CDN_IMAGE_FALLBACK_BASE_URL: secondary, IMARAT_ORIGIN_URL: product, DANDE_BASE_URL: dande, DANDE_CDN_BASE_URL: dandeCdn });
   globalThis.fetch = fetchImpl || (async () => new Response(new Uint8Array([1,2,3]), { status: 200, headers: { "content-type": "image/webp" } }));
   try { return await productImage(new Request("https://catalog.example/api/product-image?source="+source+"&path="+encodeURIComponent(path))); }
   finally {
     globalThis.fetch = originalFetch;
-    if (originalPrimary === undefined) delete process.env.CDN_IMAGE_BASE_URL; else process.env.CDN_IMAGE_BASE_URL = originalPrimary;
-    if (originalSecondary === undefined) delete process.env.CDN_IMAGE_FALLBACK_BASE_URL; else process.env.CDN_IMAGE_FALLBACK_BASE_URL = originalSecondary;
-    if (originalProduct === undefined) delete process.env.IMARAT_ORIGIN_URL; else process.env.IMARAT_ORIGIN_URL = originalProduct;
-    if (originalDande === undefined) delete process.env.DANDE_BASE_URL; else process.env.DANDE_BASE_URL = originalDande;
+    for (const key of envKeys) { if (originalEnv[key] === undefined) delete process.env[key]; else process.env[key] = originalEnv[key]; }
   }
 }
 test("retorna indisponível quando a origem selecionada não está configurada", async () => {
@@ -43,9 +35,9 @@ test("limita corpo real e bloqueia redirecionamentos", async () => {
   const redirect = await runWith({ fetchImpl: async (_url, opts) => { mode = opts.redirect; throw new TypeError("redirect"); } });
   assert.equal(mode, "error"); assert.equal(redirect.status, 502);
 });
-async function assertImageDelivery({ source, path, expectedOrigin }) {
+async function assertImageDelivery({ source, path, expectedOrigin, options = {} }) {
   let requested;
-  const response = await runWith({ source, path, fetchImpl: async url => {
+  const response = await runWith({ source, path, ...options, fetchImpl: async url => {
     requested = String(url);
     return new Response(new Uint8Array([1,2,3]), { status: 200, headers: { "content-type": "image/webp; charset=binary" } });
   }});
@@ -66,7 +58,9 @@ test("entrega imagem pela origem secundária Nuvemshop", async () => {
 test("entrega imagem pela origem de produtos Imarat", async () => {
   await assertImageDelivery({ source: "p", path: "/uploads/products/c.webp", expectedOrigin: "https://products.example" });
 });
-
 test("entrega imagem pela origem Dande", async () => {
   await assertImageDelivery({ source: "d", path: "/products/anel.webp", expectedOrigin: "https://dande.example" });
+});
+test("entrega imagem pelo CDN CloudFront separado da origem Dande", async () => {
+  await assertImageDelivery({ source: "c", path: "/stores/123/products/anel.webp", expectedOrigin: "https://dande-cdn.example" });
 });
