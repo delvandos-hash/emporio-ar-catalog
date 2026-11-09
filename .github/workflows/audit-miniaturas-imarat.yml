@@ -18,12 +18,17 @@ on:
       - "scripts/sync-catalog.mjs"
       - ".github/workflows/audit-miniaturas-imarat.yml"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Sync catálogo (estoque + novos produtos)"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   audit-miniaturas:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Baixar repositório
