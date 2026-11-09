@@ -1308,6 +1308,7 @@ async function main() {
           }
           item.fonte = 'imarat';
 
+          // Revisão final: marca e produto permanecem em campos separados.
           // Marca e produto são campos separados: move apenas os itens confirmados
           // pela origem para o grupo Arabiyat Prestige, sem renomear os demais.
           if (norm(hit.brand).includes('arabiyat prestige')) {
