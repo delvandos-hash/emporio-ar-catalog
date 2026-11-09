@@ -1524,8 +1524,19 @@ async function main() {
         console.log("IDS DO GIST AINDA SEM ID INTERNO APÓS REKEY PRE-SYNC " + JSON.stringify(missingLiveItems));
       }
       console.log(`BASELINE POR PUBLIC_ID: data.js=${internalBaseline.count} IDs/${internalBaseline.items} itens; Gist=${liveBaseline.count} IDs/${liveBaseline.items} itens; IDs sem origem interna=${liveBaseline.missingIds}; IDs só no data.js=${onlyInternal}; IDs só no Gist=${onlyLive}`);
-      if (!SYNC_DRY_RUN && (liveBaseline.missingIds > 0 || onlyLive > 0 || onlyInternal > 80 || Math.abs(liveBaseline.count - internalBaseline.count) > 80)) {
-        throw new Error("SINCRONIZAÇÃO BLOQUEADA: há IDs públicos do Gist sem representação interna ou excesso de novos IDs. Reconcilie a base antes de publicar para evitar perda de produtos e ajustes.");
+      const safeAdditiveBaseline = process.env.ALLOW_SAFE_ADDITIVE_BASELINE === "1";
+      const allowedLiveOnly = safeAdditiveBaseline ? 1 : 0;
+      const baselineUnsafe =
+        liveBaseline.missingIds > 0 ||
+        onlyLive > allowedLiveOnly ||
+        onlyInternal > 80 ||
+        Math.abs(liveBaseline.count - internalBaseline.count) > 80 ||
+        (safeAdditiveBaseline && preSyncPreservation.ambiguous > 0);
+      if (!SYNC_DRY_RUN && baselineUnsafe) {
+        throw new Error("SINCRONIZAÇÃO BLOQUEADA: baseline não passou pelos limites de segurança. Excesso de IDs sem correspondência, ambiguidades ou divergência acima do limite; nenhum dado foi publicado.");
+      }
+      if (!SYNC_DRY_RUN && safeAdditiveBaseline) {
+        console.log(`SAFE_ADDITIVE_BASELINE_OVERRIDE=true onlyLive=${onlyLive} onlyInternal=${onlyInternal} matched=${preSyncPreservation.matched} ambiguous=${preSyncPreservation.ambiguous}`);
       }
       if (SYNC_DRY_RUN && (onlyLive > 0 || onlyInternal > 80)) {
         console.log("⚠️ Base divergente detectada; dry-run permitido apenas para diagnóstico. Nenhuma publicação será feita.");
