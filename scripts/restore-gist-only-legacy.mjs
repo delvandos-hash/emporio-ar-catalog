@@ -48,12 +48,11 @@ function mergePublicFields(target, publicItem) {
   ];
   const mergedPhotos = [...new Set([...existingPhotos, ...publicPhotos].map(x => String(x || "").trim()).filter(Boolean))];
   if (mergedPhotos.length) target.fotos = mergedPhotos;
-  if (!target.foto && publicItem.foto) target.foto = publicItem.foto;
-  if (!target.notas && publicItem.notas) target.notas = publicItem.notas;
-  if (!target.badge && publicItem.badge) target.badge = publicItem.badge;
-  if (!target.novoDesde && publicItem.novoDesde) target.novoDesde = publicItem.novoDesde;
-  if ((!Array.isArray(target.variacoes) || !target.variacoes.length) &&
-      Array.isArray(publicItem.variacoes) && publicItem.variacoes.length) {
+  if (publicItem.foto) target.foto = publicItem.foto;
+  if (publicItem.notas) target.notas = publicItem.notas;
+  if (publicItem.badge) target.badge = publicItem.badge;
+  if (publicItem.novoDesde) target.novoDesde = publicItem.novoDesde;
+  if (Array.isArray(publicItem.variacoes) && publicItem.variacoes.length) {
     target.variacoes = [...publicItem.variacoes];
   }
   if (!target.stock_ref && publicItem.stock_ref) target.stock_ref = publicItem.stock_ref;
