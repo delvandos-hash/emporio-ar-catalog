@@ -1,0 +1,40 @@
+name: Restaurar miniaturas Only You sem sobrescrever catálogo
+
+on:
+  pull_request:
+    paths:
+      - "scripts/restore-onlyyou-minis.mjs"
+      - "scripts/imarat-source-guard.test.mjs"
+      - ".github/workflows/restore-onlyyou-minis.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/restore-onlyyou-minis.mjs"
+      - "scripts/imarat-source-guard.test.mjs"
+      - ".github/workflows/restore-onlyyou-minis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore-onlyyou:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxe e regras de segurança
+        run: |
+          node --check scripts/restore-onlyyou-minis.mjs
+          node --test scripts/imarat-source-guard.test.mjs
+      - name: Auditar e restaurar somente miniaturas Only You
+        run: node scripts/restore-onlyyou-minis.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          RESTORE_ONLYYOU_DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '0' }}

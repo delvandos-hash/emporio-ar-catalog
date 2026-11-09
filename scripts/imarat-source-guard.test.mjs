@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("./sync-catalog.mjs", import.meta.url), "utf8");
+const restoreOnlyYouSource = fs.readFileSync(new URL("./restore-onlyyou-minis.mjs", import.meta.url), "utf8");
 const auditMiniSource = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
 const auditAllSource = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
@@ -97,6 +98,17 @@ test("bloqueia publicação quando a base interna diverge do Gist vivo", () => {
   assert.match(source, /function countCatalogIdentity\(DATA\)/);
   assert.match(source, /if \(!SYNC_DRY_RUN && \(onlyLive > 25 \|\| onlyInternal > 25/);
   assert.match(source, /SINCRONIZAÇÃO BLOQUEADA: data\.js interno diverge do Gist vivo/);
+});
+
+test("restauração Only You é append-only, respeita preço manual e valida antes de gravar", () => {
+  assert.match(restoreOnlyYouSource, /source\.filter\(p => norm\(p\.brand\) === "only you"\)/);
+  assert.match(restoreOnlyYouSource, /function findLiveMatches\(DATA, product, volume\)/);
+  assert.match(restoreOnlyYouSource, /if \(matches\.length\)/);
+  assert.match(restoreOnlyYouSource, /manualPrice\(internalItem\) \? internalItem\.varejo/);
+  assert.match(restoreOnlyYouSource, /group\.items\.push\(entry\.item\)/);
+  assert.match(restoreOnlyYouSource, /if \(DRY_RUN\)/);
+  assert.match(restoreOnlyYouSource, /stillMissing/);
+  assert.doesNotMatch(restoreOnlyYouSource, /group\.items\s*=\s*group\.items\.filter/);
 });
 
 test("deduplicação de miniaturas exige marca e volume compatíveis", () => {
