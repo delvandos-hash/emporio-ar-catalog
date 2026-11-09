@@ -80,7 +80,7 @@ function publicFingerprint(item) {
     notas: String(item?.notas ?? ""), badge: String(item?.badge ?? ""),
     novoDesde: String(item?.novoDesde ?? ""), disponivel: String(item?.disponivel ?? ""),
     variacoes: item?.variacoes || [], stock_ref: String(item?.stock_ref ?? ""),
-    stock_route: String(item?.stock_route ?? "")
+    stock_route: String(item?.stock_route ?? ""), origin_ref: String(item?.origin_ref ?? "")
   });
 }
 
@@ -91,11 +91,14 @@ function publicPhotoFingerprint(item) {
 
 function rekeyLiveVariants(liveDATA, internalPublic) {
   const byBase = new Map();
+  const byOriginRef = new Map();
   for (const [line,groups] of Object.entries(internalPublic || {})) for (const group of groups || []) {
     for (const item of group.items || []) {
       const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
       if(!byBase.has(key)) byBase.set(key,[]);
       byBase.get(key).push(item);
+      const originRef=String(item.origin_ref||"").trim();
+      if(originRef){if(!byOriginRef.has(originRef))byOriginRef.set(originRef,[]);byOriginRef.get(originRef).push(item);}
     }
   }
   const used=new Set(); let rekeyed=0, unmatched=0;
@@ -105,14 +108,16 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
       const fp=publicFingerprint(item);
       const candidates=(byBase.get(key)||[]).filter(candidate=>!used.has(candidate.public_id));
       const byExistingId=item.public_id?candidates.filter(candidate=>candidate.public_id===item.public_id):[];
+      const byOrigin=String(item.origin_ref||"").trim()?((byOriginRef.get(String(item.origin_ref).trim())||[]).filter(candidate=>!used.has(candidate.public_id))):[];
       const photoFingerprint=publicPhotoFingerprint(item);
       const byPhoto=photoFingerprint!=="[]"?candidates.filter(candidate=>publicPhotoFingerprint(candidate)===photoFingerprint):[];
       const byExactContent=candidates.filter(candidate=>publicFingerprint(candidate)===fp);
       const match=byExistingId.length===1?byExistingId[0]
+        :byOrigin.length===1?byOrigin[0]
         :byPhoto.length===1?byPhoto[0]
         :byExactContent.length===1?byExactContent[0]
         :candidates.length===1?candidates[0]:null;
-      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,candidatas:candidates.length,fotosCompativeis:byPhoto.length,conteudoExato:byExactContent.length}));continue;}
+      if(!match){unmatched++;console.log("VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA "+JSON.stringify({linha:line,marca:group.brand,categoria:group.cat,nome:item.nome,candidatas:candidates.length,origin_ref:byOrigin.length,fotosCompativeis:byPhoto.length,conteudoExato:byExactContent.length}));continue;}
       used.add(match.public_id);
       if(item.public_id!==match.public_id){item.public_id=match.public_id;rekeyed++;}
     }
