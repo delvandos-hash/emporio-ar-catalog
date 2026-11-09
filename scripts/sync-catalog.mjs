@@ -267,7 +267,7 @@ function priceBrand(orig, isArabicMini, session) {
 
 async function fetchImaratList() {
   const all = [];
-  let page = 1, total = 0, fetched = 0, prefixosMarcaRemovidos = 0;
+  let page = 1, total = 0, fetched = 0, prefixosMarcaRemovidos = 0, miniAfeerGrafiasNormalizadas = 0;
   for (let g = 0; g < 40; g++) {
     const res = await fetch(`${IMARAT_API}?page=${page}&perPage=60`, {
       headers: { 'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8' },
@@ -288,6 +288,12 @@ async function fetchImaratList() {
           p.name = String(p.name).replace(/^prestige\s+/i, '').trim();
           prefixosMarcaRemovidos++;
         }
+        // Grafia comercial confirmada pelo responsável: a variante "Atheri" é
+        // incorreta; ambas as entradas da API devem convergir para Atherri.
+        if (norm(p.brand).includes('afeer') && norm(p.name) === 'miniatura atheri afeer') {
+          p.name = 'Miniatura Atherri Afeer';
+          miniAfeerGrafiasNormalizadas++;
+        }
         if (p.shortDesc) p.shortDesc = limparTexto(p.shortDesc);
         if (p.description) p.description = limparTexto(p.description);
     }
@@ -300,6 +306,7 @@ async function fetchImaratList() {
     throw new Error(`Paginação Imarat incompleta: recebidos ${fetched} de ${total} produtos. Sincronização interrompida para evitar limpeza com lista parcial.`);
   }
   console.log(`Prefixos de marca removidos do nome Imarat (Arabiyat Prestige): ${prefixosMarcaRemovidos}`);
+  console.log(`Grafias Atheri Afeer normalizadas para Miniatura Atherri Afeer: ${miniAfeerGrafiasNormalizadas}`);
   return all;
 }
 
