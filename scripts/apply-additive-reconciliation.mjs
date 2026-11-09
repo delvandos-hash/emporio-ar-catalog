@@ -59,31 +59,125 @@ async function fetchLiveGist(token) {
   return { snapshot, DATA };
 }
 
+function publicFingerprint(item) {
+  const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
+  return JSON.stringify({
+    nome: norm(item?.nome),
+    volume: volumeMatch(item?.volume, item?.nome),
+    varejo: String(item?.varejo ?? "").trim(),
+    atacado: String(item?.atacado ?? "").trim(),
+    foto: String(item?.foto ?? "").trim(),
+    fotos: [...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort(),
+    notas: String(item?.notas ?? ""),
+    badge: String(item?.badge ?? ""),
+    novoDesde: String(item?.novoDesde ?? ""),
+    disponivel: String(item?.disponivel ?? ""),
+    variacoes: item?.variacoes || [],
+    stock_ref: String(item?.stock_ref ?? ""),
+    stock_route: String(item?.stock_route ?? ""),
+    fonte: String(item?.fonte ?? "")
+  });
+}
+
 function collectKeys(DATA) {
   const keys = new Set();
   for (const [line, groups] of Object.entries(DATA || {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
-        if (item?.nome) keys.add(identity(line, group, item));
+        if (item?.nome) keys.add(String(item.public_id || identity(line, group, item)));
       }
     }
   }
   return keys;
 }
 
+function collectContentKeys(DATA) {
+  const keys = new Set();
+  for (const [line, groups] of Object.entries(DATA || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        if (item?.nome) keys.add(identity(line, group, item) + "|" + publicFingerprint(item));
+      }
+    }
+  }
+  return keys;
+}
+
+function dedupeExactLiveVariants(DATA) {
+  const seen = new Set();
+  let removed = 0;
+  for (const [line, groups] of Object.entries(DATA || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const kept = [];
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const key = identity(line, group, item) + "|" + publicFingerprint(item);
+        if (seen.has(key)) { removed++; continue; }
+        seen.add(key);
+        kept.push(item);
+      }
+      group.items = kept;
+    }
+  }
+  return removed;
+}
+
 function collectInternalIndex(DATA) {
+  const publicData = toPublicCatalog(DATA);
+  const publicBuckets = new Map();
+  for (const [line, groups] of Object.entries(publicData || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const publicItem of Array.isArray(group?.items) ? group.items : []) {
+        const base = identity(line, group, publicItem);
+        if (!publicBuckets.has(base)) publicBuckets.set(base, []);
+        publicBuckets.get(base).push({ publicLine: line, publicGroup: group, publicItem });
+      }
+    }
+  }
+
   const index = new Map();
   for (const [line, groups] of Object.entries(DATA || {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
         if (!item?.nome) continue;
-        const key = identity(line, group, item);
+        const base = identity(line, group, item);
+        const match = publicBuckets.get(base)?.shift();
+        if (!match?.publicItem?.public_id) throw new Error(`Public ID não gerado para ${base}`);
+        const key = match.publicItem.public_id;
         if (!index.has(key)) index.set(key, []);
-        index.get(key).push({ line, group, item });
+        index.get(key).push({ line, group, item, ...match });
       }
     }
   }
   return index;
+}
+
+function rekeyLiveVariants(liveDATA, internalIndex) {
+  const internalByBase = new Map();
+  for (const rows of internalIndex.values()) for (const row of rows) {
+    const base = identity(row.publicLine, row.publicGroup, row.publicItem);
+    if (!internalByBase.has(base)) internalByBase.set(base, []);
+    internalByBase.get(base).push(row);
+  }
+  const used = new Set();
+  let rekeyed = 0;
+  for (const [line, groups] of Object.entries(liveDATA || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const base = identity(line, group, item);
+        const fingerprint = publicFingerprint(item);
+        const candidates = internalByBase.get(base) || [];
+        const match = candidates.find(row => !used.has(row.publicItem.public_id) &&
+          publicFingerprint(row.publicItem) === fingerprint);
+        if (!match) throw new Error(`Variante atual do Gist sem correspondência exata na base: ${base} / ${item.nome}`);
+        used.add(match.publicItem.public_id);
+        if (item.public_id !== match.publicItem.public_id) {
+          item.public_id = match.publicItem.public_id;
+          rekeyed++;
+        }
+      }
+    }
+  }
+  return rekeyed;
 }
 
 function addSafePublicItem(merged, publicLine, publicGroup, publicItem) {
