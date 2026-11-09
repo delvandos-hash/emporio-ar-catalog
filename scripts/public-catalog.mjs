@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { sanitizePublicImageUrl } from "./public-image-url.mjs";
 
 const GROUP_FIELDS = new Set(["brand", "cat"]);
-const PRODUCT_FIELDS = new Set(["nome", "volume", "varejo", "atacado", "foto", "fotos", "notas", "disponivel", "badge", "novoDesde", "variacoes"]);
+const PRODUCT_FIELDS = new Set(["nome", "volume", "varejo", "atacado", "foto", "fotos", "notas", "disponivel", "badge", "novoDesde", "variacoes", "origin_ref"]);
 const VARIATION_FIELDS = new Set(["nome", "estoque"]);
 
 function pick(value, allowed) {
@@ -40,6 +40,10 @@ function publicLine(line, groups) {
 function stockRef(source, originId) {
   if (!originId || !["roupas", "acessorios"].includes(source)) return "";
   return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
+}
+function originRef(source, originId) {
+  if (!originId) return "";
+  return "o_" + createHash("sha256").update(String(source || "outros") + "|" + String(originId)).digest("hex").slice(0, 24);
 }
 function publicIdentityBase(line, group, item) {
   return [line, group?.brand, group?.cat, item?.nome, item?.volume]
@@ -125,6 +129,9 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
         safeItem.public_id = publicIdByItem.get(item) || publicId(line, group, item);
+        const stableOriginRef = originRef(item?.fonte || publicSource(line, group?.cat), item?.id_origem);
+        if (stableOriginRef) safeItem.origin_ref = stableOriginRef;
+        else if (/^o_[a-f0-9]{24}$/.test(String(item?.origin_ref || ""))) safeItem.origin_ref = String(item.origin_ref);
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
         if (liveRef) {
           safeItem.stock_ref = liveRef;
