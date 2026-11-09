@@ -1254,6 +1254,7 @@ async function main() {
   }));
   const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
   let produtosImaratForaDoSiteRaizRemovidos = 0;
+  const relatorioImaratNomesRemovidos = [];
   // Remove registros explicitamente Imarat e itens em grupos de marcas presentes
   // na API Imarat quando o título não existe na listagem completa do site raiz.
   // Grupos/categorias de outras fontes permanecem intactos.
@@ -1266,11 +1267,13 @@ async function main() {
         if (!fonteImarat && !grupoImarat) return true;
         if (imaratNomesAtuais.has(norm(item.nome))) return true;
         produtosImaratForaDoSiteRaizRemovidos++;
+        relatorioImaratNomesRemovidos.push({ linha: line, marca: g.brand, categoria: g.cat, nome: item.nome, fonte: item.fonte || 'grupo de marca Imarat' });
         return false;
       });
     }
   }
   console.log(`Produtos Imarat removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
+  for (const removido of relatorioImaratNomesRemovidos) console.log('TÍTULO FORA DO SITE RAIZ REMOVIDO: ' + JSON.stringify(removido));
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
