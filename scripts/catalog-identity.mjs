@@ -58,3 +58,32 @@ export function isDuplicateMiniSource(existingItems, candidateOriginId) {
   // Se algum registro legado não tem ID, aplica o fallback marca + nome + volume.
   return existingIds.some(id => !id);
 }
+
+function normalizedPrice(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const parsed = Number(raw.includes(",") ? raw.replace(/\\./g, "").replace(",", ".") : raw);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : normalizeIdentity(raw);
+}
+
+function normalizedImages(item) {
+  const images = Array.isArray(item?.fotos) && item.fotos.length
+    ? item.fotos
+    : (item?.foto ? [item.foto] : []);
+  return [...new Set(images.map(x => String(x ?? "").trim()).filter(Boolean))].sort().join("~");
+}
+
+// Só considera duplicata quando todos os atributos de identidade e exibição coincidem.
+// Diferenças de marca, volume, ID de origem, preço ou imagens preservam o registro.
+export function exactCatalogFingerprint(item, brand, source) {
+  return [
+    normalizeIdentity(brand),
+    normalizeIdentity(item?.nome),
+    normalizedVolume(item?.volume),
+    normalizeIdentity(source || item?.fonte || ""),
+    String(item?.id_origem ?? "").trim(),
+    normalizedPrice(item?.varejo),
+    normalizedPrice(item?.atacado),
+    normalizedImages(item),
+  ].join("|");
+}
