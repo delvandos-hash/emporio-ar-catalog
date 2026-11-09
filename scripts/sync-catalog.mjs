@@ -1277,17 +1277,35 @@ async function main() {
         if (it.notas) it.notas = limparTexto(it.notas);
 
         const n = norm(it.nome); const b = norm(g.brand);
-        // Compatibilidade para registros antigos com o prefixo redundante "Prestige"
-        // no nome, quando a marca do grupo confirma Arabiyat Prestige.
-        const nomeSemPrefixoPrestige = b.includes('arabiyat prestige') ? n.replace(/^prestige\s+/, '') : n;
-        const hit = imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige);
+        const nomeSemPrefixoPrestige = n.replace(/^prestige\s+/, '');
+        const hit =
+          imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) ||
+          imaratList.find((p) => norm(p.name) === n) ||
+          // A marca Arabiyat Prestige pode estar agrupada historicamente como "ARABIYAT".
+          // Nesse caso, remove "Prestige" somente para localizar o produto na marca correta.
+          imaratList.find((p) => norm(p.brand).includes('arabiyat prestige') && norm(p.name) === nomeSemPrefixoPrestige);
         if (!hit) continue;
 
-        // Identifica a origem para a limpeza global de duplicatas históricas Imarat.
+        // Identifica a origem e atualiza o título exatamente como consta na API raiz.
         it.fonte = 'imarat';
         it.nome = hit.name;
-        // Regra comercial vigente: marca "Imarat" na origem é exibida como Empório A.R.
-        if (norm(hit.brand) === 'imarat') g.brand = 'Empório A.R'; 
+
+        // A marca vem do campo próprio da origem; move apenas este item se o grupo antigo
+        // estiver com uma marca abreviada/genérica, sem reclassificar os demais itens.
+        const marcaApi = limparTexto(hit.brand || g.brand || 'Outros');
+        const marcaPublica = norm(marcaApi) === 'imarat' ? 'Empório A.R' : marcaApi.toUpperCase();
+        if (norm(marcaPublica) !== norm(g.brand)) {
+          const grupoDestino = ensureBrandGroup(DATA, line, marcaPublica, g.cat);
+          if (grupoDestino !== g) {
+            g.items.splice(i, 1);
+            i--;
+            grupoDestino.items.push(it);
+          } else {
+            g.brand = marcaPublica;
+          }
+        } else {
+          g.brand = marcaPublica;
+        } 
         
         // Uma única consulta ao detalhe alimenta notas e galeria, evitando
         // duas requisições idênticas por produto durante a sincronização.
