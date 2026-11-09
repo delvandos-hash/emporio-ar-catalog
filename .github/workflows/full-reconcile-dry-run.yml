@@ -103,7 +103,7 @@ jobs:
           path: js/data.js
           retention-days: 7
       - name: Persistir snapshot reconciliado somente se baseline passar
-        if: env.BASELINE_OK == 'true' && github.event_name == 'push'
+        if: env.BASELINE_OK == 'true' && github.event_name == 'push' && env.PERSIST_RECONCILED_SNAPSHOT == '1'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
