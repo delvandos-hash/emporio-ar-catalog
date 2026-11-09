@@ -197,6 +197,7 @@ const arabiyatCatalog = Object.entries(DATA).flatMap(([line, groups]) =>
     : [])
 );
 console.log('ARABIYAT PRESTIGE — TÍTULOS NOIRE/PRESTIGE NO GIST: ' + JSON.stringify(arabiyatCatalog));
+// Diagnóstico repetido após a consolidação de grupos no catálogo de produção.
 
 function sourceMatch(item, group) {
   const name = norm(item?.nome);
