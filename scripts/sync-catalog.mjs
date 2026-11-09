@@ -1402,6 +1402,7 @@ async function main() {
   }
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
+  let titulosFuzzyCorrigidos = 0;
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
@@ -1455,6 +1456,13 @@ async function main() {
         if (!hit) continue;
 
         // Identifica a origem e atualiza o título exatamente como consta na API raiz.
+        if (String(it.nome || '') !== String(hit.name || '')) {
+          titulosFuzzyCorrigidos++;
+          console.log('TÍTULO IMARAT CORRIGIDO POR MARCA/VOLUME: ' + JSON.stringify({
+            linha: line, marca: g.brand, categoria: g.cat,
+            nomeAnterior: it.nome, nomeNoSiteRaiz: hit.name
+          }));
+        }
         it.fonte = 'imarat';
         it.nome = hit.name;
 
@@ -1940,6 +1948,7 @@ async function main() {
 
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
+  console.log(`Títulos corrigidos por correspondência forte de marca/volume: ${titulosFuzzyCorrigidos}`);
   console.log(`Novos Brand: ${addedBrand}`);
   console.log(`Roupas Sophia: ${roupasCount} | Franny: ${frannyCount} | Acessórios: ${acessoriosCount}`);
   console.log(`Estoque alterado: ${stockChanged}`);
