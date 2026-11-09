@@ -52,6 +52,6 @@ test("normaliza o prefixo Óleo somente na comparação de títulos da categoria
 });
 
 test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompatível", () => {
-  assert.match(auditSource, /if \(raw && \^\\d\+\(\?:\[.,\]\\d\+\)\?\$\/.test\(raw\)\) raw \+= "ml"/);
+  assert.ok(auditSource.includes('if (raw && /^\\d+(?:[.,]\\d+)?$/.test(raw)) raw += "ml";'));
   assert.match(source, /itemVolume === sourceVolume/);
 });
