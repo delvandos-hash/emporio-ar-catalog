@@ -114,7 +114,7 @@ test("restauração Only You é append-only, respeita preço manual e valida ant
 
 test("deduplicação de miniaturas exige marca e volume compatíveis", () => {
   assert.ok(source.includes("marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}"));
-  assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`"));
+  assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeKey}`"));
   assert.ok(source.includes("duplicado = indexMiniImarat.has(chaveComIdentidade)"));
   assert.ok(!source.includes("indexMiniImarat.has(chave)"));
 });
