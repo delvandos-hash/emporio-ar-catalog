@@ -124,3 +124,11 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
   assert.ok(auditSource.includes(".replace(/['’]s"));
   assert.ok(auditMiniSource.includes(".replace(/['’]s"));
 });
+
+test("deduplicação geral preserva nomes iguais entre marcas e volumes diferentes", () => {
+  assert.match(source, /const chave = id \? `id\|\$\{norm\(g\.brand\)\}\|\$\{id\}`/);
+  assert.match(source, /produto\|\$\{norm\(g\.brand\)\}\|\$\{limparParaComparacao\(item\.nome\)\}\|\$\{volume\}/);
+  assert.match(source, /indexNormal\.add\(`\$\{norm\(g\.brand\)\}\|\$\{limparParaComparacao\(it\.nome\)\}\|\$\{volumeMatch\(it\.volume, it\.nome\)\}`)/);
+  assert.doesNotMatch(source, /indexNormal\.add\(limparParaComparacao\(it\.nome\)\)/);
+  assert.match(source, /duplicado = indexNormal\.has\(`\$\{norm\(brand\)\}\|\$\{limparParaComparacao\(nome\)\}\|\$\{volumeMatch\(volume, nome\)\}`)/);
+});
