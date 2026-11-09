@@ -1248,16 +1248,12 @@ async function main() {
   console.log(`Imarat: ${imaratList.length} produtos`);
 
   const imaratNomesAtuais = new Set(imaratList.map(p => norm(p.name)).filter(Boolean));
-  const marcasImaratAtuais = new Set(imaratList.map(p => {
-    const marca = limparTexto(p.brand || 'Outros');
-    return norm(marca) === 'imarat' ? norm('Empório A.R') : norm(marca);
-  }));
   const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
   let produtosImaratForaDoSiteRaizRemovidos = 0;
   const relatorioImaratNomesRemovidos = [];
-  // Remove registros explicitamente Imarat e itens em grupos de marcas presentes
-  // na API Imarat quando o título não existe na listagem completa do site raiz.
-  // Grupos/categorias de outras fontes permanecem intactos.
+  // As categorias Perfumes, Miniaturas e Óleos são abastecidas pela Imarat.
+  // Compara todos os itens dessas categorias com a lista completa do site raiz;
+  // categorias de outras fontes (Brand, roupas, acessórios etc.) ficam intactas.
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
       const grupoImarat = categoriasImarat.has(norm(g.cat));
