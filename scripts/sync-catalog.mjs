@@ -1654,6 +1654,12 @@ async function main() {
         } else {
           const prices = calcularPrecoMiniatura(it.nome, hit.brand || g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
           if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
+            console.log('PREÇO A ALTERAR NO DRY-RUN: ' + JSON.stringify({
+              marca: g.brand, nome: it.nome, volume: it.volume,
+              atualVarejo: it.varejo, atualAtacado: it.atacado,
+              calculadoVarejo: prices.varejo, calculadoAtacado: prices.atacado,
+              precoManual: it.precoManual ?? false, idOrigem: it.id_origem ?? ''
+            }));
             it.varejo = prices.varejo;
             it.atacado = prices.atacado;
             priceChanged++;
@@ -1771,6 +1777,11 @@ async function main() {
           || (!marcaConhecida && indexNameVolume.has(`${nomeKey}|${volumeKey}`));
       }
       if (duplicado) continue;
+      console.log('CANDIDATO NOVO IMARAT NO DRY-RUN: ' + JSON.stringify({
+        id: p.id ?? p.productId ?? '', nome, marca: brand, marcaOrigem,
+        volume, categoria, miniatura: ehMini, oleo: ehOleo,
+        publicMatch: Boolean(findPublicCatalogMatch(LIVE_GIST_DATA, brand, nome, volume, ehMini))
+      }));
 
       let notas = '';
       let detail = null;
