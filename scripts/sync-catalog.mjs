@@ -1513,6 +1513,7 @@ async function main() {
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
   let publicGistMatches = 0, publicPricesPreserved = 0;
+  let publicExistingPricesPreserved = 0, existingPricesProtectedWithoutMatch = 0;
   let titulosFuzzyCorrigidos = 0;
 
   for (const line of Object.keys(DATA)) {
@@ -1520,6 +1521,9 @@ async function main() {
       if (g.cat === 'Brand' || String(g.cat || '').startsWith('Brand')) continue;
       for (let i = 0; i < g.items.length; i++) {
         const it = g.items[i];
+        const nomePublicoAnterior = it.nome;
+        const marcaPublicaAnterior = g.brand;
+        const volumePublicoAnterior = it.volume;
         it.nome = limparTexto(it.nome);
         if (it.notas) it.notas = limparTexto(it.notas);
 
@@ -1653,13 +1657,26 @@ async function main() {
           // mantém preços definidos manualmente
         } else {
           const prices = calcularPrecoMiniatura(it.nome, hit.brand || g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
-          if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
-            console.log('PREÇO A ALTERAR NO DRY-RUN: ' + JSON.stringify({
-              marca: g.brand, nome: it.nome, volume: it.volume,
-              atualVarejo: it.varejo, atualAtacado: it.atacado,
-              calculadoVarejo: prices.varejo, calculadoAtacado: prices.atacado,
-              precoManual: it.precoManual ?? false, idOrigem: it.id_origem ?? ''
-            }));
+          const miniExistente = isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome);
+          const marcaAtualizada = norm(hit.brand || g.brand) === 'imarat' ? 'Empório A.R' : String(hit.brand || g.brand).trim().toUpperCase();
+          const publicMatchExisting =
+            findPublicCatalogMatch(LIVE_GIST_DATA, marcaPublicaAnterior, nomePublicoAnterior, volumePublicoAnterior, miniExistente) ||
+            findPublicCatalogMatch(LIVE_GIST_DATA, marcaAtualizada, it.nome, it.volume, miniExistente);
+          const publicHasPrices = publicMatchExisting?.varejo != null && publicMatchExisting?.atacado != null;
+          const publicPriceDiffers = publicHasPrices &&
+            (priceNumber(publicMatchExisting.varejo) !== priceNumber(prices.varejo) ||
+             priceNumber(publicMatchExisting.atacado) !== priceNumber(prices.atacado));
+
+          if (publicPriceDiffers) {
+            it.varejo = publicMatchExisting.varejo;
+            it.atacado = publicMatchExisting.atacado;
+            it.precoManual = true;
+            publicExistingPricesPreserved++;
+          } else if (!publicMatchExisting && (it.varejo !== prices.varejo || it.atacado !== prices.atacado)) {
+            // Sem correspondência pública inequívoca, não sobrescreve preço já publicado/interno.
+            it.precoManual = true;
+            existingPricesProtectedWithoutMatch++;
+          } else if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
             it.varejo = prices.varejo;
             it.atacado = prices.atacado;
             priceChanged++;
@@ -2287,7 +2304,9 @@ async function main() {
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
   console.log(`Novos com correspondência no Gist: ${publicGistMatches}`);
-  console.log(`Preços públicos preservados como manuais: ${publicPricesPreserved}`);
+  console.log(`Preços públicos preservados como manuais (novos): ${publicPricesPreserved}`);
+  console.log(`Preços públicos preservados como manuais (existentes): ${publicExistingPricesPreserved}`);
+  console.log(`Preços internos protegidos sem correspondência pública: ${existingPricesProtectedWithoutMatch}`);
   console.log(`Títulos corrigidos por correspondência forte de marca/volume: ${titulosFuzzyCorrigidos}`);
   console.log(`Novos Brand: ${addedBrand}`);
   console.log(`Roupas Sophia: ${roupasCount} | Franny: ${frannyCount} | Acessórios: ${acessoriosCount}`);
