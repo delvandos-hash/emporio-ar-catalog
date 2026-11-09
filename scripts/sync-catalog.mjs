@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
-import { normalProductKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource } from './catalog-identity.mjs';
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource } from './catalog-identity.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1684,8 +1684,8 @@ async function main() {
       for (const it of g.items || []) {
         const volumeKey = volumeMatch(it.volume, it.nome);
         const nomeKey = limparParaComparacao(it.nome);
-        indexNormal.add(`${norm(g.brand)}|${nomeKey}|${volumeKey}`);
-        indexNameVolume.add(normalProductKey(it.nome, it.volume));
+        indexNormal.add(normalProductKey(it.nome, it.volume, g.brand));
+        indexNameVolume.add(normalProductNameVolumeKey(it.nome, it.volume));
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const baseKey = miniIdentityBaseKey(it, g.brand);
           if (!indexMiniByBase.has(baseKey)) indexMiniByBase.set(baseKey, []);
@@ -1700,7 +1700,7 @@ async function main() {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
       const marcaOrigem = limparTexto(p.brand || 'Outros').trim();
-      const marcaConhecida = Boolean(String(p.brand || '').trim()) && !['outros', 'outra'].includes(norm(marcaOrigem));
+      const marcaConhecida = Boolean(String(p.brand || '').trim()) && !['outros', 'outra', 'sem marca', 'sem marca definida', 'nao informado', 'n/a'].includes(norm(marcaOrigem));
       const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
@@ -1740,9 +1740,10 @@ async function main() {
           }));
         }
       } else {
-        // Perfumes: comparação global por nome exato normalizado + volume.
-        // Não usa substring, similaridade aproximada ou marca como chave.
-        duplicado = indexNameVolume.has(normalProductKey(nome, volume));
+        // Perfumes: marca + nome exato normalizado + volume.
+        // Nomes iguais em marcas diferentes coexistem; marca ausente usa fallback conservador.
+        duplicado = indexNormal.has(normalProductKey(nome, volume, brand))
+          || (!marcaConhecida && indexNameVolume.has(normalProductNameVolumeKey(nome, volume)));
         if (!duplicado) console.log('NOVO PERFUME CANDIDATO: ' + JSON.stringify({ nome, marca: brand, volume }));
       }
       if (duplicado) continue;
@@ -1774,8 +1775,8 @@ async function main() {
       
       const nomeKey = limparParaComparacao(nome);
       const volumeKey = volumeMatch(volume, nome);
-      indexNormal.add(`${norm(brand)}|${nomeKey}|${volumeKey}`);
-      indexNameVolume.add(normalProductKey(nome, volume));
+      indexNormal.add(normalProductKey(nome, volume, brand));
+      indexNameVolume.add(normalProductNameVolumeKey(nome, volume));
       if (ehMini) {
         const actualMini = { nome, volume, varejo: prices.varejo, atacado: prices.atacado, foto, fotos: imgsNew };
         const baseKey = miniIdentityBaseKey(actualMini, brand);
