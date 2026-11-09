@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/sync-catalog.mjs"
       - "scripts/audit-imarat-all-products.mjs"
+      - "scripts/restore-gist-only-legacy.mjs"
       - ".github/workflows/full-reconcile-dry-run.yml"
 
 permissions:
@@ -56,15 +57,19 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+      - name: Restaurar itens legados ainda existentes no Gist
+        run: node scripts/restore-gist-only-legacy.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Auditar snapshot gerado contra Gist (somente leitura)
         run: |
           node scripts/audit-imarat-all-products.mjs | tee /tmp/reconcile-audit.log
-          if grep -q 'publicação permitida=true' /tmp/reconcile-audit.log; then
+          if grep -q 'ADDITIVE_RECONCILIATION_SAFE=true' /tmp/reconcile-audit.log; then
             echo "BASELINE_OK=true" >> "$GITHUB_ENV"
-            echo "Baseline reconciliada dentro do limite de segurança." >> "$GITHUB_STEP_SUMMARY"
+            echo "Reconciliação aditiva validada: nenhum item do Gist será removido e todos os novos itens têm origem confirmada." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "BASELINE_OK=false" >> "$GITHUB_ENV"
-            echo "Baseline ainda divergente; nenhum commit será feito." >> "$GITHUB_STEP_SUMMARY"
+            echo "Reconciliação aditiva não validada; nenhum commit será feito." >> "$GITHUB_STEP_SUMMARY"
           fi
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
