@@ -118,7 +118,7 @@ test("miniaturas usam ID de origem e fallback conservador por marca, nome e volu
   assert.ok(source.includes("miniIdentityBaseKey(it, g.brand)"));
   assert.ok(source.includes("isDuplicateMiniSource(existing, p.id ?? p.productId ?? p.slug ?? \"\""));
   assert.ok(source.includes("!marcaConhecida && nameVolumeCandidates.length"));
-  assert.ok(source.includes("indexMiniByBase.get(baseKey).push({ id_origem: String(p.id ?? p.productId ?? \"\""));
+  assert.ok(source.includes("indexMiniByBase.get(baseKey).push({ id_origem: it.id_origem ?? \"\" }"));
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
 });
 
