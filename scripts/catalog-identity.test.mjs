@@ -53,3 +53,12 @@ test("fingerprint exato preserva linha, categoria e referências de estoque dist
   assert.notEqual(exactCatalogFingerprint(base,"Marca A","imarat","masculino","Miniaturas"),key);
   assert.notEqual(exactCatalogFingerprint({...base,stock_ref:"stock-b"},"Marca A","imarat","masculino","Perfumes"),key);
 });
+
+test("perfumes com mesma marca, nome e volume mas IDs de origem diferentes permanecem distintos", () => {
+  assert.equal(isDuplicateMiniSource([{ id_origem: "101" }], "102"), false);
+  assert.equal(isDuplicateMiniSource([{ id_origem: "101" }], "101"), true);
+});
+test("sem ID de origem, a identidade-base continua sendo o fallback conservador", () => {
+  assert.equal(isDuplicateMiniSource([{ id_origem: "101" }], ""), true);
+  assert.equal(isDuplicateMiniSource([{ id_origem: "" }], "102"), true);
+});
