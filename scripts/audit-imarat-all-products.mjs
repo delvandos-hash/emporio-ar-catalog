@@ -318,7 +318,6 @@ const additiveReconciliationSafe =
   // Ambiguidades de rekey não bloqueiam a preservação: os itens permanecem no Gist
   // e a publicação aditiva só prossegue se nenhum ID público ficar sem representação.
   liveOnlyKeys.length === 0 &&
-  eligibleInternalOnlyRows.length > 0 &&
   eligibleInternalOnlyRows.length <= 80 &&
   internalOnlyKeys.length <= 80 &&
   Math.abs(catalog.length - internalItemCount) <= 80 &&
