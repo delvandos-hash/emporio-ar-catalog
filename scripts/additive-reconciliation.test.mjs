@@ -135,3 +135,9 @@ test("variantes legadas sem reidentificação inequívoca permanecem preservadas
   assert.doesNotMatch(apply, /if \(!match\) throw new Error\(\`Variante atual do Gist/);
   assert.doesNotMatch(audit, /rekeyAudit\.unmatched === 0/);
 });
+
+test("auditoria reconhece item Brand legado com mesmo nome-base e foto como já representado", () => {
+  assert.match(audit, /legacyBrandDuplicateRows/);
+  assert.match(audit, /liveLoosePhotoKeys/);
+  assert.match(apply, /rowCategory\.includes\("brand"\)/);
+});
