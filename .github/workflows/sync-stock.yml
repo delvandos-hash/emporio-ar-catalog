@@ -48,3 +48,8 @@ jobs:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
