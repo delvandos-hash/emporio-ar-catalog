@@ -93,9 +93,10 @@ test("registra o ID privado da origem e consolida duplicatas sem confundir IDs d
 
 
 test("deduplicação de miniaturas exige marca e volume compatíveis", () => {
-  assert.match(source, /marca\|\\$\{norm\(g\.brand\)\}\|nome\|\\$\{chaveComparacaoMini\(item\.nome\)\}\|volume\|\\$\{volumeMatch\(item\.volume, item\.nome\)\}/);
-  assert.match(source, /const chaveComIdentidade = `\\$\{norm\(brand\)\}\\|\\$\{chave\}\\|\\$\{volumeMatch\(volume, nome\)\}`/);
-  assert.doesNotMatch(source, /indexMiniImarat\.has\(chave\)/);
+  assert.ok(source.includes("marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}"));
+  assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`"));
+  assert.ok(source.includes("duplicado = indexMiniImarat.has(chaveComIdentidade)"));
+  assert.ok(!source.includes("indexMiniImarat.has(chave)"));
 });
 
 test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome da origem", () => {
