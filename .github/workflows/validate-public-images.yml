@@ -1,0 +1,40 @@
+name: Validar imagens públicas sem publicar catálogo
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "scripts/validate-public-images.mjs"
+      - ".github/workflows/validate-public-images.yml"
+      - "netlify/functions/product-image.mjs"
+      - "scripts/public-image-url.mjs"
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: "URL do Deploy Preview do projeto catalogoemporio"
+        required: true
+        type: string
+
+jobs:
+  validate-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Testar regras locais de URL e proxy de imagens
+        run: node --test scripts/public-image-url.test.mjs scripts/product-image-function.test.mjs
+        env:
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+      - name: Validar entrega de imagens do snapshot público na prévia
+        run: node scripts/validate-public-images.mjs
+        env:
+          NETLIFY_PREVIEW_URL: ${{ github.event_name == 'pull_request' && format('https://deploy-preview-{0}--catalogoemporio.netlify.app', github.event.pull_request.number) || inputs.preview_url }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
