@@ -135,7 +135,7 @@ test("perfumes exigem marca, nome exato e volume; semelhanças entre marcas são
 });
 
 test("sincronização remove somente cópias integralmente idênticas", () => {
-  assert.match(source, /exactCatalogFingerprint\(item, group\.brand, item\.fonte\)/);
+  assert.match(source, /exactCatalogFingerprint\(item, group\.brand, item\.fonte, line, group\.cat\)/);
   assert.match(source, /Duplicatas integralmente idênticas removidas/);
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
   assert.doesNotMatch(source, /miniaturasDuplicadasRemovidas\+\+/);
