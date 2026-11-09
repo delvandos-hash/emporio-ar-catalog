@@ -183,6 +183,28 @@ const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.name)
 const internalOnlyKeys=[...internalIndex.keys()].filter(key=>!liveKeySet.has(key));
 const liveOnlyKeys=[...liveKeySet].filter(key=>!internalIndex.has(key));
 console.log(`COMPARAÇÃO EXATA DO BLOQUEIO DE SYNC: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}; limite de publicação=25; publicação permitida=${internalOnlyKeys.length<=25&&liveOnlyKeys.length<=25&&Math.abs(catalog.length-internalItemCount)<=25}`);
+const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
+const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, items: internalIndex.get(key) || [] }));
+const internalOnlySourceConfirmed = internalOnlySourceRows.every(({ items }) =>
+  items.length === 1 &&
+  allowedAdditiveSources.has(norm(items[0]?.fonte)) &&
+  (norm(items[0]?.fonte) === "brand" || Boolean(String(items[0]?.id_origem || "").trim()))
+);
+const additiveReconciliationSafe =
+  liveOnlyKeys.length === 0 &&
+  internalOnlyKeys.length > 0 &&
+  internalOnlyKeys.length <= 30 &&
+  Math.abs(catalog.length - internalItemCount) <= 30 &&
+  internalOnlySourceConfirmed;
+console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
+for (const row of internalOnlySourceRows) {
+  const item = row.items[0] || {};
+  console.log("ADDITIVE SOURCE ITEM " + JSON.stringify({
+    key: row.key, fonte: item.fonte || "", id_origem: item.id_origem || "",
+    nome: item.nome || "", precoManual: item.precoManual || false
+  }));
+}
+
 const summarizeKeys=keys=>{
   const byBrand=new Map();
   for(const key of keys) {
