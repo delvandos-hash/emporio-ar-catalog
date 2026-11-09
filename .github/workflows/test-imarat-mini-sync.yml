@@ -6,6 +6,11 @@ on:
     paths:
       - "scripts/sync-catalog.mjs"
       - ".github/workflows/test-imarat-mini-sync.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - ".github/workflows/test-imarat-mini-sync.yml"
   workflow_dispatch:
 
 permissions:
