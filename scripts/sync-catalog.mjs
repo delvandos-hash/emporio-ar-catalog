@@ -196,8 +196,8 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (liveItem.badge) item.badge = liveItem.badge;
         if (liveItem.novoDesde) item.novoDesde = liveItem.novoDesde;
         if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
-        if (!item.stock_ref && liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
-        if (!item.stock_route && liveItem.stock_route) item.stock_route = liveItem.stock_route;
+        if (liveItem.stock_ref && item.stock_ref !== liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
+        if (liveItem.stock_route && item.stock_route !== liveItem.stock_route) item.stock_route = liveItem.stock_route;
         if (liveItem.public_id && item.public_id !== liveItem.public_id) item.public_id = liveItem.public_id;
       }
     }
