@@ -1654,12 +1654,15 @@ async function main() {
   }
   console.log(`Miniaturas Afeer com grafia corrigida para Atherri: ${miniAfeerGrafiaCorrigida}`);
 
-  // Filtro de segurança: duplicatas exatas dentro de cada grupo.
+  // Deduplicação dentro do grupo: preservar volume e identidade de origem.
   for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
+    for (const g of DATA[line] || []) {
       const vistos = new Set();
-      g.items = g.items.filter(item => {
-        const chave = limparParaComparacao(item.nome);
+      g.items = (g.items || []).filter(item => {
+        const id = String(item.id_origem || '').trim();
+        const volume = volumeMatch(item.volume, item.nome);
+        const chave = id ? `id|${norm(g.brand)}|${id}`
+          : `produto|${norm(g.brand)}|${limparParaComparacao(item.nome)}|${volume}`;
         if (vistos.has(chave)) return false;
         vistos.add(chave);
         return true;
@@ -1678,7 +1681,7 @@ async function main() {
         if (String(item.fonte || '').toLowerCase() !== 'imarat' || !isMiniatura(item.nome, item.volume, g.cat) || isOleo(item.nome)) return true;
         const idOrigem = String(item.id_origem || '').trim();
         const chave = idOrigem
-          ? `id|${idOrigem}`
+          ? `marca|${norm(g.brand)}|id|${idOrigem}`
           : `marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}`;
         if (!chave || chave.endsWith('|')) return true;
         if (miniaturasGlobaisVistas.has(chave)) {
@@ -1692,16 +1695,14 @@ async function main() {
   }
   console.log(`Miniaturas Imarat duplicadas removidas por ID ou marca/nome/volume: ${miniaturasDuplicadasRemovidas}`);
 
-  // Índice convencional global: nome sem volume e nome+marca, conforme regra homologada.
-  // A chave sem marca impede reimportação quando a fonte muda a marca ou o grupo.
+  // Índice de identidade: marca + nome normalizado + volume.
+  // Nomes iguais de marcas diferentes e apresentações distintas coexistem.
   const indexNormal = new Set();
   const indexMiniImarat = new Set();
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       for (const it of g.items) {
-        indexNormal.add(`${limparParaComparacao(it.nome)}|${norm(g.brand)}`);
-        // Regra global homologada: bloqueia reimportação mesmo se a marca/grupo mudar.
-        indexNormal.add(limparParaComparacao(it.nome));
+        indexNormal.add(`${norm(g.brand)}|${limparParaComparacao(it.nome)}|${volumeMatch(it.volume, it.nome)}`);
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const chaveMini = chaveComparacaoMini(it.nome);
           // Marca e volume integram a chave; nomes parecidos de marcas diferentes coexistem.
@@ -1726,7 +1727,7 @@ async function main() {
         const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`;
         duplicado = indexMiniImarat.has(chaveComIdentidade);
       } else {
-        duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(brand)}`) || indexNormal.has(limparParaComparacao(nome));
+        duplicado = indexNormal.has(`${norm(brand)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`);
       }
       if (duplicado) continue;
 
@@ -1762,8 +1763,7 @@ async function main() {
           id_origem: String(p.id ?? p.productId ?? ''),
       }, true));
       
-      indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
-      indexNormal.add(limparParaComparacao(nome));
+      indexNormal.add(`${norm(brand)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`);
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
         indexMiniImarat.add(`${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`);
@@ -1813,7 +1813,7 @@ async function main() {
   if (ADD_BRAND_NEW) {
     for (const p of brandAllowed) {
       const nome = p.nome || ''; if (!nome) continue; let session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session && norm(nome).includes('tubete')) session = 'TUBETES BRAND'; if (!session) continue;
-      const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(session)}`) || indexNormal.has(limparParaComparacao(nome)); if (duplicado) continue;
+      const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${norm(session)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`); if (duplicado) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
@@ -1828,7 +1828,7 @@ async function main() {
           foto,
           fonte: 'brand',
       }, true));
-      indexNormal.add(`${limparParaComparacao(nome)}|${norm(session)}`); addedBrand++;
+      indexNormal.add(`${norm(session)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`); addedBrand++;
     }
   }
 
