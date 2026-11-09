@@ -276,10 +276,16 @@ const eligibleInternalOnlyRows = internalOnlySourceRows.filter(({ row }) =>
   !String(row?.publicItem?.stock_ref || "").trim() ||
   !liveStockRefs.has(String(row.publicItem.stock_ref).trim())
 );
+const KNOWN_BRAND_GROUPS = new Set(["arabic collection","beauty brand","body splash","colecao dream","colecao brand","dream brand 80 100ml","dream brand","flaconete brand","sapatinho good girl","tubetes brand"]);
+function effectiveAdditiveSource(row) {
+  const source = norm(row?.item?.fonte);
+  if (source) return source;
+  return norm(row?.group?.cat) === "brand" && KNOWN_BRAND_GROUPS.has(norm(row?.group?.brand)) ? "brand" : "";
+}
 const internalOnlySourceConfirmed = eligibleInternalOnlyRows.every(({ row }) =>
   Boolean(row) &&
-  allowedAdditiveSources.has(norm(row.item?.fonte)) &&
-  (norm(row.item?.fonte) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
+  allowedAdditiveSources.has(effectiveAdditiveSource(row)) &&
+  (effectiveAdditiveSource(row) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
 );
 const additiveReconciliationSafe =
   rekeyAudit.unmatched === 0 &&
