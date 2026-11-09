@@ -888,7 +888,7 @@ function hasDandeNextPage(html, page) {
   return /rel=["']next["']/i.test(html) || queryPage.test(html) || pathPage.test(html);
 }
 
-async function fetchDandeCategoryPage(path, page = 1) {
+async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
   const url = page <= 1
@@ -898,7 +898,18 @@ async function fetchDandeCategoryPage(path, page = 1) {
     headers: { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'pt-BR,pt;q=0.9' },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.text();
+  const html = await res.text();
+  if (expectedCategory) {
+    const titleMatch = html.match(/<h1\\b[^>]*>([\\s\\S]*?)<\\/h1>/i);
+    const actualTitle = titleMatch
+      ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
+      : '';
+    const expectedTitle = norm(expectedCategory).replace(/s$/, '');
+    if (!actualTitle || actualTitle !== expectedTitle) {
+      throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}")`);
+    }
+  }
+  return html;
 }
 
 function parseDandeListProducts(html) {
@@ -1015,7 +1026,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     let categoryAdded = 0;
     for (let page = 1; page <= 15; page++) {
       try {
-        const html = await fetchDandeCategoryPage(cat.path, page);
+        const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
         if (!list.length) break;
         const pageSignature = list.map((p) => p.id).sort().join('|');
