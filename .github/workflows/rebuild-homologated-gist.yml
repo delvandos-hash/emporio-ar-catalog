@@ -1,0 +1,30 @@
+name: Reconstruir base Gist da homologação
+on:
+  push:
+    branches:
+      - rebuild-gist-from-homologated-471dcd1
+permissions:
+  contents: read
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 471dcd18817239069df7311418548a3b6909b8ee
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Gerar snapshot público sem consultar fornecedores e sem gravar Gist
+        run: node scripts/rebuild-homologated-gist-data.mjs
+        env:
+          GITHUB_SHA: 471dcd18817239069df7311418548a3b6909b8ee
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gist-homologado-471dcd1
+          path: rebuild-output/
+          if-no-files-found: error
+          retention-days: 7
