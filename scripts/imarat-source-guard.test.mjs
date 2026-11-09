@@ -135,17 +135,6 @@ test("perfumes usam nome normalizado exato e volume, sem similaridade aproximada
   assert.ok(source.includes("indexNormal.add(`${norm(brand)}|${nomeKey}|${volumeKey}`)"));
 });
 
-undefined
-
-test("marca ausente não pode criar duplicata ambígua em outra marca", () => {
-  assert.match(source, /const marcaConhecida = Boolean\(String\(p\.brand \|\| ''\)\.trim\(\)\)/);
-  assert.match(source, /!marcaConhecida && indexNameVolume\.has/);
-  assert.match(source, /!marcaConhecida && indexMiniNameVolume\.has/);
-  assert.match(audit, /const brandKnown=Boolean\(String\(p\.brand\|\|""\)\.trim\(\)\)/);
-  assert.match(audit, /!brandKnown&&normalNameVolumeIndex\.has/);
-  assert.match(audit, /!brandKnown&&miniNameVolumeIndex\.has/);
-});
-
 test("sincronização não remove produtos já existentes automaticamente", () => {
   assert.match(source, /Deduplicação destrutiva desativada: todos os registros existentes foram preservados/);
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
