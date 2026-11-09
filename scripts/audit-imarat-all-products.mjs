@@ -233,9 +233,11 @@ function sourceTitleKey(name,category,brand) {
 }
 function sourceBrandMatches(catalogBrand,sourceBrand) {
   const b=norm(catalogBrand), s=norm(sourceBrand);
+  const generic=new Set(["outros","outra","sem marca","sem marca definida","nao informado","n/a"]);
   if(b==="arabiyat" && s.includes("arabiyat prestige")) return true;
   if(b==="emporio a r" && s==="imarat") return true;
-  if(b==="outros" || b==="outra") return !s;
+  if(generic.has(b)) return generic.has(s) || !s;
+  if(generic.has(s)) return generic.has(b);
   return Boolean(b && s && b===s);
 }
 function matchSourceForCatalog(item) {
