@@ -1238,7 +1238,9 @@ async function main() {
         
         const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
         if (!hit) continue;
-        
+
+        // Identifica a origem para a limpeza global de duplicatas históricas Imarat.
+        it.fonte = 'imarat';
         it.nome = hit.name; 
         
         let notas = '';
