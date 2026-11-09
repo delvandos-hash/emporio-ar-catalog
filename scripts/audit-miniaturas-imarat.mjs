@@ -265,7 +265,7 @@ for (const [line, groups] of Object.entries(DATA)) {
         sourcePrice: source?.priceCents != null ? fmtBRL(Number(source.priceCents) / 100) : "—",
         expectedRetail: expected?.varejo || "sem correspondência",
         expectedWholesale: expected?.atacado || "sem correspondência",
-        key: norm(line) + "|" + name + "|" + volumeOf(item),
+        key: norm(line) + "|" + norm(group.brand) + "|" + name + "|" + volumeOf(item),
       });
     }
   }
