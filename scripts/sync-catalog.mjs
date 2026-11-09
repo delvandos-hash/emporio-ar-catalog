@@ -27,6 +27,7 @@ const BRAND_ALLOWED_SESSIONS = [
 ];
 
 const SYNC_DRY_RUN = process.env.SYNC_DRY_RUN === '1';
+const SYNC_DANDE_ONLY = process.env.SYNC_DANDE_ONLY === '1';
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
 const PREFIXOS_MINI_IMARAT = ['mini armaf', 'miniatura armaf', 'miniatura', 'mini'];
@@ -819,6 +820,7 @@ function dandePathOnly(value) {
   catch { return ''; }
 }
 
+const DANDE_SCRAPE_COUNTS = new Map();
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -1010,6 +1012,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     console.log(`  Dande cat ${cat.nome}`);
     const seenCategoryIds = new Set();
     const seenPageSignatures = new Set();
+    let categoryAdded = 0;
     for (let page = 1; page <= 15; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page);
@@ -1115,6 +1118,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
             cat: cat.nome,
           }, !prev, prev));
           added++;
+          categoryAdded++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
 
@@ -1130,6 +1134,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
         break;
       }
     }
+    DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
   }
 
   const byCat = new Map();
@@ -1168,7 +1173,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
 
 
 async function main() {
-  const requiredSources = ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
+  const requiredSources = SYNC_DANDE_ONLY ? ['DANDE_BASE_URL'] : ['IMARAT_API_URL','IMARAT_ORIGIN_URL','BRAND_BASE_URL','CDN_IMAGE_BASE_URL','CDN_IMAGE_FALLBACK_BASE_URL','SOPHIA_PRIMARY_URL','SOPHIA_FALLBACK_URL','SOPHIA_FALLBACK_ORIGIN','FRANNY_BASE_URL','DANDE_BASE_URL'];
   const missingSources = requiredSources.filter((key) => !process.env[key]);
   if (missingSources.length) throw new Error('Configure os secrets de origem no GitHub Actions: ' + missingSources.join(', '));
   console.log('Carregando data.js...');
@@ -1178,6 +1183,22 @@ async function main() {
   const DATA = JSON.parse(m[1]);
 
   console.log(`Flags: ADD_IMARAT_NEW=${ADD_IMARAT_NEW} ADD_BRAND_NEW=${ADD_BRAND_NEW} ADD_ROUPAS=${ADD_ROUPAS}`);
+
+  if (SYNC_DANDE_ONLY) {
+    if (!SYNC_DRY_RUN) throw new Error('SYNC_DANDE_ONLY exige SYNC_DRY_RUN=1 para impedir publicação.');
+    console.log('Modo exclusivo Dande: nenhuma outra fonte será sincronizada.');
+    const prevAcc = Array.isArray(DATA.acessorios) ? DATA.acessorios : [];
+    const groups = await fetchDandeAcessorios(prevAcc);
+    const hairCount = DANDE_SCRAPE_COUNTS.get('Acessórios de Cabelo') || 0;
+    const hair = groups.find((g) => g.cat === 'Acessórios de Cabelo');
+    const hairItems = hair?.items || [];
+    const missingImages = hairItems.filter((item) => !(item.foto || (Array.isArray(item.fotos) && item.fotos.length))).length;
+    console.log(`VALIDAÇÃO DANDE: coletados na origem em Acessórios de Cabelo=${hairCount}; itens no snapshot=${hairItems.length}; sem imagem=${missingImages}`);
+    if (hairCount < 1) throw new Error('Dande não retornou produtos novos/visíveis para Acessórios de Cabelo.');
+    if (!hairItems.length || missingImages > 0) throw new Error('Validação de Acessórios de Cabelo falhou: itens ou imagens ausentes.');
+    console.log('SYNC_DRY_RUN=1 — nenhuma alteração foi enviada ao Gist.');
+    return;
+  }
 
   console.log('Buscando Imarat...');
   const imaratList = await fetchImaratList();
