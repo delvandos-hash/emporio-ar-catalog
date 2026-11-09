@@ -41,13 +41,81 @@ function stockRef(source, originId) {
   if (!originId || !["roupas", "acessorios"].includes(source)) return "";
   return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
 }
-function publicId(line, group, item) {
-  const identity = [line, group?.brand, group?.cat, item?.nome, item?.volume, ].map(x => String(x || "").trim().toLowerCase()).join("|");
-  return "p_" + createHash("sha256").update(identity).digest("hex").slice(0, 20);
+function publicIdentityBase(line, group, item) {
+  return [line, group?.brand, group?.cat, item?.nome, item?.volume]
+    .map(x => String(x || "").trim().toLowerCase()).join("|");
+}
+function publicId(line, group, item, variantToken = "") {
+  const identity = publicIdentityBase(line, group, item);
+  const material = variantToken ? identity + "|variant|" + variantToken : identity;
+  return "p_" + createHash("sha256").update(material).digest("hex").slice(0, 20);
+}
+function publicVariantToken(item) {
+  const images = Array.isArray(item?.fotos) && item.fotos.length
+    ? item.fotos
+    : (item?.foto ? [item.foto] : []);
+  const media = [...new Set(images.map(x => String(x || "").trim()).filter(Boolean))].sort();
+  return JSON.stringify({
+    id_origem: String(item?.id_origem || "").trim(),
+    fonte: String(item?.fonte || "").trim(),
+    varejo: String(item?.varejo ?? "").trim(),
+    atacado: String(item?.atacado ?? "").trim(),
+    foto: String(item?.foto || "").trim(),
+    fotos: media,
+    stock_ref: String(item?.stock_ref || "").trim(),
+    stock_route: String(item?.stock_route || "").trim(),
+    notas: String(item?.notas || ""),
+    badge: String(item?.badge || ""),
+    novoDesde: String(item?.novoDesde || ""),
+    disponivel: String(item?.disponivel || ""),
+    variacoes: item?.variacoes || []
+  });
 }
 export function toPublicCatalog(DATA, imageOptions = {}) {
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("DATA inválido para publicação");
   const publicData = {};
+  const identityGroups = new Map();
+  for (const [line, groups] of Object.entries(DATA)) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        const key = publicIdentityBase(line, group, item);
+        if (!identityGroups.has(key)) identityGroups.set(key, []);
+        identityGroups.get(key).push({ line, group, item });
+      }
+    }
+  }
+  const publicIdByItem = new Map();
+  for (const [identityKey, records] of identityGroups) {
+    const used = new Set();
+    // Primeiro reserva todos os IDs públicos explícitos, para que itens legados
+    // mantenham a referência que já existe no Gist.
+    for (const record of records) {
+      const supplied = String(record.item?.public_id || "").trim();
+      if (/^p_[a-f0-9]{20}$/.test(supplied) && !used.has(supplied)) {
+        publicIdByItem.set(record.item, supplied);
+        used.add(supplied);
+      }
+    }
+    const baseId = publicId(records[0].line, records[0].group, records[0].item);
+    for (let index = 0; index < records.length; index++) {
+      const record = records[index];
+      if (publicIdByItem.has(record.item)) continue;
+      let nextId;
+      if (!used.has(baseId)) {
+        nextId = baseId;
+      } else {
+        const token = publicVariantToken(record.item);
+        nextId = publicId(record.line, record.group, record.item, token);
+      }
+      let collision = 1;
+      while (used.has(nextId)) {
+        nextId = publicId(record.line, record.group, record.item, publicVariantToken(record.item) + "|occurrence|" + collision);
+        collision++;
+      }
+      publicIdByItem.set(record.item, nextId);
+      used.add(nextId);
+    }
+  }
   for (const [line, groups] of Object.entries(DATA)) {
     if (!Array.isArray(groups)) continue;
     const safeLine = publicLine(line, groups);
@@ -56,7 +124,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       const safeGroup = pick(group, GROUP_FIELDS);
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
-        safeItem.public_id = publicId(line, group, item);
+        safeItem.public_id = publicIdByItem.get(item) || publicId(line, group, item);
         const liveRef = stockRef(safeItem.fonte || publicSource(line, group?.cat), item?.id_origem);
         if (liveRef) {
           safeItem.stock_ref = liveRef;
