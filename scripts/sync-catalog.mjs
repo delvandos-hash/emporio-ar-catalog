@@ -2007,7 +2007,10 @@ async function main() {
   if (ADD_BRAND_NEW) {
     for (const p of brandAllowed) {
       const nome = p.nome || ''; if (!nome) continue; let session = mapBrandSession(p.categoria_nome || p.categoria || ''); if (!session && norm(nome).includes('tubete')) session = 'TUBETES BRAND'; if (!session) continue;
-      const volume = volumeFrom(null, nome); const duplicado = indexNormal.has(`${norm(session)}|${limparParaComparacao(nome)}|${volumeMatch(volume, nome)}`); if (duplicado) continue;
+      const volume = volumeFrom(null, nome);
+      const brandKey = normalProductKey(nome, volume, session);
+      const brandCandidates = indexNormal.get(brandKey) || [];
+      if (isDuplicateMiniSource(brandCandidates, p.id ?? p.productId ?? "")) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
@@ -2022,10 +2025,11 @@ async function main() {
           foto,
           fonte: 'brand',
       }, true));
-      const nomeKey = limparParaComparacao(nome);
-      const volumeKey = volumeMatch(volume, nome);
-      indexNormal.add(`${norm(session)}|${nomeKey}|${volumeKey}`);
-      indexNameVolume.add(`${nomeKey}|${volumeKey}`);
+      if (!indexNormal.has(brandKey)) indexNormal.set(brandKey, []);
+      indexNormal.get(brandKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
+      const nameVolumeKey = normalProductNameVolumeKey(nome, volume);
+      if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
+      indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? "") });
       addedBrand++;
     }
   }
