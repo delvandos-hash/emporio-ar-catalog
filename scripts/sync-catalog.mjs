@@ -1635,6 +1635,102 @@ async function main() {
     }
   }
 
+  // Consolida grupos repetidos de marcas/categorias confirmadas na origem Imarat.
+  // Em seguida remove somente cópias idênticas de produtos que ainda existem na API,
+  // preservando volumes diferentes e divergências de preço sem proteção manual.
+  const categoriasImaratConsolidacao = new Set(['perfumes', 'miniaturas', 'oleos']);
+  const marcasImaratPublicas = new Set(imaratList.map(p => {
+    const marca = limparTexto(p.brand || 'Outros');
+    return norm(marca) === 'imarat' ? norm('Empório A.R') : norm(marca);
+  }).filter(m => m && m !== 'outros' && m !== 'outra'));
+  let gruposImaratConsolidados = 0;
+  let duplicatasImaratRemovidas = 0;
+  let conflitosPrecoImaratPreservados = 0;
+  const precoManualAtivo = item => item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
+  const volumeProduto = item => {
+    const explicito = String(item.volume || '').trim();
+    if (explicito) return norm(explicito);
+    const match = String(item.nome || '').match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+    return match ? norm(match[0]) : '';
+  };
+  for (const line of Object.keys(DATA)) {
+    const grupos = DATA[line] || [];
+    const consolidados = [];
+    const porMarcaCategoria = new Map();
+    for (const g of grupos) {
+      const marcaKey = norm(g.brand);
+      const categoriaKey = norm(g.cat);
+      const grupoImarat = categoriasImaratConsolidacao.has(categoriaKey) && marcasImaratPublicas.has(marcaKey);
+      if (!grupoImarat) {
+        consolidados.push(g);
+        continue;
+      }
+      const groupKey = marcaKey + '|' + categoriaKey;
+      const destino = porMarcaCategoria.get(groupKey);
+      if (!destino) {
+        porMarcaCategoria.set(groupKey, g);
+        consolidados.push(g);
+      } else {
+        destino.items = [...(destino.items || []), ...(g.items || [])];
+        gruposImaratConsolidados++;
+      }
+    }
+    DATA[line] = consolidados;
+
+    for (const g of DATA[line]) {
+      const marcaKey = norm(g.brand);
+      const categoriaKey = norm(g.cat);
+      if (!categoriasImaratConsolidacao.has(categoriaKey) || !marcasImaratPublicas.has(marcaKey)) continue;
+      const vistos = new Map();
+      const itensUnicos = [];
+      for (const item of g.items || []) {
+        const nomeKey = norm(item.nome);
+        const volumeKey = volumeProduto(item);
+        const origemExiste = imaratList.some(p => norm(p.name) === nomeKey && (
+          norm(p.brand) === marcaKey ||
+          (norm(p.brand) === 'imarat' && marcaKey === norm('Empório A.R')) ||
+          (!norm(p.brand) && marcaKey === 'outros')
+        ));
+        if (!origemExiste || !nomeKey) {
+          itensUnicos.push(item);
+          continue;
+        }
+        const itemKey = nomeKey + '|' + volumeKey;
+        const anterior = vistos.get(itemKey);
+        if (!anterior) {
+          vistos.set(itemKey, item);
+          itensUnicos.push(item);
+          continue;
+        }
+        const mesmoPreco = String(anterior.varejo ?? '') === String(item.varejo ?? '') &&
+          String(anterior.atacado ?? '') === String(item.atacado ?? '');
+        const manualAnterior = precoManualAtivo(anterior);
+        const manualAtual = precoManualAtivo(item);
+        if (!mesmoPreco && !manualAnterior && !manualAtual) {
+          conflitosPrecoImaratPreservados++;
+          itensUnicos.push(item);
+          continue;
+        }
+        const manter = manualAtual && !manualAnterior ? item : anterior;
+        const descartar = manter === anterior ? item : anterior;
+        if (manter !== anterior) {
+          const indice = itensUnicos.indexOf(anterior);
+          if (indice >= 0) itensUnicos[indice] = manter;
+          vistos.set(itemKey, manter);
+        }
+        for (const [campo, valor] of Object.entries(descartar)) {
+          if (manter[campo] == null || manter[campo] === '') manter[campo] = valor;
+        }
+        manter.fonte = 'imarat';
+        duplicatasImaratRemovidas++;
+      }
+      g.items = itensUnicos;
+    }
+  }
+  console.log(`Grupos Imarat consolidados: ${gruposImaratConsolidados}`);
+  console.log(`Duplicatas exatas Imarat removidas: ${duplicatasImaratRemovidas}`);
+  console.log(`Conflitos de preço preservados para revisão: ${conflitosPrecoImaratPreservados}`);
+
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     DATA[line].sort((a, b) => String(a.brand).localeCompare(String(b.brand), 'pt-BR'));
