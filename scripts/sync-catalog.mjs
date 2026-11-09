@@ -1600,16 +1600,20 @@ async function main() {
     }
   }
 
-  // Regra homologada da Imarat: miniaturas são únicas globalmente pelo nome-base,
-  // sem prefixo/marca/volume e independentemente de linha ou grupo. Óleos ficam fora.
+  // Deduplicação segura: o mesmo nome-base só é duplicata quando a marca
+  // também coincide. IDs iguais são consolidados depois pela identidade da origem.
+  // Marca diferente nunca é removida por semelhança de título; óleos ficam fora.
   const miniaturasGlobaisVistas = new Set();
   let miniaturasDuplicadasRemovidas = 0;
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
       g.items = (g.items || []).filter(item => {
         if (String(item.fonte || '').toLowerCase() !== 'imarat' || !isMiniatura(item.nome, item.volume, g.cat) || isOleo(item.nome)) return true;
-        const chave = chaveComparacaoMini(item.nome);
-        if (!chave) return true;
+        const idOrigem = String(item.id_origem || '').trim();
+        const chave = idOrigem
+          ? `id|${idOrigem}`
+          : `marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}`;
+        if (!chave || chave.endsWith('|')) return true;
         if (miniaturasGlobaisVistas.has(chave)) {
           miniaturasDuplicadasRemovidas++;
           return false;
@@ -1619,7 +1623,7 @@ async function main() {
       });
     }
   }
-  console.log(`Miniaturas Imarat duplicadas removidas do snapshot: ${miniaturasDuplicadasRemovidas}`);
+  console.log(`Miniaturas Imarat duplicadas removidas por ID ou marca/nome/volume: ${miniaturasDuplicadasRemovidas}`);
 
   // Índice convencional global: nome sem volume e nome+marca, conforme regra homologada.
   // A chave sem marca impede reimportação quando a fonte muda a marca ou o grupo.
@@ -1633,10 +1637,8 @@ async function main() {
         indexNormal.add(limparParaComparacao(it.nome));
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const chaveMini = chaveComparacaoMini(it.nome);
-          // Regra homologada: comparação global por nome-base, sem prefixo e sem volume,
-          // exclusiva para miniaturas Imarat. Mantém o bloqueio entre marcas/grupos.
-          indexMiniImarat.add(chaveMini);
-          indexMiniImarat.add(`${chaveMini}|${norm(g.brand)}`);
+          // Marca e volume integram a chave; nomes parecidos de marcas diferentes coexistem.
+          indexMiniImarat.add(`${norm(g.brand)}|${chaveMini}|${volumeMatch(it.volume, it.nome)}`);
         }
       }
     }
@@ -1654,12 +1656,8 @@ async function main() {
       let duplicado;
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
-        duplicado =
-          indexMiniImarat.has(chave) ||
-          indexMiniImarat.has(`${chave}|${norm(brand)}`) ||
-          indexMiniImarat.has(`${chave}|armaf`) ||
-          indexMiniImarat.has(`${chave}|outros`) ||
-          indexMiniImarat.has(`${chave}|outra`);
+        const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`;
+        duplicado = indexMiniImarat.has(chaveComIdentidade);
       } else {
         duplicado = indexNormal.has(`${limparParaComparacao(nome)}|${norm(brand)}`) || indexNormal.has(limparParaComparacao(nome));
       }
@@ -1701,8 +1699,7 @@ async function main() {
       indexNormal.add(limparParaComparacao(nome));
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
-        indexMiniImarat.add(chave);
-        indexMiniImarat.add(`${chave}|${norm(brand)}`);
+        indexMiniImarat.add(`${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`);
       }
       addedImarat++;
     }

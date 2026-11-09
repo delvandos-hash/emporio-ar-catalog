@@ -137,6 +137,12 @@ for(const [actual,expected,label] of checks) {
   if(actual!==expected) throw new Error(`Falha no teste ${label}: esperado "${expected}", recebido "${actual}"`);
 }
 
+const onlyYouMiniKey=miniIdentityKey("Only You","Mini Marshmellow","30ml");
+const armafMiniKey=miniIdentityKey("Armaf","Mini Marshmellow","30ml");
+if(onlyYouMiniKey===armafMiniKey) throw new Error("Colisão indevida: marcas diferentes não podem compartilhar a chave de miniatura.");
+if(onlyYouMiniKey!==miniIdentityKey("ONLY YOU","Mini Marshmellow","30ml")) throw new Error("Normalização de marca inconsistente na chave de miniatura.");
+if(onlyYouMiniKey===miniIdentityKey("Only You","Mini Marshmellow","15ml")) throw new Error("Volumes diferentes não podem compartilhar a chave de miniatura.");
+
 const INTERNAL_DATA=parseInternalData();
 const internalIndex=new Map();
 for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
@@ -208,13 +214,16 @@ function sourceIdentity(p) {
   if(slug) return "slug|"+slug;
   return "key|"+norm(p.brand)+"|"+sourceTitleKey(p.name,p.categoria_nome||p.categoria,p.brand)+"|"+volumeFrom(p.sizeMl,p.name);
 }
+function miniIdentityKey(brand,name,volume) {
+  return "mini|"+norm(brand||"outros")+"|"+chaveComparacaoMini(name)+"|"+volumeFrom(volume,name);
+}
 function apiDuplicateKey(p) {
   const name=String(p.name||"").trim();
   const volume=volumeFrom(p.sizeMl,name);
   const category=p.categoria_nome||p.categoria||"";
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   return mini
-    ? "mini|"+chaveComparacaoMini(name)
+    ? miniIdentityKey(p.brand,name,volume)
     : "normal|"+norm(p.brand||"outros")+"|"+limparParaComparacao(name)+"|"+volume;
 }
 const matchedCatalog=catalog.map(item=>({...item,matchedSource:matchSourceForCatalog(item)}));
@@ -244,7 +253,7 @@ const miniGlobalGroups=new Map();
 for(const item of matchedCatalog) {
   if(!item.matchedSource) continue;
   if(!isMiniatura(item.name,item.volume,item.category)||isOleo(item.name)) continue;
-  const key=chaveComparacaoMini(item.name);
+  const key=miniIdentityKey(item.brand,item.name,item.volume);
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
@@ -271,7 +280,7 @@ for(const item of catalog) {
   normalIndex.add(limparParaComparacao(item.name));
   normalIndex.add(`${limparParaComparacao(item.name)}|${norm(item.brand)}`);
   if(isMiniatura(item.name,item.volume,item.category)&&!isOleo(item.name))
-    miniIndex.add(chaveComparacaoMini(item.name));
+    miniIndex.add(miniIdentityKey(item.brand,item.name,item.volume));
 }
 const initialNormalIndex=new Set(normalIndex);
 const initialMiniIndex=new Set(miniIndex);
@@ -287,22 +296,21 @@ for(const p of source) {
   const mini=isMiniatura(name,volume,category)&&!isOleo(name);
   const normalKey=limparParaComparacao(name);
   const miniKey=chaveComparacaoMini(name);
+  const miniIdentity=miniIdentityKey(brand,name,volume);
   const duplicate=mini
-    ? (miniIndex.has(miniKey)||miniIndex.has(`${miniKey}|${norm(brand)}`)
-      ||miniIndex.has(`${miniKey}|armaf`)||miniIndex.has(`${miniKey}|outros`)||miniIndex.has(`${miniKey}|outra`))
+    ? miniIndex.has(miniIdentity)
     : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
   if(duplicate) {
-    const entry={name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`};
-    const existedBefore=mini?initialMiniIndex.has(miniKey):initialNormalIndex.has(normalKey);
+    const entry={name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${normalKey}`};
+    const existedBefore=mini?initialMiniIndex.has(miniIdentity):initialNormalIndex.has(normalKey);
     (existedBefore?blockedByCatalog:blockedWithinImarat).push(entry);
     continue;
   }
-  simulatedNew.push({name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`});
+  simulatedNew.push({name,brand,volume,key:mini?`mini|${norm(brand)}|${miniKey}|${volume}`:`normal|${normalKey}`});
   normalIndex.add(normalKey);
   normalIndex.add(`${normalKey}|${norm(brand)}`);
   if(mini) {
-    miniIndex.add(miniKey);
-    miniIndex.add(`${miniKey}|${norm(brand)}`);
+    miniIndex.add(miniIdentityKey(brand,name,volume));
   }
 }
 console.log("AUDITORIA GLOBAL DE DUPLICIDADE — IMARAT (SOMENTE LEITURA)");
@@ -316,6 +324,19 @@ console.log(`Itens com categoria diferente da categoria da origem: ${categoryMis
 console.log(`Grupos duplicados na própria API por identidade de produto: ${apiDuplicateGroups.length}`);
 
 console.log(`Simulação do sincronizador: ${simulatedNew.length} novos produtos únicos | ${blockedByCatalog.length} bloqueados pelo catálogo atual | ${blockedWithinImarat.length} bloqueados por repetição na própria lista Imarat`);
+
+const onlyYouProducts=source.filter(p=>norm(p.brand)==="only you");
+console.log(`VERIFICAÇÃO ESPECÍFICA ONLY YOU — origem: ${onlyYouProducts.length} produtos`);
+for(const p of onlyYouProducts) {
+  const identity=sourceIdentity(p);
+  const inCatalog=catalogBySourceIdentity.has(identity);
+  const volume=volumeFrom(p.sizeMl,p.name);
+  const inNew=simulatedNew.some(x=>norm(x.brand)==="only you"&&norm(x.name)===norm(p.name)&&x.volume===volume);
+  const inBlockedCatalog=blockedByCatalog.some(x=>norm(x.brand)==="only you"&&norm(x.name)===norm(p.name)&&x.volume===volume);
+  const inBlockedApi=blockedWithinImarat.some(x=>norm(x.brand)==="only you"&&norm(x.name)===norm(p.name)&&x.volume===volume);
+  const status=inCatalog?"PRESENTE NO CATÁLOGO":inNew?"SERÁ REIMPORTADO NA PRÓXIMA SINCRONIZAÇÃO":inBlockedCatalog?"BLOQUEADO POR COLISÃO COM ITEM DO CATÁLOGO":inBlockedApi?"REPETIDO NA PRÓPRIA API":"SEM CORRESPONDÊNCIA — REVISÃO NECESSÁRIA";
+  console.log("ONLY YOU "+JSON.stringify({id:p.id||p.productId||p.slug||"",nome:p.name,volume, categoria:p.categoria_nome||p.categoria||"",status}));
+}
 if(new Set(simulatedNew.map(x=>x.key)).size!==simulatedNew.length) throw new Error("Simulação detectou chave duplicada entre novos produtos: regra global falhou.");
 const imaratSourceCatalog=catalog.filter(x=>x.source.toLowerCase()==="imarat");
 const repeatedOriginIds=[...new Set(imaratSourceCatalog.filter(x=>x.originId).map(x=>x.originId))]
