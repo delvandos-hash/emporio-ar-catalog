@@ -1968,6 +1968,8 @@ async function main() {
   }
 
   
+  // Em reconciliação restrita à Imarat, não altere disponibilidade de Brand.
+  if (!SYNC_IMARAT_ONLY) {
   // Brand: itens do catálogo que não existem mais na loja → esgotado
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line] || []) {
@@ -1984,6 +1986,8 @@ async function main() {
         }
       }
     }
+  }
+
   }
 
   if (ADD_BRAND_NEW) {
