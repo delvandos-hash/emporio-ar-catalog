@@ -121,7 +121,7 @@ for (const [source, paths] of pathsBySource) {
     } catch (error) {
       checked++;
       failures++;
-      console.log(`FALHA source=${source}: ${error.message}`);
+      console.log(`FALHA source=${source}: erro de conexão ou resposta inválida (detalhes omitidos para proteger a origem e o caminho).`);
     }
   }
 }
