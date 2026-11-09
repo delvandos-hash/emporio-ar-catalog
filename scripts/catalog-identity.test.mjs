@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalProductKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource } from "./catalog-identity.mjs";
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource } from "./catalog-identity.mjs";
 
-test("perfumes use exact normalized title and volume globally", () => {
-  assert.equal(normalProductKey("Perfume Áureo 100ml", "100ml"), normalProductKey("PERFUME Aureo", "100ml"));
-  assert.notEqual(normalProductKey("Perfume Áureo", "100ml"), normalProductKey("Perfume Áureo Intense", "100ml"));
-  assert.notEqual(normalProductKey("Perfume Áureo", "100ml"), normalProductKey("Perfume Áureo", "50ml"));
+test("perfumes exigem nome exato, volume e marca", () => {
+  assert.equal(normalProductKey("Perfume Áureo 100ml", "100ml", "Marca A"), normalProductKey("PERFUME Aureo", "100ml", "Marca A"));
+  assert.notEqual(normalProductKey("Perfume Áureo", "100ml", "Marca A"), normalProductKey("Perfume Áureo Intense", "100ml", "Marca A"));
+  assert.notEqual(normalProductKey("Perfume Áureo", "100ml", "Marca A"), normalProductKey("Perfume Áureo", "50ml", "Marca A"));
+  assert.notEqual(normalProductKey("Perfume Áureo", "100ml", "Marca A"), normalProductKey("Perfume Áureo", "100ml", "Marca B"));
+  assert.equal(normalProductNameVolumeKey("Perfume Áureo", "100ml"), normalProductNameVolumeKey("Perfume Áureo", "100ml"));
 });
 test("miniatures normalize generic prefixes and matching brand in title", () => {
   const a={nome:"Miniatura Lattafa Yara Candy 30ml",volume:"30ml",varejo:"99,90",atacado:"69,90",foto:"https://img.example/a.webp"};
