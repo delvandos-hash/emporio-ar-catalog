@@ -7,6 +7,7 @@ const restoreOnlyYouSource = fs.readFileSync(new URL("./restore-onlyyou-minis.mj
 const auditMiniSource = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
 const auditAllSource = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
+const audit = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 
 test("limpeza de títulos só pode excluir produto com procedência Imarat explícita", () => {
   assert.match(source, /const fonteImarat = norm\(item\.fonte\) === 'imarat';/);
@@ -113,7 +114,7 @@ test("restauração Only You é append-only, respeita preço manual e valida ant
 
 test("deduplicação de miniaturas exige marca e volume compatíveis", () => {
   assert.ok(source.includes("marca|${norm(g.brand)}|nome|${chaveComparacaoMini(item.nome)}|volume|${volumeMatch(item.volume, item.nome)}"));
-  assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeMatch(volume, nome)}`"));
+  assert.ok(source.includes("const chaveComIdentidade = `${norm(brand)}|${chave}|${volumeKey}`"));
   assert.ok(source.includes("duplicado = indexMiniImarat.has(chaveComIdentidade)"));
   assert.ok(!source.includes("indexMiniImarat.has(chave)"));
 });
@@ -128,7 +129,16 @@ test("normaliza o possessivo inglês para comparar Victoria's Secret com o nome 
 test("deduplicação geral preserva nomes iguais entre marcas e volumes diferentes", () => {
   assert.ok(source.includes("const chave = id ? `id|\u0024{norm(g.brand)}|\u0024{id}`"));
   assert.ok(source.includes("`produto|\u0024{norm(g.brand)}|\u0024{limparParaComparacao(item.nome)}|\u0024{volume}`"));
-  assert.ok(source.includes("indexNormal.add(`\u0024{norm(g.brand)}|\u0024{limparParaComparacao(it.nome)}|\u0024{volumeMatch(it.volume, it.nome)}`)"));
+  assert.ok(source.includes("indexNormal.add(`\u0024{norm(g.brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
   assert.ok(!source.includes("indexNormal.add(limparParaComparacao(it.nome))"));
-  assert.ok(source.includes("duplicado = indexNormal.has(`\u0024{norm(brand)}|\u0024{limparParaComparacao(nome)}|\u0024{volumeMatch(volume, nome)}`)"));
+  assert.ok(source.includes("duplicado = indexNormal.has(`\u0024{norm(brand)}|\u0024{nomeKey}|\u0024{volumeKey}`)"));
+});
+
+test("marca ausente não pode criar duplicata ambígua em outra marca", () => {
+  assert.match(source, /const marcaConhecida = Boolean\(String\(p\.brand \|\| ''\)\.trim\(\)\)/);
+  assert.match(source, /!marcaConhecida && indexNameVolume\.has/);
+  assert.match(source, /!marcaConhecida && indexMiniNameVolume\.has/);
+  assert.match(audit, /const brandKnown=Boolean\(String\(p\.brand\|\|""\)\.trim\(\)\)/);
+  assert.match(audit, /!brandKnown&&normalNameVolumeIndex\.has/);
+  assert.match(audit, /!brandKnown&&miniNameVolumeIndex\.has/);
 });
