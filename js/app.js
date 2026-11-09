@@ -85,7 +85,7 @@ function setProductUrl(p) {
   try {
     const url = new URL(window.location.href);
     if (p) {
-      url.searchParams.set('produto', productId(p));
+      url.searchParams.set('produto', String(p.public_id || productId(p)));
     } else {
       url.searchParams.delete('produto');
     }
