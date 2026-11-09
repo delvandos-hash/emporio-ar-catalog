@@ -53,7 +53,8 @@ test("reconciliação aditiva reidentifica variantes sem remover conteúdo exist
 test("auditoria compara IDs públicos únicos e só libera fontes confirmadas", () => {
   assert.match(audit, /internalPublicIndex/);
   assert.match(audit, /rekeyLiveVariants/);
-  assert.match(audit, /rekeyAudit\.unmatched === 0/);
+  assert.doesNotMatch(audit, /rekeyAudit\.unmatched === 0/);
+  assert.match(audit, /variantes sem correspondência inequívoca continuam preservadas/);
   assert.match(audit, /internalOnlyKeys\.length <= 80/);
   assert.match(audit, /Math\.abs\(catalog\.length - internalItemCount\) <= 80/);
 });
