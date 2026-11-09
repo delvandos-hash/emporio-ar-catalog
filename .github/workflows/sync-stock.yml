@@ -62,7 +62,9 @@ jobs:
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
           SYNC_IMARAT_ONLY: ${{ github.event_name == 'push' && '1' || '0' }}
+          SYNC_DRY_RUN: ${{ github.event_name == 'push' && '1' || '0' }}
       - name: Persistir data.js após sincronização bem-sucedida
+        if: github.event_name != 'push'
         run: |
           if git diff --quiet -- js/data.js; then
             echo "data.js já está atualizado; nenhum commit necessário."
@@ -75,6 +77,7 @@ jobs:
           git push origin HEAD:main
 
       - name: Sincronizar estoque (apenas disponibilidade)
+        if: github.event_name != 'push'
         run: node scripts/sync-stock.mjs
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
