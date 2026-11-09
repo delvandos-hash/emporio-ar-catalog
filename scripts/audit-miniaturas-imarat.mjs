@@ -80,9 +80,11 @@ function isMini(item, group) {
 // O data.js versionado mantém metadados internos (incluindo precoManual)
 // que são removidos corretamente da projeção pública do Gist.
 const localDataText = readFileSync(new URL("../js/data.js", import.meta.url), "utf8");
-const localMatch = localDataText.match(/export const DATA = (\\{[\\s\\S]*?\\});\\s*\\nexport const WHATSAPP/);
-if (!localMatch) throw new Error("Não foi possível ler DATA interno de js/data.js.");
-const INTERNAL_DATA = JSON.parse(localMatch[1]);
+const dataMarker = "export const DATA = ";
+const dataStart = localDataText.indexOf(dataMarker);
+const dataEnd = localDataText.indexOf(";\\nexport const WHATSAPP", dataStart);
+if (dataStart < 0 || dataEnd < 0) throw new Error("Não foi possível ler DATA interno de js/data.js.");
+const INTERNAL_DATA = JSON.parse(localDataText.slice(dataStart + dataMarker.length, dataEnd));
 const internalIndex = new Map();
 for (const [line, groups] of Object.entries(INTERNAL_DATA)) {
   if (!Array.isArray(groups)) continue;
