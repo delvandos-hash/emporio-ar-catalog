@@ -285,7 +285,7 @@ async function main() {
     if (liveKeys.has(key)) return false;
     const row = (internalIndex.get(key) || [])[0];
     const stockRef = String(row?.publicItem?.stock_ref || "").trim();
-    if (stockRef && liveStockRefs.has(stockRef)) {
+    if (stockRef && liveStockRefs.has(norm(row?.publicGroup?.brand) + "|" + stockRef)) {
       duplicateSourceKeys.add(key);
       return false;
     }
