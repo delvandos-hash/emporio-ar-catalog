@@ -132,10 +132,15 @@ async function main() {
   const missing = [];
   for (const [line, groups] of Object.entries(liveDATA)) for (const group of groups || []) {
     for (const item of group.items || []) {
-      if (item.public_id && !checkIds.has(item.public_id) && !(item.stock_ref && checkStockRefs.has(item.stock_ref))) missing.push(item.public_id);
+      if (item.public_id && !checkIds.has(item.public_id) && !(item.stock_ref && checkStockRefs.has(item.stock_ref))) {
+        missing.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, public_id: item.public_id, stock_ref: item.stock_ref || "" });
+      }
     }
   }
-  if (missing.length) throw new Error(`Restaram ${missing.length} public_id do Gist sem representação interna; nada foi salvo.`);
+  if (missing.length) {
+    console.log("GIST_PUBLIC_ID_AINDA_AUSENTE " + JSON.stringify(missing));
+    throw new Error(`Restaram ${missing.length} public_id do Gist sem representação interna; nada foi salvo.`);
+  }
 
   const out = "/** Empório A.R — recuperação aditiva de legado Gist " + new Date().toISOString() + " */\n" +
     "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
