@@ -127,6 +127,11 @@ for(const [line,groups] of Object.entries(DATA)) {
   }
 }
 const {all:source,total,pages}=await fetchAllImarat();
+const afeersApi=source.filter(p=>norm(p.brand).includes("afeer")||norm(p.name).includes("afeer")||norm(p.name).includes("atherri")||norm(p.name).includes("atheri"));
+const afeersCatalog=catalog.filter(x=>norm(x.category)==="miniaturas"&&norm(x.brand).includes("afeer"));
+console.log("AUDITORIA ESPECÍFICA AFEER — API: "+afeersApi.length+" | CATÁLOGO: "+afeersCatalog.length);
+for(const p of afeersApi) console.log("AFEER API "+JSON.stringify({nome:p.name,marca:p.brand,volume:volumeFrom(p.sizeMl,p.name),id:p.id,slug:p.slug}));
+for(const p of afeersCatalog) console.log("AFEER CATÁLOGO "+JSON.stringify({nome:p.name,marca:p.brand,volume:p.volume,fonte:p.source||"não informada"}));
 const catalogByKey=new Map();
 for(const item of catalog) add(catalogByKey,item.key,item);
 const apiByKey=new Map();
