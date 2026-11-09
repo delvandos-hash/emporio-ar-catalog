@@ -1312,6 +1312,8 @@ async function main() {
     for (const g of DATA[line]) {
       for (const it of g.items) {
         indexNormal.add(`${limparParaComparacao(it.nome)}|${norm(g.brand)}`);
+        // Regra global homologada: bloqueia reimportação mesmo se a marca/grupo mudar.
+        indexNormal.add(limparParaComparacao(it.nome));
         if (isMiniatura(it.nome, it.volume, g.cat) && !isOleo(it.nome)) {
           const chaveMini = chaveComparacaoMini(it.nome);
           // Regra homologada: comparação global por nome-base, sem prefixo e sem volume,
@@ -1377,6 +1379,7 @@ async function main() {
       }, true));
       
       indexNormal.add(`${limparParaComparacao(nome)}|${norm(brand)}`);
+      indexNormal.add(limparParaComparacao(nome));
       if (ehMini) {
         const chave = chaveComparacaoMini(nome);
         indexMiniImarat.add(chave);
