@@ -829,11 +829,11 @@ const DANDE_CATEGORIES = [
   { path: '/colares/', nome: 'Colares' },
   { path: '/conjuntos/', nome: 'Conjuntos' },
   { path: '/lancamentos/', nome: 'Lançamentos' },
-  { path: '/masculinos/', nome: 'Masculinos' },
+  { path: '/masculino/', nome: 'Masculinos' },
   { path: '/prata-925/', nome: 'Prata 925' },
   { path: '/pulseiras/', nome: 'Pulseiras' },
   { path: '/semijoia-italiana/', nome: 'Semijoia Italiana' },
-  { path: '/tornozeleiras/', nome: 'Tornozeleiras' },
+  { path: '/tornozeleiras1/', nome: 'Tornozeleiras' },
 ];
 
 function calcPrecosAcessorios(precoBase) {
@@ -1193,9 +1193,17 @@ async function main() {
     const hair = groups.find((g) => g.cat === 'Acessórios de Cabelo');
     const hairItems = hair?.items || [];
     const missingImages = hairItems.filter((item) => !(item.foto || (Array.isArray(item.fotos) && item.fotos.length))).length;
-    console.log(`VALIDAÇÃO DANDE: coletados na origem em Acessórios de Cabelo=${hairCount}; itens no snapshot=${hairItems.length}; sem imagem=${missingImages}`);
-    if (hairCount < 1) throw new Error('Dande não retornou produtos novos/visíveis para Acessórios de Cabelo.');
+    const masculineCount = DANDE_SCRAPE_COUNTS.get('Masculinos') || 0;
+    const ankleCount = DANDE_SCRAPE_COUNTS.get('Tornozeleiras') || 0;
+    const masculineItems = groups.find((g) => g.cat === 'Masculinos')?.items || [];
+    const ankleItems = groups.find((g) => g.cat === 'Tornozeleiras')?.items || [];
+    const wrongMasculine = masculineItems.filter((item) => !/masculin/i.test(item.nome || '')).length;
+    const wrongAnkle = ankleItems.filter((item) => !/tornoz/i.test(item.nome || '')).length;
+    console.log(`VALIDAÇÃO DANDE: Acessórios de Cabelo origem=${hairCount}; itens=${hairItems.length}; sem imagem=${missingImages}; Masculinos origem=${masculineCount}; Tornozeleiras origem=${ankleCount}; itens sem nome compatível=${wrongMasculine + wrongAnkle}`);
+    if (hairCount < 1) throw new Error('Dande não retornou produtos para Acessórios de Cabelo.');
     if (!hairItems.length || missingImages > 0) throw new Error('Validação de Acessórios de Cabelo falhou: itens ou imagens ausentes.');
+    if (masculineCount < 1 || ankleCount < 1) throw new Error('Dande não retornou produtos em Masculinos e/ou Tornozeleiras; confira os caminhos das categorias.');
+    if (wrongMasculine > 0 || wrongAnkle > 0) throw new Error('Produtos de Masculinos/Tornozeleiras não correspondem ao nome esperado.');
     console.log('SYNC_DRY_RUN=1 — nenhuma alteração foi enviada ao Gist.');
     return;
   }
