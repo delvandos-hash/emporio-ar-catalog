@@ -148,7 +148,7 @@ const internalIndex=new Map();
 for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
   if(!Array.isArray(groups)) continue;
   for(const group of groups) for(const item of (Array.isArray(group?.items)?group.items:[])) {
-    const key=[norm(line),norm(group.brand),norm(item.nome),volumeFrom(item.volume,item.nome)].join("|");
+    const key=[norm(line),norm(group.brand),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
     if(!internalIndex.has(key)) internalIndex.set(key,[]);
     internalIndex.get(key).push(item);
   }
@@ -161,7 +161,7 @@ for(const [line,groups] of Object.entries(DATA)) {
     const name=String(item.nome||"").trim();
     if(!name) continue;
     const volume=String(item.volume||volumeFrom(null,name));
-    const internalKey=[norm(line),norm(group.brand),norm(name),volumeFrom(volume,name)].join("|");
+    const internalKey=[norm(line),norm(group.brand),norm(name),volumeMatch(volume,name)].join("|");
     const internal=internalIndex.get(internalKey)?.[0];
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
@@ -172,10 +172,10 @@ for(const [line,groups] of Object.entries(DATA)) {
   }
 }
 const internalItemCount=[...internalIndex.values()].reduce((sum,items)=>sum+items.length,0);
-const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.name),volumeFrom(x.volume,x.name)].join("|")));
+const liveKeySet=new Set(catalog.map(x=>[norm(x.line),norm(x.brand),norm(x.name),volumeMatch(x.volume,x.name)].join("|")));
 const internalOnlyKeys=[...internalIndex.keys()].filter(key=>!liveKeySet.has(key));
 const liveOnlyKeys=[...liveKeySet].filter(key=>!internalIndex.has(key));
-console.log(`COMPARAÇÃO BASE INTERNA × GIST VIVO: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}`);
+console.log(`COMPARAÇÃO EXATA DO BLOQUEIO DE SYNC: data.js interno=${internalItemCount} itens; Gist vivo=${catalog.length} itens; chaves só no data.js=${internalOnlyKeys.length}; chaves só no Gist=${liveOnlyKeys.length}; limite de publicação=25; publicação permitida=${internalOnlyKeys.length<=25&&liveOnlyKeys.length<=25&&Math.abs(catalog.length-internalItemCount)<=25}`);
 for(const key of internalOnlyKeys.slice(0,30)) console.log("SÓ NO DATA.JS "+key);
 for(const key of liveOnlyKeys.slice(0,30)) console.log("SÓ NO GIST "+key);
 
