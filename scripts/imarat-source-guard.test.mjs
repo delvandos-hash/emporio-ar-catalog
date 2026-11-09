@@ -140,3 +140,8 @@ test("sincronização não remove produtos já existentes automaticamente", () =
   assert.doesNotMatch(source, /miniaturasGlobaisVistas/);
   assert.doesNotMatch(source, /miniaturasDuplicadasRemovidas\+\+/);
 });
+
+test("auditorias não classificam miniaturas de marcas diferentes como duplicatas", () => {
+  assert.match(auditMiniSource, /key: norm\(line\) \+ "\|" \+ norm\(group\.brand\) \+ "\|" \+ name/);
+  assert.match(auditAllSource, /mini\|\$\{norm\(brand\|\|"outros"\)\}\|\$\{chaveComparacaoMini\(nome\)\}\|\$\{volumeMatch\(volume,nome\)\}/);
+});
