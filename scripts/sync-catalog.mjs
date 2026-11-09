@@ -69,8 +69,9 @@ function preserveLivePublicFields(DATA, liveDATA) {
           liveByPublicId.get(id).push(item);
         }
         if (item.stock_ref) {
-          if (!liveByStockRef.has(String(item.stock_ref))) liveByStockRef.set(String(item.stock_ref), []);
-          liveByStockRef.get(String(item.stock_ref)).push(item);
+          const stockKey = norm(group?.brand) + "|" + String(item.stock_ref);
+          if (!liveByStockRef.has(stockKey)) liveByStockRef.set(stockKey, []);
+          liveByStockRef.get(stockKey).push(item);
         }
         if (item.origin_ref) {
           if (!liveByOriginRef.has(String(item.origin_ref))) liveByOriginRef.set(String(item.origin_ref), []);
@@ -111,7 +112,8 @@ function preserveLivePublicFields(DATA, liveDATA) {
           if (publicMatches.length === 1) liveItem = publicMatches[0];
         }
         if (!liveItem && publicItem.stock_ref) {
-          const refs = (liveByStockRef.get(String(publicItem.stock_ref)) || []).filter(x => !used.has(x));
+          const stockKey = norm(group?.brand) + "|" + String(publicItem.stock_ref);
+          const refs = (liveByStockRef.get(stockKey) || []).filter(x => !used.has(x));
           if (refs.length === 1) liveItem = refs[0];
         }
         if (!liveItem) {
