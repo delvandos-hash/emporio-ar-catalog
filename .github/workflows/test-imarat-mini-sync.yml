@@ -67,3 +67,5 @@ jobs:
           name: data-js-dry-run-${{ github.run_id }}
           path: js/data.js
           retention-days: 7
+
+# Dry-run isolated: source credentials are explicitly passed to the sync step.
