@@ -1,0 +1,243 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { toPublicCatalog } from "./public-catalog.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const dataPath = path.join(__dirname, "..", "js", "data.js");
+const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
+
+function norm(value) {
+  return String(value || "").toLowerCase().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").replace(/['’]s\b/gi, "")
+    .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+}
+function volumeMatch(value, name) {
+  let raw = String(value || "").trim();
+  if (raw && /^\d+(?:[.,]\d+)?$/.test(raw)) raw += "ml";
+  const match = raw.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i) ||
+    String(name || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  return match ? String(Number(match[1].replace(",", "."))) + match[2].toLowerCase() : "";
+}
+function identity(line, group, item) {
+  return [norm(line), norm(group?.brand), norm(group?.cat), norm(item?.nome), volumeMatch(item?.volume, item?.nome)].join("|");
+}
+function priceNumber(value) {
+  const raw = String(value ?? "").trim().replace(/[^0-9,.-]/g, "");
+  if (!raw) return NaN;
+  return Number(raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw);
+}
+function mergePublicFields(target, publicItem) {
+  const publicRetail = priceNumber(publicItem.varejo);
+  const publicWholesale = priceNumber(publicItem.atacado);
+  const currentRetail = priceNumber(target.varejo);
+  const currentWholesale = priceNumber(target.atacado);
+  if (Number.isFinite(publicRetail) && Number.isFinite(publicWholesale) &&
+      (publicRetail !== currentRetail || publicWholesale !== currentWholesale)) {
+    target.varejo = publicItem.varejo;
+    target.atacado = publicItem.atacado;
+    target.precoManual = true;
+  }
+  const existingPhotos = [
+    ...(Array.isArray(target.fotos) ? target.fotos : []),
+    target.foto || ""
+  ];
+  const publicPhotos = [
+    ...(Array.isArray(publicItem.fotos) ? publicItem.fotos : []),
+    publicItem.foto || ""
+  ];
+  const mergedPhotos = [...new Set([...existingPhotos, ...publicPhotos].map(x => String(x || "").trim()).filter(Boolean))];
+  if (mergedPhotos.length) target.fotos = mergedPhotos;
+  if (publicItem.foto) target.foto = publicItem.foto;
+  if (publicItem.notas) target.notas = publicItem.notas;
+  if (publicItem.badge) target.badge = publicItem.badge;
+  if (publicItem.novoDesde) target.novoDesde = publicItem.novoDesde;
+  if (Array.isArray(publicItem.variacoes) && publicItem.variacoes.length) {
+    target.variacoes = [...publicItem.variacoes];
+  }
+  if (!target.stock_ref && publicItem.stock_ref) target.stock_ref = publicItem.stock_ref;
+  if (!target.stock_route && publicItem.stock_route) target.stock_route = publicItem.stock_route;
+  if (!target.public_id && publicItem.public_id) target.public_id = publicItem.public_id;
+}
+function legacyFromPublic(item) {
+  return {
+    ...(item.public_id ? { public_id: item.public_id } : {}),
+    nome: item.nome,
+    volume: item.volume || "—",
+    varejo: item.varejo,
+    atacado: item.atacado,
+    foto: item.foto || "",
+    ...(Array.isArray(item.fotos) ? { fotos: [...item.fotos] } : {}),
+    notas: item.notas || "",
+    badge: item.badge || "",
+    ...(item.novoDesde ? { novoDesde: item.novoDesde } : {}),
+    ...(Array.isArray(item.variacoes) ? { variacoes: [...item.variacoes] } : {}),
+    disponivel: item.disponivel || "Não",
+    ...(item.stock_ref ? { stock_ref: item.stock_ref } : {}),
+    ...(item.stock_route ? { stock_route: item.stock_route } : {}),
+    precoManual: true,
+    fonte: "legacy-gist"
+  };
+}
+function buildIndexes(DATA) {
+  const publicDATA = toPublicCatalog(DATA);
+  const identityIndex = new Map();
+  const stockIndex = new Map();
+  const publicIdIndex = new Map();
+  const buckets = new Map();
+  for (const [line, groups] of Object.entries(publicDATA)) {
+    for (const group of groups || []) for (const publicItem of group.items || []) {
+      const key = identity(line, group, publicItem);
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(publicItem);
+    }
+  }
+  for (const [line, groups] of Object.entries(DATA)) {
+    for (const group of groups || []) for (const item of group.items || []) {
+      const key = identity(line, group, item);
+      const publicItem = buckets.get(key)?.shift();
+      if (!publicItem) throw new Error("Não foi possível mapear item interno para catálogo público: " + key);
+      const row = { line, group, item, publicItem };
+      if (!identityIndex.has(key)) identityIndex.set(key, []);
+      identityIndex.get(key).push(row);
+      if (publicItem.stock_ref) {
+        if (!stockIndex.has(publicItem.stock_ref)) stockIndex.set(publicItem.stock_ref, []);
+        stockIndex.get(publicItem.stock_ref).push(row);
+      }
+      if (publicItem.public_id) publicIdIndex.set(publicItem.public_id, row);
+    }
+  }
+  return { publicDATA, identityIndex, stockIndex, publicIdIndex };
+}
+function readInternal() {
+  const raw = fs.readFileSync(dataPath, "utf8");
+  const match = raw.match(/export const DATA = (\{[\s\S]*?\});\s*\nexport const WHATSAPP/);
+  if (!match) throw new Error("DATA não encontrada em js/data.js");
+  const DATA = JSON.parse(match[1]);
+  const whatsapp = raw.match(/export const WHATSAPP = [^;]+;/)?.[0] || 'export const WHATSAPP = "5562991134488";';
+  const brand = raw.match(/export const BRAND = [^;]+;/)?.[0] || 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };';
+  return { DATA, whatsapp, brand };
+}
+async function fetchGist(token) {
+  const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "EmporioAR-Legacy-Recovery/1.0"
+    }
+  });
+  if (!response.ok) throw new Error(`Falha ao ler Gist: HTTP ${response.status}`);
+  const gist = await response.json();
+  const file = gist.files?.["catalogo.json"];
+  if (!file) throw new Error("Gist sem catalogo.json");
+  let raw = file.content;
+  if (file.truncated || !raw) {
+    if (!file.raw_url) throw new Error("Gist truncado sem raw_url");
+    const rawResponse = await fetch(file.raw_url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!rawResponse.ok) throw new Error(`Falha ao baixar Gist: HTTP ${rawResponse.status}`);
+    raw = await rawResponse.text();
+  }
+  const snapshot = JSON.parse(String(raw).replace(/^\uFEFF/, ""));
+  const DATA = snapshot.DATA || snapshot;
+  if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("DATA pública inválida");
+  return DATA;
+}
+function addLegacy(DATA, line, group, publicItem) {
+  if (!Array.isArray(DATA[line])) DATA[line] = [];
+  const cat = String(group.cat || "Roupas");
+  let target = DATA[line].find(g => norm(g.brand) === norm(group.brand) && norm(g.cat) === norm(cat));
+  if (!target) {
+    target = { brand: group.brand || "Empório A.R", cat, items: [] };
+    DATA[line].push(target);
+  }
+  const legacy = legacyFromPublic(publicItem);
+  target.items.push(legacy);
+  return legacy;
+}
+async function main() {
+  const token = process.env.GIST_TOKEN;
+  if (!token) throw new Error("GIST_TOKEN ausente");
+  const { DATA, whatsapp, brand } = readInternal();
+  const liveDATA = await fetchGist(token);
+  let indexes = buildIndexes(DATA);
+  let restored = 0, merged = 0;
+  const ambiguous = [];
+
+  // Recupera apenas roupas e acessórios Empório A.R que ainda estão no Gist.
+  // stock_ref identifica variantes distintas; sem stock_ref, exige identidade inequívoca.
+  for (const [line, groups] of Object.entries(liveDATA)) {
+    if (!["roupas", "acessorios"].includes(norm(line))) continue;
+    for (const group of Array.isArray(groups) ? groups : []) {
+      if (norm(group?.brand) !== "emporio a r") continue;
+      for (const publicItem of Array.isArray(group?.items) ? group.items : []) {
+        if (!publicItem?.nome) continue;
+        const key = identity(line, group, publicItem);
+        const stockRef = String(publicItem.stock_ref || "").trim();
+        const stockMatches = stockRef ? (indexes.stockIndex.get(stockRef) || []) : [];
+        if (stockMatches.length === 1) {
+          mergePublicFields(stockMatches[0].item, publicItem);
+          merged++;
+          continue;
+        }
+        if (stockMatches.length > 1) {
+          ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, stock_ref: stockRef, matches: stockMatches.length });
+          continue;
+        }
+
+        const matches = indexes.identityIndex.get(key) || [];
+        if (matches.length === 1) {
+          const existingStockRef = String(matches[0].publicItem.stock_ref || "").trim();
+          if (!stockRef || !existingStockRef || stockRef === existingStockRef) {
+            mergePublicFields(matches[0].item, publicItem);
+            merged++;
+            continue;
+          }
+          // Mesmo nome, marca e categoria, mas stock_ref diferente: é outra variante.
+        } else if (matches.length > 1 && !stockRef) {
+          ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, matches: matches.length });
+          continue;
+        }
+        const legacy = addLegacy(DATA, line, group, publicItem);
+        restored++;
+        // Atualiza índices para que uma segunda passagem veja a variante já preservada.
+        indexes = buildIndexes(DATA);
+      }
+    }
+  }
+
+  if (ambiguous.length) {
+    console.log("LEGACY_GIST_IDENTITY_AMBIGUA " + JSON.stringify(ambiguous));
+    throw new Error(`Há ${ambiguous.length} identidades legadas ambíguas; nada foi salvo.`);
+  }
+
+  const check = buildIndexes(DATA);
+  const missing = [];
+  for (const [line, groups] of Object.entries(liveDATA)) {
+    if (!["roupas", "acessorios"].includes(norm(line))) continue;
+    for (const group of groups || []) {
+      if (norm(group?.brand) !== "emporio a r") continue;
+      for (const item of group.items || []) {
+        const stockRef = String(item.stock_ref || "").trim();
+        const stockMatches = stockRef ? (check.stockIndex.get(stockRef) || []) : [];
+        const key = identity(line, group, item);
+        const identityMatches = check.identityIndex.get(key) || [];
+        if (!stockMatches.length && !identityMatches.length) {
+          missing.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, stock_ref: stockRef, public_id: item.public_id || "" });
+        }
+      }
+    }
+  }
+  if (missing.length) {
+    console.log("GIST_IDENTITY_AINDA_AUSENTE " + JSON.stringify(missing));
+    throw new Error(`Restaram ${missing.length} itens legados sem representação interna; nada foi salvo.`);
+  }
+  if (restored > 80) throw new Error(`Restauração legada excedeu limite seguro (80): ${restored}; nada foi salvo.`);
+
+  const out = "/** Empório A.R — recuperação aditiva de legado Gist " + new Date().toISOString() + " */\n" +
+    "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
+  fs.writeFileSync(dataPath, out, "utf8");
+  console.log(`LEGACY_GIST_RESTORED=${restored} LEGACY_GIST_MERGED=${merged}`);
+  console.log("Todos os itens públicos Empório A.R de roupas e acessórios permanecem representados no data.js.");
+}
+main().catch(error => { console.error(error); process.exit(1); });
