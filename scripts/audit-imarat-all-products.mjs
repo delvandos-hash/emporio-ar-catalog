@@ -153,8 +153,11 @@ for(const item of catalog) {
   if(isMiniatura(item.name,item.volume,item.category)&&!isOleo(item.name))
     miniIndex.add(chaveComparacaoMini(item.name));
 }
+const initialNormalIndex=new Set(normalIndex);
+const initialMiniIndex=new Set(miniIndex);
 const simulatedNew=[];
-const simulatedBlocked=[];
+const blockedByCatalog=[];
+const blockedWithinImarat=[];
 for(const p of source) {
   const name=String(p.name||"").trim();
   if(!name) continue;
@@ -169,7 +172,9 @@ for(const p of source) {
       ||miniIndex.has(`${miniKey}|armaf`)||miniIndex.has(`${miniKey}|outros`)||miniIndex.has(`${miniKey}|outra`))
     : (normalIndex.has(`${normalKey}|${norm(brand)}`)||normalIndex.has(normalKey));
   if(duplicate) {
-    simulatedBlocked.push({name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`});
+    const entry={name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`};
+    const existedBefore=mini?initialMiniIndex.has(miniKey):initialNormalIndex.has(normalKey);
+    (existedBefore?blockedByCatalog:blockedWithinImarat).push(entry);
     continue;
   }
   simulatedNew.push({name,brand,volume,key:mini?`mini|${miniKey}`:`normal|${normalKey}`});
@@ -202,7 +207,8 @@ console.log(`Itens do catálogo cuja chave coincide com algum produto Imarat: ${
 console.log(`Grupos de colisão de chave no catálogo (2+ itens para chave Imarat): ${imaratDuplicateGroups.length}`);
 console.log(`Grupos duplicados na própria API Imarat: ${apiDuplicateGroups.length}`);
 console.log(`Produtos da API cuja chave já existe no catálogo (bloqueio esperado): ${apiAlreadyPresent.length}`);
-console.log(`Simulação do sincronizador: ${simulatedNew.length} novos produtos únicos | ${simulatedBlocked.length} bloqueados por chave já existente/repetida`);
+console.log(`Simulação do sincronizador: ${simulatedNew.length} novos produtos únicos | ${blockedByCatalog.length} bloqueados pelo catálogo atual | ${blockedWithinImarat.length} bloqueados por repetição na própria lista Imarat`);
+if(new Set(simulatedNew.map(x=>x.key)).size!==simulatedNew.length) throw new Error("Simulação detectou chave duplicada entre novos produtos: regra global falhou.");
 const imaratSourceCatalog=catalog.filter(x=>x.source.toLowerCase()==="imarat");
 const repeatedOriginIds=[...new Set(imaratSourceCatalog.filter(x=>x.originId).map(x=>x.originId))]
   .filter(id=>imaratSourceCatalog.filter(x=>x.originId===id).length>1);
