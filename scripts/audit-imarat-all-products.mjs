@@ -302,7 +302,8 @@ const internalOnlySourceConfirmed = eligibleInternalOnlyRows.every(({ row }) =>
   (effectiveAdditiveSource(row) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
 );
 const additiveReconciliationSafe =
-  rekeyAudit.unmatched === 0 &&
+  // Variantes sem correspondência inequívoca continuam preservadas no Gist;
+  // a reconciliação nunca exige rekey forçado para aprovar uma operação aditiva.
   liveOnlyKeys.length === 0 &&
   eligibleInternalOnlyRows.length > 0 &&
   eligibleInternalOnlyRows.length <= 80 &&
