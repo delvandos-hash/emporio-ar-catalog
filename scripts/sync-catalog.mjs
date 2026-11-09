@@ -27,6 +27,8 @@ const BRAND_ALLOWED_SESSIONS = [
 ];
 
 const SYNC_DRY_RUN = process.env.SYNC_DRY_RUN === '1';
+const SYNC_SKIP_DETAILS = process.env.SYNC_SKIP_DETAILS === '1';
+const SYNC_IMARAT_ONLY = process.env.SYNC_IMARAT_ONLY === '1';
 const SYNC_DANDE_ONLY = process.env.SYNC_DANDE_ONLY === '1';
 const ADD_IMARAT_NEW = process.env.ADD_IMARAT_NEW !== '0';
 const ADD_BRAND_NEW = process.env.ADD_BRAND_NEW !== '0';
@@ -103,7 +105,11 @@ function removerMarcaDoNome(s) {
 
 // Mini Marshmellow === Mini Armaf Marshmellow → "marshmellow"
 function chaveComparacaoMini(nome) {
-  return removerMarcaDoNome(removerPrefixosMini(limparParaComparacao(nome)));
+  const nomeNormalizado = limparParaComparacao(nome);
+  // Corrige a variação de digitação conhecida da miniatura Afeer:
+  // "Miniatura Atheri Afeer" e "Miniatura Atherri Afeer" são o mesmo produto.
+  if (nomeNormalizado === 'miniatura atheri afeer' || nomeNormalizado === 'miniatura atherri afeer') return 'atherri';
+  return removerMarcaDoNome(removerPrefixosMini(nomeNormalizado));
 }
 
 function isOleo(nome) {
@@ -157,7 +163,8 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
   if (isKitLattafa(nome, brand)) return { varejo: fmtBRL(precoVarejoOrig + 110), atacado: fmtBRL(precoAtacadoOrig + 90) };
   
   if (b.includes('orientica')) return { varejo: fmtBRL(precoVarejoOrig + 75), atacado: fmtBRL(precoAtacadoOrig + 45) };
-  if (b.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 40), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
+  // Afeer pode vir sem a marca estruturada na API; reconhecer também pelo nome do produto.
+  if (b.includes('afeer') || n.includes('afeer')) return { varejo: fmtBRL(precoVarejoOrig + 40), atacado: fmtBRL(precoAtacadoOrig + 30) }; 
   if (b.includes('clive')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('only')) return { varejo: fmtBRL(precoVarejoOrig + 60), atacado: fmtBRL(precoAtacadoOrig + 40) };
   if (b.includes('armaf')) return { varejo: fmtBRL(precoVarejoOrig + 70), atacado: fmtBRL(precoAtacadoOrig + 40) };
@@ -202,6 +209,12 @@ function notesToText(notes) {
   if (heart) parts.push('Coração: ' + heart);
   if (base) parts.push('Fundo: ' + base);
   return parts.join(' | ');
+}
+
+// No catálogo público, a marca genérica "Imarat" deve ser apresentada como Empório A.R.
+function marcaPublicaImarat(brand) {
+  const valor = limparTexto(brand || 'Outros');
+  return norm(valor) === 'imarat' ? 'Empório A.R' : valor;
 }
 
 function ensureBrandGroup(DATA, line, brand, cat) {
@@ -254,7 +267,7 @@ function priceBrand(orig, isArabicMini, session) {
 
 async function fetchImaratList() {
   const all = [];
-  let page = 1, total = 0, fetched = 0;
+  let page = 1, total = 0, fetched = 0, prefixosMarcaRemovidos = 0;
   for (let g = 0; g < 40; g++) {
     const res = await fetch(`${IMARAT_API}?page=${page}&perPage=60`, {
       headers: { 'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Accept-Charset': 'utf-8' },
@@ -268,6 +281,13 @@ async function fetchImaratList() {
     for (const p of products) {
         p.name = limparTexto(p.name);
         if (p.brand) p.brand = limparTexto(p.brand);
+        // O site raiz separa marca e nome comercial. Na linha Arabiyat Prestige,
+        // "Prestige" não integra o nome Noiré Absolu: remover apenas quando vier
+        // como prefixo redundante e a marca confirmar Arabiyat Prestige.
+        if (norm(p.brand).includes('arabiyat prestige') && /^prestige\s+/i.test(String(p.name || ''))) {
+          p.name = String(p.name).replace(/^prestige\s+/i, '').trim();
+          prefixosMarcaRemovidos++;
+        }
         if (p.shortDesc) p.shortDesc = limparTexto(p.shortDesc);
         if (p.description) p.description = limparTexto(p.description);
     }
@@ -276,6 +296,10 @@ async function fetchImaratList() {
     if (fetched >= total || products.length < 60) break;
     page++;
   }
+  if (total && fetched < total) {
+    throw new Error(`Paginação Imarat incompleta: recebidos ${fetched} de ${total} produtos. Sincronização interrompida para evitar limpeza com lista parcial.`);
+  }
+  console.log(`Prefixos de marca removidos do nome Imarat (Arabiyat Prestige): ${prefixosMarcaRemovidos}`);
   return all;
 }
 
@@ -1223,6 +1247,34 @@ async function main() {
   const imaratList = await fetchImaratList();
   console.log(`Imarat: ${imaratList.length} produtos`);
 
+  const imaratNomesAtuais = new Set(imaratList.map(p => norm(p.name)).filter(Boolean));
+  const marcasImaratAtuais = new Set(imaratList.map(p => {
+    const marca = limparTexto(p.brand || 'Outros');
+    return norm(marca) === 'imarat' ? norm('Empório A.R') : norm(marca);
+  }));
+  const categoriasImarat = new Set(['perfumes', 'miniaturas', 'oleos']);
+  let produtosImaratForaDoSiteRaizRemovidos = 0;
+  const relatorioImaratNomesRemovidos = [];
+  // Remove registros explicitamente Imarat e itens em grupos de marcas presentes
+  // na API Imarat quando o título não existe na listagem completa do site raiz.
+  // Grupos/categorias de outras fontes permanecem intactos.
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      const marcaGrupo = norm(g.brand);
+      const grupoImarat = categoriasImarat.has(norm(g.cat)) && marcaGrupo !== 'outros' && marcaGrupo !== 'outra' && marcasImaratAtuais.has(marcaGrupo);
+      g.items = (g.items || []).filter(item => {
+        const fonteImarat = String(item.fonte || '').toLowerCase() === 'imarat';
+        if (!fonteImarat && !grupoImarat) return true;
+        if (imaratNomesAtuais.has(norm(item.nome))) return true;
+        produtosImaratForaDoSiteRaizRemovidos++;
+        relatorioImaratNomesRemovidos.push({ linha: line, marca: g.brand, categoria: g.cat, nome: item.nome, fonte: item.fonte || 'grupo de marca Imarat' });
+        return false;
+      });
+    }
+  }
+  console.log(`Produtos Imarat removidos por nome ausente no site raiz: ${produtosImaratForaDoSiteRaizRemovidos}`);
+  for (const removido of relatorioImaratNomesRemovidos) console.log('TÍTULO FORA DO SITE RAIZ REMOVIDO: ' + JSON.stringify(removido));
+
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
 
   for (const line of Object.keys(DATA)) {
@@ -1234,29 +1286,27 @@ async function main() {
         if (it.notas) it.notas = limparTexto(it.notas);
 
         const n = norm(it.nome); const b = norm(g.brand);
-        
-        const hit = imaratList.find((p) => norm(p.name) === n && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === n);
+        // Compatibilidade para registros antigos com o prefixo redundante "Prestige"
+        // no nome, quando a marca do grupo confirma Arabiyat Prestige.
+        const nomeSemPrefixoPrestige = b.includes('arabiyat prestige') ? n.replace(/^prestige\s+/, '') : n;
+        const hit = imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige && (norm(p.brand) === b || !b || norm(p.brand).includes(b) || b.includes(norm(p.brand)))) || imaratList.find((p) => norm(p.name) === nomeSemPrefixoPrestige);
         if (!hit) continue;
-        
-        it.nome = hit.name; 
-        
-        let notas = '';
-        if (hit.slug) { 
-            const detail = await fetchImaratDetail(hit.slug); 
-            if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400); 
-        }
-        if (notas) it.notas = notas;
 
-        // Galeria: busca imagens extras no detalhe da Imarat
+        // Identifica a origem para a limpeza global de duplicatas históricas Imarat.
+        it.fonte = 'imarat';
+        it.nome = hit.name;
+        // Regra comercial vigente: marca "Imarat" na origem é exibida como Empório A.R.
+        if (norm(hit.brand) === 'imarat') g.brand = 'Empório A.R'; 
+        
+        // Uma única consulta ao detalhe alimenta notas e galeria, evitando
+        // duas requisições idênticas por produto durante a sincronização.
         let detailImgs = null;
-        if (hit.slug) {
-          const detail2 = await fetchImaratDetail(hit.slug);
-          if (detail2) {
-            if (!notas) {
-              const n2 = notesToText(detail2.notes) || (detail2.shortDesc || detail2.description || '').slice(0, 400);
-              if (n2) it.notas = sanitizarNotas(n2);
-            }
-            detailImgs = detail2;
+        let notas = '';
+        if (hit.slug && !SYNC_SKIP_DETAILS) {
+          detailImgs = await fetchImaratDetail(hit.slug);
+          if (detailImgs) {
+            notas = notesToText(detailImgs.notes) || (detailImgs.shortDesc || detailImgs.description || '').slice(0, 400);
+            if (notas) it.notas = sanitizarNotas(notas);
           }
         }
         const imgs = imaratImagesFrom(hit, detailImgs);
@@ -1282,7 +1332,7 @@ async function main() {
         if (it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1) {
           // mantém preços definidos manualmente
         } else {
-          const prices = calcularPrecoMiniatura(it.nome, g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+          const prices = calcularPrecoMiniatura(it.nome, hit.brand || g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
           if (it.varejo !== prices.varejo || it.atacado !== prices.atacado) {
             it.varejo = prices.varejo;
             it.atacado = prices.atacado;
@@ -1293,18 +1343,67 @@ async function main() {
     }
   }
 
-  // Filtro de segurança (remove duplicatas exatas dentro do mesmo grupo)
-  for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line]) {
-        const vistos = new Set();
-        g.items = g.items.filter(item => {
-            const chave = limparParaComparacao(item.nome); 
-            if (vistos.has(chave)) return false;
-            vistos.add(chave);
-            return true;
-        });
+  // Correção nominal específica validada pelo responsável do catálogo:
+  // Atheri é a grafia incorreta; Atherri é a grafia correta da miniatura Afeer.
+  // Só atua na categoria Miniaturas e no grupo da marca Afeer.
+  const nomeMiniAfeerErrado = 'miniatura atheri afeer';
+  const nomeMiniAfeerCorreto = 'miniatura atherri afeer';
+  const miniAfeerCorretaNaApi = imaratList.some(p =>
+    norm(p.name) === nomeMiniAfeerCorreto && norm(p.brand || '').includes('afeer')
+  );
+  const miniAfeerCorretaNoSnapshot = Object.keys(DATA).some(line =>
+    (DATA[line] || []).some(g =>
+      norm(g.cat).includes('miniatura') &&
+      norm(g.brand).includes('afeer') &&
+      (g.items || []).some(item => norm(item.nome) === nomeMiniAfeerCorreto)
+    )
+  );
+  let miniAfeerGrafiaErradaRemovida = 0;
+  if (miniAfeerCorretaNaApi || miniAfeerCorretaNoSnapshot) {
+    for (const line of Object.keys(DATA)) {
+      for (const g of DATA[line] || []) {
+        if (!norm(g.cat).includes('miniatura') || !norm(g.brand).includes('afeer')) continue;
+        const antes = (g.items || []).length;
+        g.items = (g.items || []).filter(item => norm(item.nome) !== nomeMiniAfeerErrado);
+        miniAfeerGrafiaErradaRemovida += antes - g.items.length;
+      }
     }
   }
+  console.log(`Miniatura Atheri Afeer (grafia incorreta) removida: ${miniAfeerGrafiaErradaRemovida}`);
+
+  // Filtro de segurança: duplicatas exatas dentro de cada grupo.
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line]) {
+      const vistos = new Set();
+      g.items = g.items.filter(item => {
+        const chave = limparParaComparacao(item.nome);
+        if (vistos.has(chave)) return false;
+        vistos.add(chave);
+        return true;
+      });
+    }
+  }
+
+  // Regra homologada da Imarat: miniaturas são únicas globalmente pelo nome-base,
+  // sem prefixo/marca/volume e independentemente de linha ou grupo. Óleos ficam fora.
+  const miniaturasGlobaisVistas = new Set();
+  let miniaturasDuplicadasRemovidas = 0;
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      g.items = (g.items || []).filter(item => {
+        if (String(item.fonte || '').toLowerCase() !== 'imarat' || !isMiniatura(item.nome, item.volume, g.cat) || isOleo(item.nome)) return true;
+        const chave = chaveComparacaoMini(item.nome);
+        if (!chave) return true;
+        if (miniaturasGlobaisVistas.has(chave)) {
+          miniaturasDuplicadasRemovidas++;
+          return false;
+        }
+        miniaturasGlobaisVistas.add(chave);
+        return true;
+      });
+    }
+  }
+  console.log(`Miniaturas Imarat duplicadas removidas do snapshot: ${miniaturasDuplicadasRemovidas}`);
 
   // Índice convencional global: nome sem volume e nome+marca, conforme regra homologada.
   // A chave sem marca impede reimportação quando a fonte muda a marca ou o grupo.
@@ -1330,7 +1429,8 @@ async function main() {
   if (ADD_IMARAT_NEW) {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
-      const brand = limparTexto((p.brand || 'Outros')).toUpperCase();
+      const marcaOrigem = limparTexto(p.brand || 'Outros');
+      const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
       const ehOleo = isOleo(nome);
@@ -1351,7 +1451,7 @@ async function main() {
 
       let notas = '';
       let detail = null;
-      if (p.slug) {
+      if (p.slug && !SYNC_SKIP_DETAILS) {
         detail = await fetchImaratDetail(p.slug);
         if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
       }
@@ -1392,7 +1492,7 @@ async function main() {
   }
 
   console.log('Buscando Brand Collection...');
-  const brandList = await fetchBrandList();
+  const brandList = SYNC_IMARAT_ONLY ? [] : await fetchBrandList();
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
 

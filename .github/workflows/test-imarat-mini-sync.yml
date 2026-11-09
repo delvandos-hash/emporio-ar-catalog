@@ -13,6 +13,10 @@ on:
       - ".github/workflows/test-imarat-mini-sync.yml"
   workflow_dispatch:
 
+concurrency:
+  group: imarat-dry-run-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -33,6 +37,8 @@ jobs:
         run: node scripts/sync-catalog.mjs
         env:
           SYNC_DRY_RUN: "1"
+          SYNC_SKIP_DETAILS: "1"
+          SYNC_IMARAT_ONLY: "1"
           SYNC_DANDE_ONLY: "0"
           ADD_IMARAT_NEW: "1"
           ADD_BRAND_NEW: "1"
