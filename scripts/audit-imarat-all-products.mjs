@@ -52,6 +52,13 @@ function volumeFrom(sizeMl,nome) {
   const m=explicit||fromName;
   return m ? String(Number(m[1].replace(",", ".")))+m[2].toLowerCase() : "—";
 }
+function volumeMatch(value,name) {
+  let raw=String(value||"").trim();
+  if(raw && /^\d+(?:[.,]\d+)?$/.test(raw)) raw += "ml";
+  const match=raw.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i)||
+    String(name||"").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  return match ? String(Number(match[1].replace(",", ".")))+match[2].toLowerCase() : "";
+}
 function isMiniatura(nome,volume,categoria) {
   const n=norm(nome), cat=norm(categoria||"");
   if(n.includes("mini ")||n.includes("miniatura")||n.includes("mini-")) return true;
