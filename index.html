@@ -745,14 +745,15 @@
   }
   .modal-actions {
     display: flex;
-    gap: .6rem;
+    flex-direction: column;
+    gap: .5rem;
     position: sticky;
     bottom: 0;
     z-index: 5;
-    background: #fff;
+    background: #f7f2e9;
     padding: .75rem 0 calc(.75rem + env(safe-area-inset-bottom, 0px));
     margin-top: .35rem;
-    border-top: 1px solid #eee;
+    border-top: 1px solid #e9dfd3;
   }
   .modal-actions .btn-buy {
     flex: 1;
@@ -3037,6 +3038,11 @@ footer img{opacity:.85}
 
   /* Modal de detalhes: acabamento marfim/café, sem fundo azul */
   #modal .modal {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: 92vh !important;
+    max-height: 92dvh !important;
+    min-height: 0 !important;
     background: #f7f2e9 !important;
     color: #332725 !important;
     border: 1px solid rgba(180,154,112,.5) !important;
@@ -3056,7 +3062,18 @@ footer img{opacity:.85}
     color: #f5ead8 !important;
     border: 1px solid rgba(232,213,163,.28) !important;
   }
-  #modal .modal-body { background: #f7f2e9 !important; color: #332725 !important; }
+  #modal .modal-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: .5rem !important;
+    background: #f7f2e9 !important;
+    color: #332725 !important;
+  }
+  #modal .modal-header { flex: 0 0 auto !important; }
+  #modal .modal-actions { flex: 0 0 auto !important; }
   #modal .modal-meta { color: #75675d !important; }
   #modal .modal-notas {
     background: #eee5d8 !important;
