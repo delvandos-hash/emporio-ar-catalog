@@ -26,3 +26,4 @@ jobs:
         run: node scripts/apply-additive-reconciliation.mjs
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          APPLY_ADDITIVE_RECONCILIATION: "1"
