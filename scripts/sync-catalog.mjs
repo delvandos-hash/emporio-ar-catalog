@@ -1512,6 +1512,7 @@ async function main() {
   }
 
   let stockChanged = 0, addedImarat = 0, priceChanged = 0;
+  let publicGistMatches = 0, publicPricesPreserved = 0;
   let titulosFuzzyCorrigidos = 0;
 
   for (const line of Object.keys(DATA)) {
@@ -1785,10 +1786,12 @@ async function main() {
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0); 
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
       const publicMatch = findPublicCatalogMatch(LIVE_GIST_DATA, brand, nome, volume, ehMini);
+      if (publicMatch) publicGistMatches++;
       const publicHasPrices = publicMatch?.varejo != null && publicMatch?.atacado != null;
       const publicPriceDiffers = publicHasPrices &&
         (priceNumber(publicMatch.varejo) !== priceNumber(prices.varejo) ||
          priceNumber(publicMatch.atacado) !== priceNumber(prices.atacado));
+      if (publicPriceDiffers) publicPricesPreserved++;
       const varejoFinal = publicPriceDiffers ? publicMatch.varejo : prices.varejo;
       const atacadoFinal = publicPriceDiffers ? publicMatch.atacado : prices.atacado;
 
@@ -2272,6 +2275,8 @@ async function main() {
 
   console.log('---');
   console.log(`Novos Imarat: ${addedImarat}`);
+  console.log(`Novos com correspondência no Gist: ${publicGistMatches}`);
+  console.log(`Preços públicos preservados como manuais: ${publicPricesPreserved}`);
   console.log(`Títulos corrigidos por correspondência forte de marca/volume: ${titulosFuzzyCorrigidos}`);
   console.log(`Novos Brand: ${addedBrand}`);
   console.log(`Roupas Sophia: ${roupasCount} | Franny: ${frannyCount} | Acessórios: ${acessoriosCount}`);
