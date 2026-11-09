@@ -63,6 +63,10 @@ jobs:
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
           SYNC_IMARAT_ONLY: ${{ github.event_name == 'push' && '1' || '0' }}
           SYNC_DRY_RUN: ${{ github.event_name == 'push' && '1' || '0' }}
+          ADD_BRAND_NEW: ${{ github.event_name == 'push' && '0' || '1' }}
+          ADD_ROUPAS: ${{ github.event_name == 'push' && '0' || '1' }}
+          ADD_FRANNY: ${{ github.event_name == 'push' && '0' || '1' }}
+          ADD_ACESSORIOS: ${{ github.event_name == 'push' && '0' || '1' }}
       - name: Persistir data.js após sincronização bem-sucedida
         if: github.event_name != 'push'
         run: |
