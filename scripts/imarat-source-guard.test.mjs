@@ -179,3 +179,11 @@ test("baseline reidentifica variante legada por marca, nome e foto antes de bloq
 test("IDs de origem diferentes nunca são colapsados só por nome e volume iguais", () => {
   assert.match(auditAllSource, /if\(id\) return "source-id\|"\+norm\(p\.brand\|\|"outros"\)\+"\|"\+id/);
 });
+
+test("restaura procedência Imarat verificada de produtos Isis Makeup sem depender do nome da categoria", () => {
+  assert.match(source, /CONFIRMED_IMARAT_LEGACY_IDS/);
+  assert.match(source, /\["isis makeup\|body spray", "719"\]/);
+  assert.match(source, /\["isis makeup\|esfoliante corporal bum bum", "832"\]/);
+  assert.match(source, /\["isis makeup\|esfoliante corporal pitaya", "830"\]/);
+  assert.match(source, /restoreConfirmedImaratProvenance\(DATA\)/);
+});
