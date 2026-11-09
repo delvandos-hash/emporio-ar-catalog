@@ -214,7 +214,7 @@ for (const [line, groups] of Object.entries(DATA)) {
         const retailOriginal = Number(source.priceCents || 0) / 100;
         const wholesaleOriginal = source.atacado?.precoCents != null
           ? Number(source.atacado.precoCents) / 100 : Math.max(retailOriginal - 30, 0);
-        expected = automaticMiniPrice(item.nome, group.brand, group.cat, retailOriginal, wholesaleOriginal);
+        expected = automaticMiniPrice(item.nome, group.brand, volumeOf(item), group.cat, retailOriginal, wholesaleOriginal);
         if (internal?.precoManual === true || internal?.precoManual === "true" || internal?.precoManual === 1) {
           manualPriceProtected++;
         } else if (String(item.varejo) !== expected.varejo || String(item.atacado) !== expected.atacado) {
