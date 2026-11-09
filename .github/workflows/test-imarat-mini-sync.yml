@@ -46,6 +46,17 @@ jobs:
           ADD_FRANNY: "0"
           ADD_ACESSORIOS: "0"
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+      - name: Comparar data.js gerado com Gist vivo (somente leitura)
+        run: node scripts/audit-imarat-all-products.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+      - name: Guardar data.js do dry-run para revisão
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-js-dry-run-${{ github.run_id }}
+          path: js/data.js
+          retention-days: 7
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
           BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
