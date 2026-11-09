@@ -61,7 +61,7 @@ test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompa
 
 test("auditoria de miniaturas usa volume e categoria retornados pela Imarat", () => {
   assert.match(auditMiniSource, /function volumeFrom\(value, name\)/);
-  assert.match(auditMiniSource, /const sourceCategory = String\(source\.categoria_nome \|\| source\.categoria \|\| group\.cat \|\| ""\)/);
+  assert.match(auditMiniSource, /const sourceCategory = String\(source\.categoria_nome \|\| source\.categoria \|\| ""\)/);
   assert.match(auditMiniSource, /automaticMiniPrice\(item\.nome, group\.brand, volumeOf\(item\), sourceCategory/);
   assert.match(auditMiniSource, /if \(isOleo\(item\?\.nome\)\) return false/);
 });
@@ -71,5 +71,6 @@ test("auditoria global só confirma duplicidade após correspondência segura de
   assert.match(auditAllSource, /function volumeCompatible\(left,right\)/);
   assert.match(auditAllSource, /const confirmedNormalDuplicates=\[\.\.\.catalogBySourceIdentity\]/);
   assert.match(auditAllSource, /const confirmedMiniDuplicates=\[\.\.\.miniGlobalGroups\]/);
+  assert.match(auditAllSource, /Boolean\(sourceCategory\) && norm\(x\.category\)!==norm\(sourceCategory\)/);
   assert.match(auditAllSource, /COLISÃO DE NOME\/CHAVE SEM DUPLICIDADE CONFIRMADA/);
 });
