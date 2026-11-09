@@ -114,8 +114,8 @@ async function main() {
   if (missingFromInternal.length) {
     throw new Error(`Publicação bloqueada: ${missingFromInternal.length} itens atuais do Gist ainda não estão no data.js. Nenhum dado foi enviado.`);
   }
-  if (!additions.length || additions.length > 30) {
-    throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=30).`);
+  if (!additions.length || additions.length > 60) {
+    throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=60).`);
   }
 
   for (const key of additions) {
