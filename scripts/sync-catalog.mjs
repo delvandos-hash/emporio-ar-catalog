@@ -1671,8 +1671,6 @@ async function main() {
     }
   }
 
-  // Deduplicação segura: o mesmo nome-base só é duplicata quando a marca
-  // também coincide. IDs iguais são consolidados depois pela identidade da origem.
   // A base homologada é preservada: esta etapa não apaga produtos existentes.
   // Duplicidades antigas serão apenas auditadas; nenhuma remoção por aproximação.
   console.log('Deduplicação destrutiva desativada: todos os registros existentes foram preservados.');
@@ -1700,7 +1698,6 @@ async function main() {
     for (const p of imaratList) {
       const nome = limparTexto(p.name);
       const marcaOrigem = limparTexto(p.brand || 'Outros').trim();
-      const marcaConhecida = Boolean(String(p.brand || '').trim()) && !['outros', 'outra'].includes(norm(marcaOrigem));
       const brand = norm(marcaOrigem) === 'imarat' ? 'Empório A.R' : marcaOrigem.toUpperCase();
       const volume = volumeFrom(p.sizeMl, nome);
       const categoria = p.categoria_nome || p.categoria || '';
@@ -1712,15 +1709,13 @@ async function main() {
       let detail = null;
       let imgsNew = imaratImagesFrom(p, null);
       let duplicado = false;
-      let miniBaseKey = '';
-      let miniFullKey = '';
 
       if (ehMini) {
         const candidate = {
           nome, volume, varejo: prices.varejo, atacado: prices.atacado,
           foto: imgsNew[0] || '', fotos: imgsNew,
         };
-        miniBaseKey = miniIdentityBaseKey(candidate, brand);
+        const miniBaseKey = miniIdentityBaseKey(candidate, brand);
         const existing = indexMiniByBase.get(miniBaseKey);
         if (existing) {
           // Só busca detalhes quando há uma identidade candidata; compara a galeria
@@ -1729,10 +1724,8 @@ async function main() {
           imgsNew = imaratImagesFrom(p, detail);
           candidate.foto = imgsNew[0] || '';
           candidate.fotos = imgsNew;
-          miniFullKey = miniIdentityKey(candidate, brand);
+          const miniFullKey = miniIdentityKey(candidate, brand);
           duplicado = existing.has(miniFullKey);
-        } else {
-          miniFullKey = miniIdentityKey(candidate, brand);
         }
       } else {
         // Perfumes: comparação global por nome exato normalizado + volume.
