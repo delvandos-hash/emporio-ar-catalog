@@ -22,7 +22,7 @@ test("Arabiyat Prestige permanece no campo de marca, separado do nome do produto
 test("identificação Imarat exige marca compatível ou nome único em grupo genérico", () => {
   assert.match(source, /candidatosNomeExato\.find\(p => norm\(marcaPublicaImarat\(p\.brand\)\) === b\)/);
   assert.doesNotMatch(source, /imaratList\.find\(\(p\) => norm\(p\.name\) === n\)\s*\|\|/);
-  assert.match(source, /\['outros', 'outra', 'emporio a r'\]\.includes\(b\) && candidatosNomeExato\.length === 1/);
+  assert.match(source, /\['outros', 'outra'\]\.includes\(b\) && candidatosNomeExato\.length === 1/);
 });
 
 test("correções aproximadas exigem marca, volume compatível e alta confiança", () => {
@@ -30,7 +30,7 @@ test("correções aproximadas exigem marca, volume compatível e alta confiança
   assert.match(source, /itemVolume === sourceVolume/);
   assert.match(source, /best\.score >= 0\.86 && best\.tokens >= 0\.8/);
   assert.match(source, /best\.score - second\.score >= 0\.08/);
-  assert.match(source, /!\['outros', 'outra', 'emporio a r'\]\.includes\(b\)/);
+  assert.match(source, /!\['outros', 'outra'\]\.includes\(b\)/);
 });
 
 test("não remove miniaturas de outras origens apenas por não constarem na Imarat", () => {
@@ -55,4 +55,18 @@ test("auditoria interpreta sizeMl numérico como ml e não aceita volume incompa
   assert.ok(auditSource.includes('raw += "ml";'));
   assert.ok(auditSource.includes('const explicit = raw.match'));
   assert.match(source, /itemVolume === sourceVolume/);
+});
+
+test("correspondência exata exige volume compatível e não trata Empório A.R como grupo genérico", () => {
+  assert.match(source, /const candidatosNomeExato = imaratList\.filter\(p => norm\(p\.name\) === n && volumeCompativel\(p\)\)/);
+  assert.match(source, /\['outros', 'outra'\]\.includes\(b\) && candidatosNomeExato\.length === 1/);
+  assert.doesNotMatch(source, /\['outros', 'outra', 'emporio a r'\]\.includes\(b\)/);
+});
+
+test("registra o ID privado da origem e consolida duplicatas sem confundir IDs distintos", () => {
+  assert.match(source, /if \(hit\.id != null\) it\.id_origem = String\(hit\.id\)/);
+  assert.match(source, /id_origem: String\(p\.id \?\? p\.productId \?\? ''\)/);
+  assert.match(source, /const imaratPorId = new Map\(\)/);
+  assert.match(source, /DUPLICATA IMARAT CONSOLIDADA POR ID DA ORIGEM/);
+  assert.match(source, /if \(norm\(item\.fonte\) === 'imarat' && item\.id_origem\)/);
 });
