@@ -183,7 +183,7 @@ async function main() {
           ? (indexes.publicIdIndex.get(String(publicItem.public_id).trim()) || [])
           : [];
         const candidates = [...new Set([...stockMatches, ...identityMatches, ...publicIdMatches])];
-        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches);
+        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches, group?.brand);
         if (resolved) {
           mergePublicFields(resolved.item, publicItem);
           merged++;
