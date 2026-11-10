@@ -1164,6 +1164,7 @@ function dandePathOnly(value) {
 }
 
 const DANDE_SCRAPE_COUNTS = new Map();
+const DANDE_SCRAPE_IDS = new Map();
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -1372,22 +1373,28 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const seenCategoryIds = new Set();
     const seenPageSignatures = new Set();
     let categoryAdded = 0;
+    const categoryIds = new Set();
     let completed = false;
-    for (let page = 1; page <= 15; page++) {
+    for (let page = 1; page <= 80; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
         if (!list.length) { completed = true; break; }
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
-          console.log(`    p${page}: página repetida; encerrando categoria`);
+          if (hasDandeNextPage(html, page)) throw new Error(`página repetida apesar de paginação anunciada (página ${page})`);
+          console.log(`    p${page}: página repetida sem continuação; encerrando categoria`);
+          completed = true;
           break;
         }
         seenPageSignatures.add(pageSignature);
+        for (const product of list) categoryIds.add(String(product.id));
 
         const newProducts = list.filter((p) => !seenCategoryIds.has(p.id));
         if (!newProducts.length) {
-          console.log(`    p${page}: nenhum ID novo; encerrando categoria`);
+          if (hasDandeNextPage(html, page)) throw new Error(`nenhum ID novo apesar de paginação anunciada na página ${page}`);
+          console.log(`    p${page}: nenhum ID novo e sem continuação; encerrando categoria`);
+          completed = true;
           break;
         }
         for (const p of newProducts) seenCategoryIds.add(p.id);
@@ -1478,26 +1485,41 @@ async function fetchDandeAcessorios(existingGroups = []) {
             cat: cat.nome,
           }, !prev, prev));
           added++;
-          categoryAdded++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
-
-        // Processa a página atual antes de decidir se existe uma próxima.
-        // Sem link de paginação, encerra somente DEPOIS de salvar os itens desta página.
-        if (!hasDandeNextPage(html, page)) {
-          console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+        const hasNextLink = hasDandeNextPage(html, page);
+        if (!hasNextLink && list.length < 8) {
+          console.log(`    p${page}: lote final (${list.length} produtos); encerrando categoria`);
           completed = true;
           break;
         }
-        if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com próxima página anunciada`);
+        if (page === 80) throw new Error(`limite de 80 páginas atingido em ${cat.nome}`);
         await sleep(400);
       } catch (e) {
         throw new Error(`Dande ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
     if (!completed) throw new Error(`paginação Dande incompleta em ${cat.nome}`);
+    categoryAdded = categoryIds.size;
     DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
+    DANDE_SCRAPE_IDS.set(cat.nome, categoryIds);
   }
+
+  const membershipsById = new Map();
+  for (const [category, ids] of DANDE_SCRAPE_IDS) {
+    for (const id of ids) {
+      if (!membershipsById.has(id)) membershipsById.set(id, []);
+      membershipsById.get(id).push(category);
+    }
+  }
+  const crossListed = [...membershipsById.entries()].filter(([, categories]) => categories.length > 1);
+  console.log(`DANDE_CATEGORY_AUDIT unique_source_ids=${membershipsById.size} cross_listed_ids=${crossListed.length}`);
+  for (const [id, categories] of membershipsById) {
+    const product = byId.get(id);
+    if (product) product.categorias_origem = [...new Set(categories)];
+  }
+  const minimumExpected = Math.max(186, Math.ceil(existingById.size * 0.8));
+  if (byId.size < minimumExpected) throw new Error(`inventário Dande abaixo do mínimo de segurança: coletados=${byId.size}, mínimo=${minimumExpected}, IDs anteriores=${existingById.size}`);
 
   const byCat = new Map();
   for (const item of byId.values()) {
