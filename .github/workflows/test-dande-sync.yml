@@ -8,6 +8,7 @@ on:
       - "scripts/sync-catalog.mjs"
       - "scripts/dande-url.mjs"
       - "scripts/dande-url.test.mjs"
+      - "netlify/functions/dande-stock.mjs"
       - ".github/workflows/test-dande-sync.yml"
 
 permissions:
