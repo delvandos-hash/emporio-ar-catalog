@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
+import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
@@ -291,6 +292,8 @@ async function main() {
 
   const internalDATA = parseInternal();
   const { snapshot, DATA: liveDATA } = await fetchLiveGist(token);
+  const excludedAtherri = removeExcludedLegacyAtherri(liveDATA);
+  console.log(`LEGACY_EXCLUDED_ATHERRI_1481=${excludedAtherri}`);
   const originalLiveContentKeys = collectContentKeys(liveDATA);
   const exactLiveDuplicatesRemoved = dedupeExactLiveVariants(liveDATA);
   const internalIndex = collectInternalIndex(internalDATA);
