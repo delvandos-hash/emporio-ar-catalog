@@ -312,3 +312,19 @@ test("não compartilha public_id entre marcas com stock_ref coincidente", () => 
   const [a, b] = result.roupas.flatMap(group => group.items);
   assert.notEqual(a.public_id, b.public_id);
 });
+
+test("publica somente nomes permitidos das categorias de origem Dande", () => {
+  const result = toPublicCatalog({
+    acessorios: [{ brand: "Empório A.R", cat: "Colares", items: [{
+      nome: "Colar de Teste",
+      fonte: "acessorios",
+      id_origem: "375085902",
+      categorias_origem: ["Colares", "Lançamentos", "Tornozeleiras", "Colares", "categoria-interna"]
+    }]}]
+  });
+  const item = result.acessorios[0].items[0];
+  assert.deepEqual(item.categorias_origem, ["Colares", "Lançamentos", "Tornozeleiras"]);
+  assert.equal("id_origem" in item, false);
+  assert.equal(JSON.stringify(result).includes("375085902"), false);
+  assert.equal(JSON.stringify(result).includes("categoria-interna"), false);
+});
