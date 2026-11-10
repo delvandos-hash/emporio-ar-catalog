@@ -1144,6 +1144,7 @@ function dandePathOnly(value) {
 }
 
 const DANDE_SCRAPE_COUNTS = new Map();
+const DANDE_SCRAPE_NAMES = new Map();
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -1355,12 +1356,14 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const seenCategoryIds = new Set();
     const seenPageSignatures = new Set();
     let categoryAdded = 0;
+    const categoryNames = [];
     let completed = false;
     for (let page = 1; page <= 80; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
         if (!list.length) { completed = true; break; }
+        categoryNames.push(...list.map((p) => String(p.nome || '').trim()).filter(Boolean));
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
           // Algumas rotas Nuvemshop ignoram ?page=N e devolvem o primeiro lote.
@@ -1383,6 +1386,9 @@ async function fetchDandeAcessorios(existingGroups = []) {
 
         let added = 0;
         for (const p of newProducts) {
+          // Conta presença na categoria de origem mesmo quando o mesmo ID já foi
+          // coletado em outra categoria. A deduplicação global continua intacta.
+          categoryAdded++;
           if (byId.has(p.id)) continue;
           let variants = p.variants || [];
           let desc = '';
@@ -1467,7 +1473,6 @@ async function fetchDandeAcessorios(existingGroups = []) {
             cat: cat.nome,
           }, !prev, prev));
           added++;
-          categoryAdded++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
 
@@ -1489,6 +1494,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     }
     if (!completed) throw new Error(`paginação Dande incompleta em ${cat.nome}`);
     DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
+    DANDE_SCRAPE_NAMES.set(cat.nome, categoryNames);
   }
 
   const byCat = new Map();
@@ -1591,10 +1597,10 @@ async function main() {
     const missingImages = hairItems.filter((item) => !(item.foto || (Array.isArray(item.fotos) && item.fotos.length))).length;
     const masculineCount = DANDE_SCRAPE_COUNTS.get('Masculinos') || 0;
     const ankleCount = DANDE_SCRAPE_COUNTS.get('Tornozeleiras') || 0;
-    const masculineItems = groups.find((g) => g.cat === 'Masculinos')?.items || [];
-    const ankleItems = groups.find((g) => g.cat === 'Tornozeleiras')?.items || [];
-    const wrongMasculine = masculineItems.filter((item) => !/masculin/i.test(item.nome || '')).length;
-    const wrongAnkle = ankleItems.filter((item) => !/tornoz/i.test(item.nome || '')).length;
+    const masculineNames = DANDE_SCRAPE_NAMES.get('Masculinos') || [];
+    const ankleNames = DANDE_SCRAPE_NAMES.get('Tornozeleiras') || [];
+    const wrongMasculine = masculineNames.filter((nome) => !/masculin/i.test(nome)).length;
+    const wrongAnkle = ankleNames.filter((nome) => !/tornoz/i.test(nome)).length;
     console.log(`VALIDAÇÃO DANDE: Acessórios de Cabelo origem=${hairCount}; itens=${hairItems.length}; sem imagem=${missingImages}; Masculinos origem=${masculineCount}; Tornozeleiras origem=${ankleCount}; itens sem nome compatível=${wrongMasculine + wrongAnkle}`);
     if (hairCount < 1) throw new Error('Dande não retornou produtos para Acessórios de Cabelo.');
     if (!hairItems.length || missingImages > 0) throw new Error('Validação de Acessórios de Cabelo falhou: itens ou imagens ausentes.');
