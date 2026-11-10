@@ -1730,7 +1730,7 @@ async function main() {
           hit = candidatosNomeExato.find(p => norm(p.brand).includes('arabiyat prestige'));
         }
         // Em grupos genéricos, só aceita associação se o nome for único em toda a API.
-        if (!hit && ['outros', 'outra'].includes(b) && candidatosNomeExato.length === 1) {
+        if (!hit && ['outros', 'outra', 'emporio a r'].includes(b) && candidatosNomeExato.length === 1) {
           hit = candidatosNomeExato[0];
         }
         // Correções pontuais validadas no catálogo: transposição em Tharwah
@@ -1853,6 +1853,30 @@ async function main() {
         }
       }
     }
+  }
+
+  // Registros sem procedência que não foram confirmados em nenhuma fonte raiz
+  // são removidos. Exceções: Brand e Roupas são reconciliados abaixo; Scoop
+  // Premiado é um item próprio do Empório A.R, não um produto de fornecedor.
+  let unverifiedLegacyRemoved = 0;
+  const unverifiedLegacyNames = [];
+  for (const line of Object.keys(DATA)) {
+    if (line === 'roupas') continue;
+    for (const group of DATA[line] || []) {
+      if (group.cat === 'Brand' || String(group.cat || '').startsWith('Brand') ||
+          norm(group.cat) === 'scoop premiado') continue;
+      group.items = (group.items || []).filter(item => {
+        const source = norm(item.fonte);
+        if (source !== '' && source !== 'legacy gist') return true;
+        unverifiedLegacyRemoved++;
+        unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome });
+        return false;
+      });
+    }
+  }
+  console.log(`Registros legados sem correspondência em fonte raiz removidos: ${unverifiedLegacyRemoved}`);
+  for (const item of unverifiedLegacyNames) {
+    console.log('LEGADO SEM ORIGEM REMOVIDO: ' + JSON.stringify(item));
   }
 
   // Correção nominal específica validada pelo responsável do catálogo:
