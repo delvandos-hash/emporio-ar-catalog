@@ -187,3 +187,9 @@ test("auditoria bloqueia public_id repetido entre identidades de origem diferent
   assert.match(audit, /INTERNAL_PUBLIC_ID_IDENTITY_CONFLICT_GROUPS=/);
   assert.match(audit, /return identities\.some\(identity => !identity\) \|\| new Set\(identities\)\.size > 1/);
 });
+
+
+test("reconciliação aditiva mantém stock_ref isolado por marca", () => {
+  assert.match(apply, /liveStockRefs\.add\(norm\(group\?\.brand\) \+ "\\|" \+ ref\)/);
+  assert.match(apply, /liveStockRefs\.has\(norm\(row\?\.publicGroup\?\.brand\) \+ "\\|" \+ stockRef\)/);
+});
