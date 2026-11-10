@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { toPublicCatalog } from "./public-catalog.mjs";
-import { findExactInternalPriceMatch } from "./audit-catalog-match.mjs";
+import { findExactInternalPriceMatch, findImaratSourceByOriginRef } from "./audit-catalog-match.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
@@ -447,6 +447,14 @@ function sourceBrandMatches(catalogBrand,sourceBrand) {
   return Boolean(b && s && b===s);
 }
 function matchSourceForCatalog(item) {
+  const originRef = String(item.item?.origin_ref || "").trim();
+  if (originRef) {
+    const exactOrigin = findImaratSourceByOriginRef(source, originRef);
+    if (!exactOrigin) return null;
+    if (!sourceBrandMatches(item.brand, exactOrigin.brand)) return null;
+    if (!volumeCompatible(volumeFrom(item.volume,item.name), volumeFrom(exactOrigin.sizeMl,exactOrigin.name))) return null;
+    return exactOrigin;
+  }
   const sourceId=String(item.originId||"").trim();
   if(sourceId) {
     const exactIdMatches=source.filter(p=>String(p.id??p.productId??p.slug??"").trim()===sourceId);
@@ -524,7 +532,10 @@ for(const item of matchedCatalog) {
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
-const confirmedMiniDuplicates=[...miniGlobalGroups].filter(([,items])=>items.length>1);
+const confirmedMiniDuplicates=[...miniGlobalGroups].filter(([,items])=>{
+  const identities=items.filter(x=>x.matchedSource).map(x=>sourceIdentity(x.matchedSource));
+  return identities.length>1 && new Set(identities).size===1;
+});
 const sourceDistinctCollisions=catalogCollisionGroups.filter(([,items])=>{
   const matched=items.filter(x=>x.matchedSource);
   if(matched.length<2) return false;
