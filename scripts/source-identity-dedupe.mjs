@@ -75,37 +75,36 @@ export function dedupeConfirmedSourceProducts(DATA) {
         const firstPrice = String(prior.item.varejo ?? "") + "|" + String(prior.item.atacado ?? "");
         const nextPrice = String(item.varejo ?? "") + "|" + String(item.atacado ?? "");
         if (firstPrice !== nextPrice &&
-            (!manualPrice(prior.item) || !manualPrice(item) ||
-             firstPrice !== nextPrice)) {
-          if (!manualPrice(prior.item) && !manualPrice(item)) {
-            conflicts.push({ source, id, brand, reason: "price-conflict" });
-            blockedKeys.add(key);
-            kept.push(item);
-            continue;
-          }
-          if (manualPrice(prior.item) && manualPrice(item) && firstPrice !== nextPrice) {
-            conflicts.push({ source, id, brand, reason: "manual-price-conflict" });
-            blockedKeys.add(key);
-            kept.push(item);
-            continue;
-          }
+            manualPrice(prior.item) && manualPrice(item)) {
+          conflicts.push({ source, id, brand, reason: "manual-price-conflict" });
+          blockedKeys.add(key);
+          kept.push(item);
+          continue;
+        }
+        if (firstPrice !== nextPrice &&
+            !manualPrice(prior.item) && !manualPrice(item)) {
+          // A source ID proves product identity. When neither price is marked
+          // manual, keep the first source-backed value and remove the duplicate.
+          conflicts.push({ source, id, brand, reason: "non-manual-price-conflict",
+            resolution: "kept-first-source-record" });
         }
         let keeper = prior.item;
         if (manualPrice(item) && !manualPrice(prior.item)) {
           keeper = item;
-          const priorList = prior.group.items;
-          // The earlier copy is removed from its original group; the manual
-          // price record remains in the current group.
-          priorList.splice(priorList.indexOf(prior.item), 1);
+          if (prior.group === group) {
+            const priorIndex = kept.indexOf(prior.item);
+            if (priorIndex >= 0) kept.splice(priorIndex, 1);
+          } else {
+            const priorList = prior.group.items;
+            const priorIndex = priorList.indexOf(prior.item);
+            if (priorIndex >= 0) priorList.splice(priorIndex, 1);
+          }
           kept.push(item);
           prior.item = item;
           prior.group = group;
           prior.line = line;
         } else {
           mergeDetails(keeper, item);
-        }
-        if (keeper === prior.item && keeper !== item) {
-          // The current duplicate is omitted from the output group.
         }
         removed++;
       }
