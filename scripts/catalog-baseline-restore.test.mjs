@@ -44,6 +44,7 @@ test("rekeys an exact stock_ref match to the prior public ID without overwriting
   assert.equal(result.restoredIds.length, 0);
   assert.equal(result.data.roupas[0].items.length, 1);
   assert.equal(result.data.roupas[0].items[0].public_id, "p_old");
+  assert.equal(result.data.roupas[0].items[0]._preserve_public_id, true);
   assert.equal(result.data.roupas[0].items[0].varejo, "89,90");
 });
 
