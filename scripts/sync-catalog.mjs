@@ -2148,7 +2148,7 @@ async function main() {
         const kept = [];
         for (const item of group.items || []) {
           const source = norm(item.fonte);
-          if (source !== '' && source !== 'legacy gist') {
+          if (source !== '' && source !== 'legacy gist' && source !== 'brand') {
             kept.push(item);
             continue;
           }
