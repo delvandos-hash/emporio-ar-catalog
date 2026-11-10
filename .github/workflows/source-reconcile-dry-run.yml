@@ -5,6 +5,8 @@ on:
     branches: [security/source-identity-dedupe-20261109]
     paths:
       - "scripts/sync-catalog.mjs"
+      - "scripts/dande-url.mjs"
+      - "scripts/dande-url.test.mjs"
       - "scripts/source-identity-dedupe.mjs"
       - ".github/workflows/source-reconcile-dry-run.yml"
   pull_request:
@@ -38,8 +40,9 @@ jobs:
       - name: Validar sintaxe e identidade
         run: |
           node --check scripts/sync-catalog.mjs
+          node --check scripts/dande-url.mjs
           node --check scripts/source-identity-dedupe.mjs
-          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs
+          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs scripts/dande-url.test.mjs
       - name: Sincronizar todas as fontes sem publicar
         run: node scripts/sync-catalog.mjs
         env:
