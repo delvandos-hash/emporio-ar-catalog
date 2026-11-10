@@ -1896,7 +1896,9 @@ function buildVariacoesHtml(p, selectedIds) {
     const qty = Number(v.estoque) || 0, ok = qty > 0, id = String(v.id || v.nome || '');
     const sel = selected.has(id) ? ' selected' : '', disabled = ok ? '' : ' disabled';
     const label = escapeHtml(v.nome || '—'), stock = ok ? `${qty} un.` : 'Esgotado';
-    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-estoque="${qty}" aria-pressed="${selected.has(id) ? 'true' : 'false'}"${disabled}><span class="var-chip-name">${label}</span><span class="var-chip-stock">${stock}</span></button>`;
+    const photo = resolveCatalogImageUrl(v.foto || (Array.isArray(v.fotos) ? v.fotos[0] : ''));
+    const thumb = photo ? `<img class="var-chip-photo" src="${escapeHtml(photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '';
+    return `<button type="button" class="var-chip${sel}${ok ? '' : ' var-chip-out'}" data-var-id="${escapeHtml(id)}" data-var-nome="${label}" data-var-foto="${escapeHtml(photo)}" data-var-estoque="${qty}" aria-pressed="${selected.has(id) ? 'true' : 'false'}"${disabled}><span class="var-chip-media">${thumb}</span><span class="var-chip-copy"><span class="var-chip-name">${label}</span><span class="var-chip-stock">${stock}</span></span></button>`;
   }).join('');
   return `<div class="variacoes-box" id="variacoesBox"><strong>Escolha uma ou mais variações</strong><div class="var-chips">${chips}</div><p class="var-hint" id="varHint">Selecione todas as opções que deseja comprar</p></div>`;
 }
@@ -1906,7 +1908,8 @@ function getSelectedVariacoes() {
   if (!box) return [];
   return [...box.querySelectorAll('.var-chip.selected')].map(sel => ({
     id: sel.getAttribute('data-var-id') || '', nome: sel.getAttribute('data-var-nome') || '',
-    estoque: Number(sel.getAttribute('data-var-estoque') || 0)
+    estoque: Number(sel.getAttribute('data-var-estoque') || 0),
+    foto: sel.getAttribute('data-var-foto') || ''
   }));
 }
 function getSelectedVariacao() { return getSelectedVariacoes()[0] || null; }
@@ -1945,7 +1948,10 @@ async function refreshVariationStock(p) {
     const data = await response.json();
     if (!Array.isArray(data.variacoes)) throw new Error('Resposta de estoque inválida');
     if (!currentProduct || (currentProduct.public_id || currentProduct.stock_ref) !== requestId) return;
+    const previousByName = new Map((Array.isArray(p.variacoes) ? p.variacoes : [])
+      .map(v => [normStockKey(v.nome), v]));
     const variacoes = data.variacoes.map((v) => ({
+      ...(previousByName.get(normStockKey(v.nome)) || {}),
       id: String(v.id || ''),
       nome: String(v.nome || '—'),
       estoque: Math.max(0, Math.floor(Number(v.estoque) || 0))
