@@ -1,0 +1,59 @@
+name: Reconciliação de todas as fontes (dry-run, sem publicar)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - "scripts/source-identity-dedupe.mjs"
+      - "scripts/source-identity-dedupe.test.mjs"
+      - ".github/workflows/source-reconcile-dry-run.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-reconcile-dry-run-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source-reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Baixar branch de homologação
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar sintaxe e identidade
+        run: |
+          node --check scripts/sync-catalog.mjs
+          node --check scripts/source-identity-dedupe.mjs
+          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs
+      - name: Sincronizar todas as fontes sem publicar
+        run: node scripts/sync-catalog.mjs
+        env:
+          SYNC_DRY_RUN: "1"
+          SYNC_SKIP_DETAILS: "1"
+          SYNC_IMARAT_ONLY: "0"
+          SYNC_DANDE_ONLY: "0"
+          ADD_IMARAT_NEW: "1"
+          ADD_BRAND_NEW: "1"
+          ADD_ROUPAS: "1"
+          ADD_FRANNY: "1"
+          ADD_ACESSORIOS: "1"
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
