@@ -2512,6 +2512,7 @@ async function main() {
   let conflitosVolumeImaratPorId = 0;
   let conflitosGeneroImaratPorId = 0;
   let conflitosPrecoImaratPorId = 0;
+  let conflitosPrecoImaratResolvidos = 0;
   let gruposImaratPorIdConsolidados = 0;
   const normalizarVolumeId = value => String(value || '').toLowerCase().replace(/\s+/g, '').replace(',', '.');
   const chavePrecoId = item => String(item.varejo ?? '').trim() + '|' + String(item.atacado ?? '').trim();
@@ -2557,15 +2558,23 @@ async function main() {
         isMiniatura(source.name, volumeDestino, '') ? 'Miniaturas' : 'Perfumes');
     const grupoDestino = ensureBrandGroup(DATA, linhaDestino, marcaDestino, categoriaDestino);
 
+    const precoVarejoOrigem = source.priceCents != null ? Number(source.priceCents) / 100 : 0;
+    const precoAtacadoOrigem = source.atacado && source.atacado.precoCents != null
+      ? Number(source.atacado.precoCents) / 100
+      : Math.max(precoVarejoOrigem - 30, 0);
+    const precosCanonicos = calcularPrecoMiniatura(
+      source.name || '', marcaOrigem || marcaDestino, volumeDestino, categoriaOrigem,
+      precoVarejoOrigem, precoAtacadoOrigem
+    );
     const precos = new Set(registros.map(r => chavePrecoId(r.item)));
     const registrosManuais = registros.filter(r => precoManualAtivo(r.item));
     let keeper;
 
     if (precos.size > 1) {
       const precosManuais = new Set(registrosManuais.map(r => chavePrecoId(r.item)));
-      if (!registrosManuais.length || precosManuais.size !== 1) {
+      if (registrosManuais.length && precosManuais.size !== 1) {
         conflitosPrecoImaratPorId++;
-        console.log('DUPLICIDADE IMARAT PRESERVADA POR CONFLITO DE PREÇO: ' + JSON.stringify({
+        console.log('DUPLICIDADE IMARAT PRESERVADA POR CONFLITO DE PREÇO MANUAL: ' + JSON.stringify({
           id, nome: source.name,
           itens: registros.map(r => ({
             linha: r.line, marca: r.group.brand, categoria: r.group.cat,
@@ -2575,7 +2584,18 @@ async function main() {
         }));
         continue;
       }
-      keeper = registrosManuais.find(r => chavePrecoId(r.item) === [...precosManuais][0]);
+      if (registrosManuais.length) {
+        keeper = registrosManuais.find(r => chavePrecoId(r.item) === [...precosManuais][0]);
+      } else {
+        keeper = registros.find(r => r.group === grupoDestino) ||
+          [...registros].sort((a, b) => completudeItem(b.item) - completudeItem(a.item))[0];
+        conflitosPrecoImaratResolvidos++;
+        console.log('DUPLICIDADE IMARAT RESOLVIDA PELO PREÇO CANÔNICO DA FONTE: ' + JSON.stringify({
+          id, nome: source.name, marcasEncontradas: [...new Set(registros.map(r => r.group.brand))],
+          precosAnteriores: [...precos], varejoRaiz: precosCanonicos.varejo,
+          atacadoRaiz: precosCanonicos.atacado
+        }));
+      }
     } else {
       keeper = registros.find(r => r.group === grupoDestino) ||
         registrosManuais[0] ||
@@ -2583,6 +2603,10 @@ async function main() {
     }
 
     const itemMantido = keeper.item;
+    if (!registrosManuais.length) {
+      itemMantido.varejo = precosCanonicos.varejo;
+      itemMantido.atacado = precosCanonicos.atacado;
+    }
     for (const registro of registros) {
       if (registro === keeper) continue;
       const outro = registro.item;
@@ -2658,7 +2682,8 @@ async function main() {
   console.log(`Duplicatas Imarat removidas por ID da origem: ${duplicatasImaratPorIdRemovidas}`);
   console.log(`Conflitos de volume preservados por ID: ${conflitosVolumeImaratPorId}`);
   console.log(`Conflitos de gênero preservados por ID: ${conflitosGeneroImaratPorId}`);
-  console.log(`Conflitos de preço preservados por ID: ${conflitosPrecoImaratPorId}`);
+  console.log(`Conflitos de preço resolvidos pelo preço canônico da origem: ${conflitosPrecoImaratResolvidos}`);
+  console.log(`Conflitos de preço manual preservados por ID: ${conflitosPrecoImaratPorId}`);
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
