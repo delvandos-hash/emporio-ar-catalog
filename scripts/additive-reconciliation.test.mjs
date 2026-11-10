@@ -172,9 +172,18 @@ test("preflight aceita tanto dry-run quanto no-op seguro da reconciliação", ()
 });
 
 
-test("auditoria bloqueia reconciliação quando public_id colide no Gist ou na base interna", () => {
-  assert.match(audit, /const internalPublicIdCollisionMap = new Map\(\)/);
-  assert.match(audit, /INTERNAL_PUBLIC_ID_COLLISION_GROUPS=/);
-  assert.match(audit, /publicIdCollisions\.length === 0/);
-  assert.match(audit, /internalPublicIdCollisions\.length === 0/);
+
+
+test("auditoria aceita public_id repetido para a mesma origem em categorias diferentes", () => {
+  assert.match(audit, /function publicIdRowsConflict\(rows\)/);
+  assert.match(audit, /origin\|" \+ brand \+ "\|" \+ name \+ "\|" \+ origin/);
+  assert.match(audit, /publicIdIdentityConflicts\.length === 0/);
+  assert.match(audit, /internalPublicIdIdentityConflicts\.length === 0/);
+  assert.match(audit, /PUBLIC_ID_DUPLICATE_REPRESENTATION_GROUPS=/);
+});
+
+test("auditoria bloqueia public_id repetido entre identidades de origem diferentes", () => {
+  assert.match(audit, /PUBLIC_ID_IDENTITY_CONFLICT_GROUPS=/);
+  assert.match(audit, /INTERNAL_PUBLIC_ID_IDENTITY_CONFLICT_GROUPS=/);
+  assert.match(audit, /return identities\.some\(identity => !identity\) \|\| new Set\(identities\)\.size > 1/);
 });
