@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { findExactInternalPriceMatch, findImaratSourceByOriginRef } from "./audit-catalog-match.mjs";
 /**
  * Auditoria somente leitura das miniaturas do catálogo Empório A.R.
  * Lê o snapshot do Gist e a lista atual da Imarat. Nunca grava ou recalcula preços.
@@ -184,6 +185,18 @@ const imaratList = await fetchImaratList();
 console.log(`Produtos lidos da Imarat: ${imaratList.length}`);
 
 function sourceMatch(item, group) {
+  const originRef = String(item?.origin_ref || "").trim();
+  if (originRef) {
+    const exact = findImaratSourceByOriginRef(imaratList, originRef);
+    if (!exact) return null;
+    const catalogBrand = norm(group?.brand);
+    const sourceBrand = norm(exact?.brand);
+    if (catalogBrand && sourceBrand && !(sourceBrand === catalogBrand || sourceBrand.includes(catalogBrand) || catalogBrand.includes(sourceBrand))) return null;
+    const itemVolume = volumeOf(item);
+    const sourceVolume = volumeFrom(exact.sizeMl, exact.name);
+    if (itemVolume !== "sem-volume" && sourceVolume && itemVolume !== sourceVolume) return null;
+    return exact;
+  }
   const itemSourceId = String(item?.id_origem || "").trim();
   if (itemSourceId) {
     const exactIdMatches = imaratList.filter(p =>
@@ -232,9 +245,8 @@ for (const [line, groups] of Object.entries(DATA)) {
       if (!name) continue;
       const internalKey = [norm(line), norm(group.brand), name, volumeOf(item)].join("|");
       const internalCandidates = internalIndex.get(internalKey) || [];
-      const internal = internalCandidates.find(candidate =>
-        String(candidate.varejo) === String(item.varejo) && String(candidate.atacado) === String(item.atacado)
-      ) || internalCandidates[0] || null;
+      // Não herdar o ID da primeira variante quando os preços não coincidem.
+      const internal = findExactInternalPriceMatch(internalCandidates, item);
       // O Gist público não expõe id_origem; use a identidade interna já
       // pareada para consultar a fonte pelo SKU exato, sem colapsar homônimos.
       const source = sourceMatch(internal || item, group);
