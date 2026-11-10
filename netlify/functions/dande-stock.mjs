@@ -18,7 +18,7 @@ const DANDE_CATEGORIES = [
   { path: "/prata-925/", nome: "Prata 925" },
   { path: "/pulseiras/", nome: "Pulseiras" },
   { path: "/semijoia-italiana/", nome: "Semijoia Italiana" },
-  { path: "/tornozeleiras/", nome: "Tornozeleiras" },
+  { path: "/tornozeleiras1/", nome: "Tornozeleiras" },
 ];
 function makeStockRef(id) {
   return "s_" + createHash("sha256").update("acessorios|" + String(id)).digest("hex").slice(0, 24);
