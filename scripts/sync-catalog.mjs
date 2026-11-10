@@ -1517,6 +1517,12 @@ async function fetchDandeAcessorios(existingGroups = []) {
   for (const [id, categories] of crossListed) {
     console.log(`DANDE_CATEGORY_CROSSLIST id=${id} categories=${categories.join(' | ')}`);
   }
+  // Persiste apenas os nomes das categorias de origem no cadastro único.
+  // Os IDs continuam únicos em byId; a vitrine expande a exibição sem duplicar DATA.
+  for (const [id, categories] of categoryMembershipsById) {
+    const product = byId.get(id);
+    if (product) product.categorias_origem = [...categories];
+  }
 
   const byCat = new Map();
   for (const item of byId.values()) {
