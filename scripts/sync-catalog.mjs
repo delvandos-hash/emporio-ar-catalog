@@ -1,3 +1,4 @@
+/* Revalidação isolada após correção do mapeamento da restauração legada. */
 /**
  * Sincroniza estoque + novos produtos (Imarat + Brand filtrado)
  * Envia os dados para o GitHub Gist
