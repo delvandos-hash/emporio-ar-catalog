@@ -165,3 +165,8 @@ test("auditoria e aplicação aceitam estado já reconciliado sem novas adiçõe
   assert.match(apply, /ADDITIVE_RECONCILIATION_NOOP=true/);
   assert.match(apply, /if \(!additions\.length\)/);
 });
+
+test("preflight aceita tanto dry-run quanto no-op seguro da reconciliação", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/sync-stock.yml", import.meta.url), "utf8");
+  assert.ok(workflow.includes("grep -Eq 'ADDITIVE_RECONCILIATION_(DRY_RUN|NOOP)=true'"));
+});
