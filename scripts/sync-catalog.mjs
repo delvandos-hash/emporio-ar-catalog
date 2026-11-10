@@ -1349,6 +1349,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const seenCategoryIds = new Set();
     const seenPageSignatures = new Set();
     let categoryAdded = 0;
+    let completed = false;
     for (let page = 1; page <= 15; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
@@ -2047,6 +2048,7 @@ async function main() {
 
   console.log('Buscando Brand Collection...');
   const brandList = SYNC_IMARAT_ONLY ? [] : await fetchBrandList();
+  if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
   const brandRootIds = new Set(brandList.map(p => String(p.id ?? p.productId ?? p.slug ?? '')).filter(Boolean));
@@ -2150,6 +2152,7 @@ async function main() {
       try {
         const sophiaGroups = await fetchSophiaRoupas();
         const n = sophiaGroups.reduce((s, g) => s + g.items.length, 0);
+        if (!n) throw new Error('Sophia retornou zero produtos; não é seguro reconciliar a fonte.');
         for (const g of sophiaGroups) for (const item of g.items || []) if (item.id_origem) liveSophiaIds.add(String(item.id_origem));
         roupasCount = n;
         if (n > 0) chunks.push(sophiaGroups);
@@ -2165,6 +2168,7 @@ async function main() {
       try {
         const frannyGroups = await fetchFrannyRoupas();
         frannyCount = frannyGroups.reduce((s, g) => s + g.items.length, 0);
+        if (!frannyCount) throw new Error('Franny retornou zero produtos; não é seguro reconciliar a fonte.');
         for (const g of frannyGroups) for (const item of g.items || []) if (item.id_origem) liveFrannyIds.add(String(item.id_origem));
         if (frannyCount > 0) chunks.push(frannyGroups);
         console.log(`Roupas Franny: ${frannyCount} produtos`);
