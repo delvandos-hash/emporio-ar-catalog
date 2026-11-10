@@ -13,22 +13,56 @@ on:
     - cron: '0 11 * * *'
     - cron: '0 23 * * *'
   workflow_dispatch:
+    inputs:
+      restore_previous_catalog:
+        description: "Restaurar os public_ids ausentes usando o snapshot conhecido da execução 42874130855."
+        required: false
+        default: false
+        type: boolean
+      publish_catalog:
+        description: "Autorizar gravação no Gist e persistência do data.js em main."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      # Push e schedule são sempre dry-run. Publicação só ocorre em workflow_dispatch
+      # com confirmação explícita publish_catalog=true.
+      SYNC_DRY_RUN: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_catalog != true) && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Validar parâmetros da execução manual
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_catalog == true && inputs.restore_previous_catalog != true
+        run: |
+          echo "::error::A publicação exige restore_previous_catalog=true para recuperar os itens do snapshot anterior."
+          exit 1
+      - name: Baixar snapshot conhecido anterior à remoção
+        if: github.event_name == 'workflow_dispatch' && inputs.restore_previous_catalog == true
+        uses: actions/download-artifact@v4
+        with:
+          name: full-reconcile-data-js-42874130855
+          run-id: 42874130855
+          github-token: ${{ github.token }}
+          path: /tmp/catalog-baseline
+      - name: Restaurar public_ids ausentes do snapshot conhecido
+        if: github.event_name == 'workflow_dispatch' && inputs.restore_previous_catalog == true
+        run: node scripts/restore-catalog-baseline.mjs
+        env:
+          CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
       - name: Testar sanitização, identidade e recuperação legada
         run: |
           node --check scripts/restore-gist-only-legacy.mjs
-          node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/imarat-image-url.test.mjs scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs scripts/legacy-restore-identity.test.mjs
+          node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/imarat-image-url.test.mjs scripts/imarat-source-guard.test.mjs scripts/additive-reconciliation.test.mjs scripts/legacy-restore-identity.test.mjs scripts/source-preservation.test.mjs scripts/catalog-baseline-restore.test.mjs
         env:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
@@ -48,6 +82,7 @@ jobs:
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          CATALOG_BASELINE_PATH: ${{ inputs.restore_previous_catalog == true && '/tmp/catalog-baseline/data.js' || '' }}
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
@@ -65,13 +100,13 @@ jobs:
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
           SYNC_IMARAT_ONLY: ${{ github.event_name == 'push' && '1' || '0' }}
-          SYNC_DRY_RUN: ${{ github.event_name == 'push' && '1' || '0' }}
+          CATALOG_BASELINE_RESTORE: ${{ inputs.restore_previous_catalog == true && '1' || '0' }}
           ADD_BRAND_NEW: ${{ github.event_name == 'push' && '0' || '1' }}
           ADD_ROUPAS: ${{ github.event_name == 'push' && '0' || '1' }}
           ADD_FRANNY: ${{ github.event_name == 'push' && '0' || '1' }}
           ADD_ACESSORIOS: ${{ github.event_name == 'push' && '0' || '1' }}
       - name: Persistir data.js após sincronização bem-sucedida
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && env.SYNC_DRY_RUN == '0'
         run: |
           if git diff --quiet -- js/data.js; then
             echo "data.js já está atualizado; nenhum commit necessário."
@@ -84,7 +119,7 @@ jobs:
           git push origin HEAD:main
 
       - name: Sincronizar estoque (apenas disponibilidade)
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && env.SYNC_DRY_RUN == '0'
         run: node scripts/sync-stock.mjs
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
