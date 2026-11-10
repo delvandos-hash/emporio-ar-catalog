@@ -4,6 +4,7 @@
  */
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 import { isFavoriteId, toggleFavoriteIds, filterFavoriteGroups, collectFavoriteProducts } from './favorites.js';
+import { expandDandeCategoryGroups } from './dande-category-membership.mjs';
 
 async function loadCatalogData() {
   // O catálogo só é carregado pela API pública sanitizada.
@@ -985,6 +986,17 @@ function allGroups(forceAll = false) {
   const lines = gSel === 'Todos' ? genderOrder : [gSel.toLowerCase()];
   const result = [];
   for (const line of lines) {
+    if (line === 'acessorios') {
+      const expandedGroups = expandDandeCategoryGroups(DATA[line] || []);
+      for (const g of expandedGroups) {
+        result.push({
+          ...g,
+          line,
+          items: g.items.map(it => withLiveStock(applyOverride(it, g.brand, overrides), g.brand, g.cat || '', line))
+        });
+      }
+      continue;
+    }
     for (const g of (DATA[line] || [])) {
       result.push({
         ...g,
