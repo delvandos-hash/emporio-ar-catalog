@@ -111,14 +111,23 @@ jobs:
             missing,
             possible_matches: missing.map(row => ({
               missing: row,
-              candidates: currentRows.filter(candidate =>
-                candidate !== row &&
-                String(candidate.stock_ref || '') === String(row.stock_ref || '') &&
-                String(row.stock_ref || '') !== ''
+              by_stock_ref: currentRows.filter(candidate =>
+                row.stock_ref && String(candidate.stock_ref || '') === String(row.stock_ref)
+              ),
+              by_origin_id: currentRows.filter(candidate =>
+                row.id_origem && String(candidate.id_origem || '') === String(row.id_origem)
+              ),
+              by_exact_catalog_identity: currentRows.filter(candidate =>
+                String(candidate.line || '') === String(row.line || '') &&
+                String(candidate.cat || '') === String(row.cat || '') &&
+                String(candidate.brand || '') === String(row.brand || '') &&
+                String(candidate.nome || '').trim().toLowerCase() === String(row.nome || '').trim().toLowerCase() &&
+                String(candidate.volume || '—').trim().toLowerCase() === String(row.volume || '—').trim().toLowerCase()
               )
             }))
           };
           fs.writeFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", JSON.stringify(report, null, 2));
+          fs.copyFileSync("js/data.js", "/tmp/catalog-reconcile-report/current-data.js");
           console.log(`BASELINE_PUBLIC_IDS_PRESERVED=${baselineIds.size - missing.length}/${baselineIds.size}`);
           console.log(`BASELINE_PUBLIC_IDS_MISSING=${missing.length}`);
           for (const row of missing) console.log("MISSING_PUBLIC_ID=" + JSON.stringify(row));
@@ -139,5 +148,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: source-reconcile-missing-id-diagnostic
-          path: /tmp/catalog-reconcile-report/missing-public-ids.json
+          path: /tmp/catalog-reconcile-report/
           if-no-files-found: warn
