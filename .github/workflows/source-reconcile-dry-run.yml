@@ -84,7 +84,7 @@ jobs:
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
       - name: Diagnosticar IDs ausentes do snapshot anterior
-        if: always() && github.event_name == 'pull_request' && hashFiles('/tmp/catalog-baseline/data.js') != ''
+        if: always() && github.event_name == 'pull_request'
         run: |
           mkdir -p /tmp/catalog-reconcile-report
           node --input-type=module <<'NODE'
