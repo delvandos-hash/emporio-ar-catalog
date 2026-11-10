@@ -18,7 +18,10 @@ test("identidade-base inclui linha, marca, categoria, nome e volume", () => {
 test("restauração legada distingue variantes pelo stock_ref e não mistura SKUs", () => {
   assert.match(restore, /const stockRef = String\(publicItem\.stock_ref \|\| ""\)/);
   assert.match(restore, /indexes\.stockIndex\.get\(stockRef\)/);
-  assert.match(restore, /resolveLegacyStockMatch\(stockMatches, identityMatches, publicItem, publicIdMatches\)/);
+  assert.match(restore, /resolveLegacyStockMatch\(stockMatches, identityMatches, publicItem, publicIdMatches, group\?\.brand\)/);
+  assert.match(restore, /check\.publicIdIndex\.get\(publicId\)/);
+  assert.match(restore, /resolveLegacyStockMatch\(stockMatches, identityMatches, item, publicIdMatches, group\?\.brand\)/);
+  assert.match(restore, /if \(!resolved\) \{/);
   assert.match(restore, /addLegacy\(DATA, line, group, publicItem\)/);
   assert.match(restore, /LEGACY_GIST_PRESERVATION_SCOPE=all-lines-all-brands-all-categories/);
   assert.doesNotMatch(restore, /if \(!\["roupas", "acessorios"\]\.includes\(norm\(line\)\)\) continue/);
