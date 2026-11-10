@@ -2128,13 +2128,19 @@ async function main() {
     // Collection. Só são movidos com ID ou nome+volume únicos na fonte raiz.
     let legacyBrandMoved = 0;
     let unverifiedLegacyRemoved = 0;
+    let scoopPremiadoPreserved = 0;
     const unverifiedLegacyNames = [];
     const brandLegacyMoves = [];
     for (const line of Object.keys(DATA)) {
       if (line === 'roupas') continue;
       for (const group of DATA[line] || []) {
-        if (group.cat === 'Brand' || String(group.cat || '').startsWith('Brand') ||
-            norm(group.cat) === 'scoop premiado') continue;
+        const isScoopPremiado = norm(group.cat) === 'scoop premiado';
+        if (isScoopPremiado) {
+          // Produto próprio do Empório A.R.: não depende de fornecedor, ID ou foto.
+          scoopPremiadoPreserved += (group.items || []).length;
+          continue;
+        }
+        if (group.cat === 'Brand' || String(group.cat || '').startsWith('Brand')) continue;
         const kept = [];
         for (const item of group.items || []) {
           const source = norm(item.fonte);
@@ -2170,6 +2176,7 @@ async function main() {
       target.items.push(move.item);
     }
     console.log(`Produtos legados movidos para a sessão Brand confirmados na origem: ${legacyBrandMoved}`);
+    console.log(`SCOOP_PREMIADO_PRODUTOS_PROPRIOS_PRESERVADOS=${scoopPremiadoPreserved}`);
     console.log(`Registros legados sem correspondência em nenhuma fonte raiz removidos: ${unverifiedLegacyRemoved}`);
     for (const item of unverifiedLegacyNames) {
       console.log('LEGADO SEM ORIGEM REMOVIDO: ' + JSON.stringify(item));
