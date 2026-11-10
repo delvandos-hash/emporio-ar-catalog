@@ -28,19 +28,22 @@ export function collectPublicIds(data) {
 export function mergeKnownGoodSnapshot(currentData, baselineData) {
   const merged = structuredClone(currentData);
   const currentIds = new Set();
-  for (const groups of Object.values(merged || {})) {
+  const currentRows = [];
+  for (const [line, groups] of Object.entries(merged || {})) {
     for (const group of groups || []) {
       for (const item of group.items || []) {
         const id = String(item?.public_id || "").trim();
-        if (!id) continue;
-        if (currentIds.has(id)) throw new Error("public_id duplicado na base atual: " + id);
-        currentIds.add(id);
+        if (id) {
+          if (currentIds.has(id)) throw new Error("public_id duplicado na base atual: " + id);
+          currentIds.add(id);
+        }
+        currentRows.push({ line, group, item });
       }
     }
   }
 
+  const baselineRows = [];
   const baselineIds = new Set();
-  const restoredIds = [];
   let skippedWithoutPublicId = 0;
   for (const [line, groups] of Object.entries(baselineData || {})) {
     for (const group of groups || []) {
@@ -52,26 +55,63 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
         }
         if (baselineIds.has(id)) throw new Error("public_id duplicado no snapshot conhecido: " + id);
         baselineIds.add(id);
-        if (currentIds.has(id)) continue;
-
-        if (!Array.isArray(merged[line])) merged[line] = [];
-        const categoryKey = norm(group.cat);
-        const brandKey = norm(group.brand);
-        let target = merged[line].find(candidate =>
-          norm(candidate.cat) === categoryKey && norm(candidate.brand) === brandKey
-        );
-        if (!target) {
-          target = { cat: group.cat, brand: group.brand, items: [] };
-          merged[line].push(target);
-        }
-        target.items.push(structuredClone(item));
-        currentIds.add(id);
-        restoredIds.push(id);
+        baselineRows.push({ line, group, item, id });
       }
     }
   }
 
-  return { data: merged, baselineIds, restoredIds, skippedWithoutPublicId };
+  const restoredIds = [];
+  const rekeyedIds = [];
+  const matchedCurrentItems = new Set();
+  for (const row of baselineRows) {
+    const { line, group, item, id } = row;
+    if (currentIds.has(id)) continue;
+
+    const stockRef = String(item?.stock_ref || "").trim();
+    if (stockRef) {
+      const matches = currentRows.filter(candidate => {
+        if (matchedCurrentItems.has(candidate.item)) return false;
+        if (String(candidate.item?.stock_ref || "").trim() !== stockRef) return false;
+        return norm(candidate.line) === norm(line) &&
+          norm(candidate.group?.cat) === norm(group?.cat) &&
+          norm(candidate.group?.brand) === norm(group?.brand) &&
+          norm(candidate.item?.nome) === norm(item?.nome) &&
+          norm(candidate.item?.volume || "—") === norm(item?.volume || "—");
+      });
+      if (matches.length > 1) {
+        throw new Error("stock_ref ambíguo no snapshot conhecido: " + stockRef);
+      }
+      if (matches.length === 1) {
+        const currentItem = matches[0].item;
+        const currentId = String(currentItem?.public_id || "").trim();
+        // Não reaproveita um ID atual que também pertence a outro registro do snapshot anterior.
+        if (!currentId || !baselineIds.has(currentId)) {
+          if (currentId) currentIds.delete(currentId);
+          currentItem.public_id = id;
+          currentIds.add(id);
+          matchedCurrentItems.add(currentItem);
+          rekeyedIds.push({ from: currentId, to: id, nome: item.nome, stock_ref: stockRef });
+          continue;
+        }
+      }
+    }
+
+    if (!Array.isArray(merged[line])) merged[line] = [];
+    const categoryKey = norm(group.cat);
+    const brandKey = norm(group.brand);
+    let target = merged[line].find(candidate =>
+      norm(candidate.cat) === categoryKey && norm(candidate.brand) === brandKey
+    );
+    if (!target) {
+      target = { cat: group.cat, brand: group.brand, items: [] };
+      merged[line].push(target);
+    }
+    target.items.push(structuredClone(item));
+    currentIds.add(id);
+    restoredIds.push(id);
+  }
+
+  return { data: merged, baselineIds, restoredIds, rekeyedIds, skippedWithoutPublicId };
 }
 
 export function serializeDataJsContent(raw, data) {
