@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalProductKey, normalProductNameVolumeKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from "./catalog-identity.mjs";
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri, isCanonicalImaratAtherri, isCanonicalAtherriGistRecord, isExcludedAtherriGistRecord } from "./catalog-identity.mjs";
 
 test("perfumes exigem nome exato, volume e marca", () => {
   assert.equal(normalProductKey("Perfume Áureo 100ml", "100ml", "Marca A"), normalProductKey("PERFUME Aureo", "100ml", "Marca A"));
@@ -64,15 +64,32 @@ test("sem ID de origem, a identidade-base continua sendo o fallback conservador"
 });
 
 
-test("bloqueia somente a miniatura Atherri Afeer incorreta da Imarat e preserva a correta", () => {
+test("bloqueia o ID 1481 e preserva o ID 1474 mesmo se o Gist trouxer preço antigo", () => {
   const wrong = { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "105,00", atacado: "75,00", id_origem: "1481" };
-  const correct = { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "95,00", atacado: "65,00", id_origem: "1474" };
+  const correct = { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "95,00", atacado: "75,00", id_origem: "1474" };
   assert.equal(isExcludedImaratAtherri(wrong, "Afeer"), true);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, varejo: "95,00", atacado: "65,00" }, "Afeer"), true);
   assert.equal(isExcludedImaratAtherri(correct, "Afeer"), false);
-  assert.equal(isExcludedImaratAtherri({ ...wrong, varejo: "95,00", atacado: "65,00" }, "Afeer"), true); // ID 1481 permanece bloqueado mesmo se o fornecedor alterar preços
-  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "9999", varejo: "105,00", atacado: "75,00" }, "Afeer"), true);
-  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "9999" }, "Afeer"), true);
+  assert.equal(isExcludedImaratAtherri({ ...correct, varejo: "105,00", atacado: "75,00" }, "Afeer"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "9999", varejo: "105,00", atacado: "75,00" }, "Afeer"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "", varejo: "105,00", atacado: "75,00" }, "Afeer"), true);
   assert.equal(isExcludedImaratAtherri({ ...wrong, nome: "Miniatura Atherri Afeer Intense" }, "Afeer"), false);
   assert.equal(isExcludedImaratAtherri({ ...wrong, nome: "Miniatura Atherri Afeer" }, "Outra Marca"), false);
   assert.equal(isExcludedImaratAtherri({ ...wrong, volume: "50ml" }, "Afeer"), false);
+});
+
+test("separa o registro Gist incorreto do correto por origin_ref estável", () => {
+  const correct = {
+    nome: "Miniatura Atherri Afeer", volume: "30ml",
+    origin_ref: "o_9e8adfbf4a5157cb7a048f8f"
+  };
+  const wrong = {
+    nome: "Miniatura Atherri Afeer", volume: "30ml",
+    origin_ref: "o_b8e0e31ca9e4dfafe8a7ecc7"
+  };
+  assert.equal(isCanonicalAtherriGistRecord(correct, "Afeer"), true);
+  assert.equal(isExcludedAtherriGistRecord(correct, "Afeer"), false);
+  assert.equal(isExcludedAtherriGistRecord(wrong, "Afeer"), true);
+  assert.equal(isExcludedAtherriGistRecord({ ...wrong, brand: "Outra Marca" }, "Outra Marca"), false);
+  assert.equal(isCanonicalImaratAtherri({ ...correct, fonte: "imarat", id_origem: "1474" }, "Afeer"), true);
 });
