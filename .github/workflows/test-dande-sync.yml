@@ -9,6 +9,11 @@ on:
       - "scripts/sync-catalog.mjs"
       - "scripts/dande-url.mjs"
       - "scripts/dande-url.test.mjs"
+      - "scripts/dande-category-membership.test.mjs"
+      - "js/dande-category-membership.mjs"
+      - "js/app.js"
+      - "scripts/public-catalog.mjs"
+      - "scripts/public-catalog.test.mjs"
       - "netlify/functions/dande-stock.mjs"
       - ".github/workflows/test-dande-sync.yml"
 
@@ -31,7 +36,8 @@ jobs:
         run: |
           node --check scripts/sync-catalog.mjs
           node --check scripts/dande-url.mjs
-          node --test scripts/dande-url.test.mjs
+          node --check js/dande-category-membership.mjs
+          node --test scripts/dande-url.test.mjs scripts/dande-category-membership.test.mjs scripts/public-catalog.test.mjs
       - name: Executar sincronização em modo isolado
         run: node scripts/sync-catalog.mjs
         env:
