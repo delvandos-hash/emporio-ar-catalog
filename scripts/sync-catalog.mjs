@@ -2051,8 +2051,6 @@ async function main() {
   const brandList = SYNC_IMARAT_ONLY ? [] : await fetchBrandList();
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
-  if (!SYNC_IMARAT_ONLY) {
-    if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
     const brandSession = p => {
       let session = mapBrandSession(p.categoria_nome || p.categoria || '');
       if (!session && norm(p.nome).includes('tubete')) session = 'TUBETES BRAND';
@@ -2069,6 +2067,8 @@ async function main() {
           volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume;
       }) || null;
     };
+  if (!SYNC_IMARAT_ONLY) {
+    if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
     let staleBrandRemoved = 0;
     for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
       if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
