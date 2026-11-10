@@ -207,6 +207,23 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
           : [];
         const photoFingerprint = publicPhotoFingerprint(item);
         const byPhoto = photoFingerprint !== "[]" ? candidates.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
+        if (norm(group?.brand) === "isis makeup" && ["body spray", "esfoliante corporal bum bum", "esfoliante corporal pitaya"].includes(norm(item?.nome))) {
+          const sameNameInternal = [...internalIndex.values()].flat().filter(row =>
+            norm(row.publicGroup?.brand) === "isis makeup" && norm(row.publicItem?.nome) === norm(item?.nome)
+          );
+          console.log("ISIS_GIST_VARIANT_DIAGNOSTIC " + JSON.stringify({
+            line, category: group?.cat, name: item?.nome, public_id: item?.public_id || "",
+            volume: item?.volume || "", retail: item?.varejo || "", wholesale: item?.atacado || "",
+            photo: item?.foto || "", photos: item?.fotos || [],
+            internalCandidates: sameNameInternal.map(row => ({
+              line: row.publicLine, category: row.publicGroup?.cat,
+              public_id: row.publicItem?.public_id || "", volume: row.publicItem?.volume || "",
+              retail: row.publicItem?.varejo || "", wholesale: row.publicItem?.atacado || "",
+              photo: row.publicItem?.foto || "", photos: row.publicItem?.fotos || [],
+              origin_id: row.item?.id_origem || ""
+            }))
+          }));
+        }
         const looseKey = looseIdentity(line, group, item);
         const byLooseIdentity = (internalByLooseIdentity.get(looseKey) || []).filter(row => !used.has(row));
         const byLoosePhoto = photoFingerprint !== "[]" ? byLooseIdentity.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
