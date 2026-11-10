@@ -189,5 +189,6 @@ export function dedupeConfirmedSourceProducts(DATA) {
       group.items = kept;
     }
   }
-  const visualRemoved = removePhotoConfirmedDuplicates(DATA);\n  return { removed, conflicts, visualRemoved };
+  const visualRemoved = removePhotoConfirmedDuplicates(DATA);
+  return { removed, conflicts, visualRemoved };
 }
