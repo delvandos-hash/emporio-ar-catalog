@@ -1,0 +1,45 @@
+name: Sincronizar somente disponibilidade do estoque
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_stock_sync:
+        description: "Confirmo a atualização de disponibilidade no catálogo público (Gist)."
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stock-availability-only
+  cancel-in-progress: false
+
+jobs:
+  stock-availability:
+    if: inputs.confirm_stock_sync == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar script e proteção de coleta
+        run: |
+          node --check scripts/sync-stock.mjs
+          node --test scripts/sync-stock-source-guard.test.mjs
+      - name: Atualizar somente disponibilidade e publicar no Gist
+        run: node scripts/sync-stock.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
