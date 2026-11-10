@@ -352,3 +352,52 @@ test("preserva fotos públicas das variações e descarta URLs não autorizadas"
   assert.equal("sku" in variation, false);
   assert.equal(JSON.stringify(result).includes("cor-privada"), false);
 });
+
+
+test("remove duplicatas Franny e Sophia na projeção pública sem cruzar fontes", () => {
+  const photos = [
+    "https://images-primary.example/roupas/modelo-a.webp",
+    "https://images-primary.example/roupas/modelo-b.webp"
+  ];
+  const make = (id, route, variations, extraPhotos = []) => ({
+    nome: "Calça Resinada", volume: "—", varejo: "149,90", atacado: "99,90",
+    foto: photos[0], fotos: [...photos, ...extraPhotos], fonte: "roupas",
+    id_origem: id, stock_ref: "s_" + id.padStart(24, "0"), stock_route: route,
+    variacoes: variations.map(([nome, estoque]) => ({ nome, estoque }))
+  });
+  const data = { roupas: [{ brand: "Empório A.R", cat: "CALÇA/SHORT", items: [
+    make("100", "a", [["Preto P", 0], ["Marrom P", 0], ["Azul P", 2], ["Café P", 2]]),
+    make("200", "a", [["Preto P", 0], ["Caramelo P", 0], ["Azul P", 2], ["Café P", 3]]),
+    make("franny-300", "b", [["Preto P", 0], ["Azul P", 1]], ["https://images-primary.example/roupas/modelo-c.webp"]),
+    make("franny-400", "b", [["Preto P", 0], ["Azul P", 1]], [
+      "https://images-primary.example/roupas/modelo-c.webp",
+      "https://images-primary.example/roupas/modelo-d.webp"
+    ])
+  ] }] };
+  const result = toPublicCatalog(data);
+  const items = result.roupas[0].items;
+  assert.equal(items.length, 2);
+  assert.deepEqual(new Set(items.map(item => item.stock_route)), new Set(["a", "b"]));
+  assert.equal(items.some(item => item.id_origem), false);
+  assert.equal(items.every(item => item.stock_ref), true);
+});
+
+test("preserva roupas com mesmo nome quando as fotografias são diferentes", () => {
+  const result = toPublicCatalog({ roupas: [{ brand: "Empório A.R", cat: "CALÇA/SHORT", items: [
+    {
+      nome: "Calça Cargo", fonte: "roupas", id_origem: "4239995",
+      stock_ref: "s_aaaaaaaaaaaaaaaaaaaaaaaa", stock_route: "a",
+      foto: "https://images-primary.example/cargo-a.webp",
+      fotos: ["https://images-primary.example/cargo-a.webp", "https://images-primary.example/cargo-b.webp"],
+      variacoes: [{ nome: "Jeans 40", estoque: 2 }, { nome: "Jeans 42", estoque: 1 }]
+    },
+    {
+      nome: "Calça Cargo", fonte: "roupas", id_origem: "4235903",
+      stock_ref: "s_bbbbbbbbbbbbbbbbbbbbbbbb", stock_route: "a",
+      foto: "https://images-primary.example/cargo-c.webp",
+      fotos: ["https://images-primary.example/cargo-c.webp", "https://images-primary.example/cargo-d.webp"],
+      variacoes: [{ nome: "Jeans 40", estoque: 2 }, { nome: "Jeans 42", estoque: 1 }]
+    }
+  ] }] });
+  assert.equal(result.roupas[0].items.length, 2);
+});
