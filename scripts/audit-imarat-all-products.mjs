@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { toPublicCatalog } from "./public-catalog.mjs";
 import { findExactInternalPriceMatch, findImaratSourceByOriginRef } from "./audit-catalog-match.mjs";
+import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
@@ -269,6 +270,8 @@ for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
   }
 }
 const DATA=await fetchLiveCatalog();
+const excludedAtherri = removeExcludedLegacyAtherri(DATA);
+console.log(`LEGACY_EXCLUDED_ATHERRI_1481_FROM_AUDIT=${excludedAtherri}`);
 const internalPublicData=toPublicCatalog(INTERNAL_DATA);
 const rekeyAudit=rekeyLiveVariants(DATA,internalPublicData);
 console.log(`GIST_VARIANTS_REKEYABLE=${rekeyAudit.rekeyed} unmatchedLiveVariants=${rekeyAudit.unmatched}`);
