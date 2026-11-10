@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
 import { toPublicCatalog } from "../../scripts/public-catalog.mjs";
 import { isExcludedImaratAtherri } from "../../scripts/catalog-identity.mjs";
 
 const GIST_RAW_URL = "https://gist.githubusercontent.com/delvandos-hash/11918b7196b3ee6a0d8a91739167b312/raw/catalogo.json";
 const TOP_LEVEL_FIELDS = new Set(["DATA", "WHATSAPP", "BRAND", "ultimaAtualizacao"]);
 const BRAND_FIELDS = new Set(["name", "phone"]);
+const INCORRECT_ATHERRI_ORIGIN_REF = "o_" + createHash("sha256")
+  .update("imarat|afeer|1481").digest("hex").slice(0, 24);
 
 function pickFields(value, allowed) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -12,8 +15,13 @@ function pickFields(value, allowed) {
   return clean;
 }
 
-// A prévia também lê o Gist publicado. Filtra o registro incorreto na resposta
-// da API para que o Deploy Preview reflita a correção sem publicar o Gist.
+function normalizeText(value) {
+  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// O Gist contém a projeção pública: ela não carrega id_origem/fonte, mas preserva
+// origin_ref, hash estável derivado da origem, marca e ID do cadastro.
 export function filterExcludedAtherri(DATA) {
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) {
     throw new Error("DATA inválido para filtragem");
@@ -28,10 +36,17 @@ export function filterExcludedAtherri(DATA) {
     filtered[line] = groups.map(group => {
       const items = Array.isArray(group?.items) ? group.items : [];
       const kept = items.filter(item => {
+        const exactPublicIdentity =
+          normalizeText(group?.brand) === "afeer" &&
+          normalizeText(item?.nome ?? item?.name) === "miniatura atherri afeer" &&
+          normalizeText(item?.volume ?? item?.sizeMl).replace(/\s/g, "") === "30ml" &&
+          String(item?.origin_ref ?? "").trim() === INCORRECT_ATHERRI_ORIGIN_REF;
         const sourceId = String(item?.id_origem ?? "").trim();
         const sourceName = String(item?.fonte ?? "").trim().toLowerCase();
-        const isImarat = sourceName === "imarat" || (!sourceName && sourceId === "1481");
-        const exclude = isImarat && isExcludedImaratAtherri(item, group?.brand);
+        const privateSourceIdentity =
+          (sourceName === "imarat" || (!sourceName && sourceId === "1481")) &&
+          isExcludedImaratAtherri(item, group?.brand);
+        const exclude = exactPublicIdentity || privateSourceIdentity;
         if (exclude) removed++;
         return !exclude;
       });
