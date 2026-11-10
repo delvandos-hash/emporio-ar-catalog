@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   public-catalog-tests:
@@ -27,3 +28,18 @@ jobs:
           node --check scripts/catalog-baseline-restore.mjs
           node --check scripts/restore-catalog-baseline.mjs
           node --test scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs scripts/product-share.test.mjs scripts/audit-catalog-match.test.mjs scripts/legacy-public-exclusions.test.mjs scripts/legacy-restore-identity.test.mjs scripts/additive-reconciliation.test.mjs scripts/source-preservation.test.mjs scripts/catalog-baseline-restore.test.mjs
+      - name: Baixar snapshot conhecido para teste de recuperação real
+        uses: actions/download-artifact@v4
+        with:
+          name: full-reconcile-data-js-42874130855
+          run-id: 42874130855
+          github-token: ${{ github.token }}
+          path: /tmp/catalog-baseline-fixture
+      - name: Validar recuperação contra o snapshot real anterior
+        run: |
+          cp js/data.js /tmp/catalog-current-fixture.js
+          CATALOG_BASELINE_PATH=/tmp/catalog-baseline-fixture/data.js CATALOG_CURRENT_DATA_PATH=/tmp/catalog-current-fixture.js node scripts/restore-catalog-baseline.mjs | tee /tmp/catalog-baseline-restore.log
+          grep -q 'KNOWN_GOOD_BASELINE_PUBLIC_IDS=2158' /tmp/catalog-baseline-restore.log
+          grep -q 'KNOWN_GOOD_BASELINE_REKEYED=28' /tmp/catalog-baseline-restore.log
+          grep -q 'KNOWN_GOOD_BASELINE_RESTORED=129' /tmp/catalog-baseline-restore.log
+
