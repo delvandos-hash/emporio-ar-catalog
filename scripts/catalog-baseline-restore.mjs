@@ -65,7 +65,14 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
   const matchedCurrentItems = new Set();
   for (const row of baselineRows) {
     const { line, group, item, id } = row;
-    if (currentIds.has(id)) continue;
+    if (currentIds.has(id)) {
+      // IDs já presentes no catálogo conhecido também são imutáveis durante a
+      // reconciliação: o Gist vivo pode ter uma chave diferente para o mesmo
+      // produto e preserveLivePublicFields não deve substituir o ID aprovado.
+      const existing = currentRows.find(candidate => String(candidate.item?.public_id || "").trim() === id);
+      if (existing) existing.item._preserve_public_id = true;
+      continue;
+    }
 
     const stockRef = String(item?.stock_ref || "").trim();
     if (stockRef) {
