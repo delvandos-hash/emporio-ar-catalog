@@ -2083,6 +2083,14 @@ async function main() {
   }
 
   let addedBrand = 0;
+  const existingBrandSourceIds = new Set();
+  for (const groups of Object.values(DATA)) for (const group of groups || []) {
+    if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
+    for (const item of group.items || []) {
+      const id = String(item.id_origem || '').trim();
+      if (id && norm(item.fonte) === 'brand') existingBrandSourceIds.add(norm(group.brand) + '|' + id);
+    }
+  }
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
@@ -2123,7 +2131,10 @@ async function main() {
       const volume = volumeFrom(null, nome);
       const brandKey = normalProductKey(nome, volume, session);
       const brandCandidates = indexNormal.get(brandKey) || [];
-      if (isDuplicateMiniSource(brandCandidates, p.id ?? p.productId ?? p.slug ?? "")) continue;
+      const candidateOriginId = String(p.id ?? p.productId ?? p.slug ?? '').trim();
+      const sourceIdKey = norm(session) + '|' + candidateOriginId;
+      if ((candidateOriginId && existingBrandSourceIds.has(sourceIdKey)) ||
+          isDuplicateMiniSource(brandCandidates, candidateOriginId)) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
@@ -2144,6 +2155,7 @@ async function main() {
       const nameVolumeKey = normalProductNameVolumeKey(nome, volume);
       if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
       indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
+      if (candidateOriginId) existingBrandSourceIds.add(sourceIdKey);
       addedBrand++;
     }
   }
