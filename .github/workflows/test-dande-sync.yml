@@ -20,7 +20,6 @@ on:
       - "scripts/variation-stock.test.mjs"
       - "netlify/functions/dande-stock.mjs"
       - "netlify/functions/roupas-stock.mjs"
-      - "scripts/variation-stock.test.mjs"
       - ".github/workflows/test-dande-sync.yml"
 
 permissions:
