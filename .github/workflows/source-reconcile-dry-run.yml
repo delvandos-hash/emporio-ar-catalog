@@ -59,9 +59,10 @@ jobs:
         run: node scripts/restore-catalog-baseline.mjs
         env:
           CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
-      - name: Sincronizar todas as fontes sem publicar
+      - name: Sincronizar todas as fontes e reaplicar IDs do snapshot sem publicar
         run: |
           node scripts/sync-catalog.mjs
+          CATALOG_BASELINE_PATH=/tmp/catalog-baseline/data.js CATALOG_BASELINE_RESTORE_FINAL=1 node scripts/restore-catalog-baseline.mjs
           mkdir -p /tmp/catalog-reconcile-report
           touch /tmp/catalog-reconcile-report/sync-success
         env:
