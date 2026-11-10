@@ -101,10 +101,10 @@ function variationImage(value) {
   const raw = String(rawValue || "").trim();
   if (!raw) return "";
   let absolute = raw;
-  if (!/^https?:\\/\\//i.test(raw)) {
+  if (!/^https?:\/\//i.test(raw)) {
     const base = String(process.env.CDN_IMAGE_BASE_URL || "").trim();
     if (!base) return "";
-    absolute = base.replace(/\\/+$/, "") + "/" + raw.replace(/^\\/+/, "");
+    absolute = base.replace(/\/+$/, "") + "/" + raw.replace(/^\/+/, "");
   }
   return sanitizePublicImageUrl(absolute);
 }
