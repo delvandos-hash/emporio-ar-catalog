@@ -13,10 +13,14 @@ on:
       - "scripts/sync-catalog.mjs"
       - "scripts/source-identity-dedupe.mjs"
       - "scripts/source-identity-dedupe.test.mjs"
+      - "scripts/catalog-baseline-restore.mjs"
+      - "scripts/catalog-baseline-restore.test.mjs"
+      - "scripts/restore-catalog-baseline.mjs"
       - ".github/workflows/source-reconcile-dry-run.yml"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: source-reconcile-dry-run-${{ github.event.pull_request.number }}
@@ -39,11 +43,27 @@ jobs:
         run: |
           node --check scripts/sync-catalog.mjs
           node --check scripts/source-identity-dedupe.mjs
-          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs
+          node --check scripts/catalog-baseline-restore.mjs
+          node --check scripts/restore-catalog-baseline.mjs
+          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs scripts/catalog-baseline-restore.test.mjs
+      - name: Baixar snapshot anterior conhecido para reconciliação
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: full-reconcile-data-js-42874130855
+          run-id: 42874130855
+          github-token: ${{ github.token }}
+          path: /tmp/catalog-baseline
+      - name: Restaurar IDs públicos do snapshot conhecido
+        if: github.event_name == 'pull_request'
+        run: node scripts/restore-catalog-baseline.mjs
+        env:
+          CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
       - name: Sincronizar todas as fontes sem publicar
         run: node scripts/sync-catalog.mjs
         env:
           SYNC_DRY_RUN: "1"
+          CATALOG_BASELINE_RESTORE: ${{ github.event_name == 'pull_request' && '1' || '0' }}
           SYNC_SKIP_DETAILS: "1"
           SYNC_IMARAT_ONLY: "0"
           SYNC_DANDE_ONLY: "0"
@@ -63,3 +83,21 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+      - name: Confirmar que todos os IDs do snapshot anterior sobreviveram ao sync
+        if: github.event_name == 'pull_request'
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { collectPublicIds, parseDataJsContent } from "./scripts/catalog-baseline-restore.mjs";
+          const baseline = parseDataJsContent(fs.readFileSync("/tmp/catalog-baseline/data.js", "utf8"));
+          const current = parseDataJsContent(fs.readFileSync("js/data.js", "utf8"));
+          const baselineIds = collectPublicIds(baseline);
+          const currentIds = collectPublicIds(current);
+          const missing = [...baselineIds].filter(id => !currentIds.has(id));
+          console.log(`BASELINE_PUBLIC_IDS_PRESERVED=${baselineIds.size - missing.length}/${baselineIds.size}`);
+          console.log(`BASELINE_PUBLIC_IDS_MISSING=${missing.length}`);
+          if (missing.length) {
+            console.error("IDs do snapshot anterior ausentes após o dry-run: " + missing.join(","));
+            process.exit(1);
+          }
+          NODE
