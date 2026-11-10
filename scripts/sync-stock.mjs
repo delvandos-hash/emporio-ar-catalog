@@ -111,7 +111,13 @@ async function fetchBrand() {
     } catch {
       throw new Error(`Brand página ${page}: JSON inválido; coleta incompleta`);
     }
-    const products = Array.isArray(data) ? data : data.produtos;
+    // Compatibilidade com o coletor principal: a Brand encerra a paginação
+    // com objeto JSON sem a chave `produtos` (ex.: {}). Uma chave presente,
+    // mas com formato inválido, continua sendo erro para evitar coleta parcial.
+    let products;
+    if (Array.isArray(data)) products = data;
+    else if (data && typeof data === 'object' && !Object.prototype.hasOwnProperty.call(data, 'produtos')) products = [];
+    else products = data?.produtos;
     if (!Array.isArray(products)) {
       throw new Error(`Brand página ${page}: estrutura de produtos inválida`);
     }
