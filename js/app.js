@@ -853,7 +853,7 @@ async function fetchFreshStockSnapshot() {
 
 async function fetchFreshVariationStock(product) {
   if (!product || !product.stock_ref || !isVariacaoCatalogProduct(product)) throw new Error('Não foi possível identificar a origem do estoque deste produto.');
-  const endpoint = isRoupasProduct(product) ? '/api/roupas-stock?ref=' + encodeURIComponent(product.stock_ref) + '&source=' + encodeURIComponent(product.stock_route || 'a') : '/api/dande-stock?ref=' + encodeURIComponent(product.stock_ref) + '&category=' + encodeURIComponent(product.cat || '');
+  const endpoint = isRoupasProduct(product) ? '/api/roupas-stock?ref=' + encodeURIComponent(product.stock_ref) + '&source=' + encodeURIComponent(product.stock_route || 'a') + '&category=' + encodeURIComponent(product.cat || '') : '/api/dande-stock?ref=' + encodeURIComponent(product.stock_ref) + '&category=' + encodeURIComponent(product.cat || '');
   const response = await fetch(endpoint + '&fresh=' + Date.now(), { cache: 'no-store' });
   if (!response.ok) throw new Error('Não foi possível confirmar as variações de ' + (product.nome || 'um produto') + '.');
   const data = await response.json();
@@ -1933,7 +1933,7 @@ async function refreshVariationStock(p) {
   if (!p || !p.stock_ref || !isVariacaoCatalogProduct(p)) return;
   const isClothing = isRoupasProduct(p);
   const endpoint = isClothing
-    ? `/api/roupas-stock?ref=${encodeURIComponent(p.stock_ref)}&source=${encodeURIComponent(p.stock_route || 'a')}`
+    ? `/api/roupas-stock?ref=${encodeURIComponent(p.stock_ref)}&source=${encodeURIComponent(p.stock_route || 'a')}&category=${encodeURIComponent(p.cat || '')}`
     : `/api/dande-stock?ref=${encodeURIComponent(p.stock_ref)}&category=${encodeURIComponent(p.cat || '')}`;
   const requestId = p.public_id || p.stock_ref;
   const btnAdd = document.getElementById('modalAddCart');
