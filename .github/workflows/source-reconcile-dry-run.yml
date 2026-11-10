@@ -5,6 +5,9 @@ on:
     branches: [security/source-identity-dedupe-20261109]
     paths:
       - "scripts/sync-catalog.mjs"
+      - "scripts/catalog-identity.mjs"
+      - "scripts/catalog-identity.test.mjs"
+      - "scripts/audit-imarat-all-products.mjs"
       - "scripts/dande-url.mjs"
       - "scripts/dande-url.test.mjs"
       - "scripts/source-identity-dedupe.mjs"
@@ -84,6 +87,19 @@ jobs:
         run: node scripts/restore-gist-only-legacy.mjs
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+
+      - name: Auditar snapshot reconciliado contra o Gist (somente leitura)
+        run: |
+          node scripts/audit-imarat-all-products.mjs | tee /tmp/source-reconcile-audit.log
+          if ! grep -q 'ADDITIVE_RECONCILIATION_SAFE=true' /tmp/source-reconcile-audit.log; then
+            echo "Reconciliação não aprovada: há itens sem correspondência inequívoca ou divergência no baseline." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "ADDITIVE_RECONCILIATION_SAFE=true" >> "$GITHUB_STEP_SUMMARY"
+          echo "O snapshot restaurado foi comparado com o Gist em modo somente leitura; nenhuma publicação foi feita." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
 
       - name: Guardar snapshot reconciliado para inspeção
         if: success()
