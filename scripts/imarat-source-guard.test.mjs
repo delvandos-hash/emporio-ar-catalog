@@ -87,6 +87,14 @@ test("correspondência exata exige volume compatível e não trata Empório A.R 
   assert.doesNotMatch(source, /\['outros', 'outra', 'emporio a r'\]\.includes\(b\)/);
 });
 
+test("resolve conflito de preço não manual pelo cálculo canônico da fonte Imarat", () => {
+  assert.match(source, /const precosCanonicos = calcularPrecoMiniatura\(/);
+  assert.match(source, /source\.priceCents/);
+  assert.match(source, /DUPLICIDADE IMARAT RESOLVIDA PELO PREÇO CANÔNICO DA FONTE/);
+  assert.match(source, /if \(!registrosManuais\.length\) \{/);
+  assert.match(source, /Conflitos de preço manual preservados por ID/);
+});
+
 test("registra o ID privado da origem e consolida duplicatas sem confundir IDs distintos", () => {
   assert.match(source, /if \(hit\.id != null\) it\.id_origem = String\(hit\.id\)/);
   assert.match(source, /id_origem: String\(p\.id \?\? p\.productId \?\? ''\)/);
