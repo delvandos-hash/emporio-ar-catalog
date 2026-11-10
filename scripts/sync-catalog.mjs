@@ -1730,7 +1730,15 @@ async function main() {
           hit = candidatosNomeExato.find(p => norm(p.brand).includes('arabiyat prestige'));
         }
         // Em grupos genéricos, só aceita associação se o nome for único em toda a API.
-        if (!hit && ['outros', 'outra', 'emporio a r'].includes(b) && candidatosNomeExato.length === 1) {
+        if (!hit && ['outros', 'outra'].includes(b) && candidatosNomeExato.length === 1) {
+          hit = candidatosNomeExato[0];
+        }
+        // Compatibilidade apenas para registros legados sem procedência:
+        // Empório A.R pode ser um agrupador antigo, mas nunca é tratado como
+        // marca genérica para itens que já têm fonte confirmada.
+        const legacyWithoutSource = !String(it.fonte || '').trim() || norm(it.fonte) === 'legacy gist';
+        if (!hit && line !== 'roupas' && legacyWithoutSource && b === 'emporio a r' &&
+            candidatosNomeExato.length === 1) {
           hit = candidatosNomeExato[0];
         }
         // Correções pontuais validadas no catálogo: transposição em Tharwah
