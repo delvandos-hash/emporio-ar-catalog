@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findExactInternalPriceMatch } from "./audit-catalog-match.mjs";
+import { findExactInternalPriceMatch, findImaratSourceByOriginRef } from "./audit-catalog-match.mjs";
 
 const candidate = (id, varejo, atacado) => ({ id_origem: id, varejo, atacado });
 
@@ -24,4 +24,14 @@ test("does not choose when more than one internal variant has the same prices", 
 test("returns null for missing or invalid candidate collections", () => {
   assert.equal(findExactInternalPriceMatch([], { varejo: "95,00", atacado: "75,00" }), null);
   assert.equal(findExactInternalPriceMatch(null, { varejo: "95,00", atacado: "75,00" }), null);
+});
+
+test("resolves Imarat source records by stable origin_ref, not by similar title", () => {
+  const products = [
+    { id: 1474, brand: "Afeer " , name: "Miniatura Atherri Afeer" },
+    { id: 1481, brand: "Afeer ", name: "Miniatura Atherri Afeer" }
+  ];
+  assert.equal(findImaratSourceByOriginRef(products, "o_9e8adfbf4a5157cb7a048f8f"), products[0]);
+  assert.equal(findImaratSourceByOriginRef(products, "o_b8e0e31ca9e4dfafe8a7ecc7"), products[1]);
+  assert.equal(findImaratSourceByOriginRef(products, "o_unknown"), null);
 });
