@@ -2067,15 +2067,14 @@ async function main() {
     const findBrandRootMatches = (item, group) => {
       const id = String(item.id_origem || item.id || '').trim();
       const itemVolume = volumeMatch(item.volume, item.nome);
-      const inSession = brandList.filter(p => norm(brandSession(p)) === norm(group.brand));
       if (id) {
-        const byId = inSession.filter(p => String(p.id ?? p.productId ?? p.slug ?? '').trim() === id);
+        const byId = brandList.filter(p => String(p.id ?? p.productId ?? p.slug ?? '').trim() === id);
         if (byId.length) return byId;
       }
-      return inSession.filter(p =>
-        norm(p.nome) === norm(item.nome) &&
-        volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume
-      );
+      const exact = p => norm(p.nome) === norm(item.nome) &&
+        volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume;
+      const inSession = brandList.filter(p => norm(brandSession(p)) === norm(group.brand) && exact(p));
+      return inSession.length ? inSession : brandList.filter(exact);
     };
     const findBrandRootMatch = (item, group) => {
       const matches = findBrandRootMatches(item, group);
@@ -2097,6 +2096,8 @@ async function main() {
     if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
     let staleBrandRemoved = 0;
     let legacyBrandMapped = 0;
+    let brandSessionMoved = 0;
+    const brandSessionMoves = [];
     for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
       if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
       group.items = (group.items || []).filter(item => {
@@ -2117,11 +2118,22 @@ async function main() {
         const sourceVolume = volumeFrom(null, hit.nome);
         if (sourceVolume) item.volume = sourceVolume;
         if (source !== 'brand') legacyBrandMapped++;
+        const targetSession = brandSession(hit);
+        if (targetSession && norm(targetSession) !== norm(group.brand)) {
+          brandSessionMoves.push({ line, session: targetSession, item });
+          brandSessionMoved++;
+          return false;
+        }
         return true;
       });
     }
+    for (const move of brandSessionMoves) {
+      const target = ensureBrandGroup(DATA, move.line, move.session, 'Brand');
+      target.items.push(move.item);
+    }
     console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
     console.log(`Produtos Brand legados confirmados e reclassificados pela origem: ${legacyBrandMapped}`);
+    console.log(`Produtos Brand movidos para a sessão correta da fonte: ${brandSessionMoved}`);
     // Registros antigos em outras categorias também podem pertencer à Brand
     // Collection. Só são movidos com ID ou nome+volume únicos na fonte raiz.
     let legacyBrandMoved = 0;
