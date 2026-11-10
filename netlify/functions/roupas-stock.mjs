@@ -4,6 +4,7 @@
  * id pode vir como "123" (Sophia) ou "franny-123" (Franny)
  */
 import { createHash } from "node:crypto";
+import { sanitizePublicImageUrl } from "../../scripts/public-image-url.mjs";
 
 function makeStockRef(source, originId) {
   return "s_" + createHash("sha256").update(source + "|" + String(originId)).digest("hex").slice(0, 24);
@@ -93,13 +94,40 @@ async function fetchCategoryPage(src, catId, page, cookie) {
   }
 }
 
+function variationImage(value) {
+  const rawValue = value && typeof value === "object"
+    ? (value.url || value.src || value.path || value.foto || value.imagem || "")
+    : value;
+  const raw = String(rawValue || "").trim();
+  if (!raw) return "";
+  let absolute = raw;
+  if (!/^https?:\\/\\//i.test(raw)) {
+    const base = String(process.env.CDN_IMAGE_BASE_URL || "").trim();
+    if (!base) return "";
+    absolute = base.replace(/\\/+$/, "") + "/" + raw.replace(/^\\/+/, "");
+  }
+  return sanitizePublicImageUrl(absolute);
+}
+
+function variationMedia(vinfo) {
+  if (!vinfo || typeof vinfo !== "object") return {};
+  const singles = ["foto", "imagem", "image", "url_imagem", "foto_url", "imagem_url",
+    "image_url", "url_foto", "thumbnail", "thumbnail_url", "src"].map(key => vinfo[key]);
+  const arrays = ["fotos", "imagens", "images", "thumbnails"]
+    .flatMap(key => Array.isArray(vinfo[key]) ? vinfo[key] : []);
+  const fotos = [...new Set([...singles, ...arrays].map(variationImage).filter(Boolean))];
+  return fotos.length ? { foto: fotos[0], fotos } : {};
+}
+
 export function buildVariacoes(found) {
   const estoqueMap = found.estoque || {};
   const varDict = found.variacoes || {};
   const variacoes = Object.entries(varDict).map(([vid, vinfo], index) => ({
     id: `v${index + 1}`,
     nome: ((vinfo && vinfo.nome) || "").trim() || String(vid),
+    ...(vinfo?.cor != null ? { cor: String(vinfo.cor).slice(0, 80) } : {}),
     estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
+    ...variationMedia(vinfo),
   }));
   const total =
     Number(found.total_estoque) ||
