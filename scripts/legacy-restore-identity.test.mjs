@@ -40,3 +40,21 @@ test("sem marca esperada, falha de forma fechada", () => {
   const a=row("p_a","foto-a");
   assert.equal(resolveLegacyStockMatch([a],[a],{public_id:"p_a",foto:"foto-a"},[]),null);
 });
+
+test("prefere o único registro confirmado na fonte raiz entre cópia legada e produto atual com a mesma foto", () => {
+  const legacy = { group: { brand: "COLEÇÃO BRAND" }, publicItem: { public_id: "p_legacy", foto: "foto-delina" }, item: { fonte: "legacy-gist" } };
+  const root = { group: { brand: "COLEÇÃO BRAND" }, publicItem: { public_id: "p_root", foto: "foto-delina" }, item: { fonte: "brand", id_origem: "2087755" } };
+  assert.equal(
+    resolveLegacyStockMatch([], [legacy, root], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
+    root
+  );
+});
+
+test("continua bloqueando quando duas correspondências com fonte e IDs distintos compartilham a mesma foto", () => {
+  const a = { group: { brand: "COLEÇÃO BRAND" }, publicItem: { public_id: "p_a", foto: "foto-delina" }, item: { fonte: "brand", id_origem: "2087755" } };
+  const b = { group: { brand: "COLEÇÃO BRAND" }, publicItem: { public_id: "p_b", foto: "foto-delina" }, item: { fonte: "brand", id_origem: "2087756" } };
+  assert.equal(
+    resolveLegacyStockMatch([], [a, b], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
+    null
+  );
+});
