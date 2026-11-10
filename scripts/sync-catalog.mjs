@@ -1592,9 +1592,11 @@ async function main() {
   for (const groups of Object.values(DATA || {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       const before = (group.items || []).length;
-      group.items = (group.items || []).filter(item =>
-        !(norm(item?.fonte) === "imarat" && isExcludedImaratAtherri(item, group.brand))
-      );
+      group.items = (group.items || []).filter(item => {
+        const sourceId = String(item?.id_origem ?? "").trim();
+        const confirmedImaratRecord = norm(item?.fonte) === "imarat" || sourceId === "1481";
+        return !(confirmedImaratRecord && isExcludedImaratAtherri(item, group.brand));
+      });
       excludedAtherriRemoved += before - group.items.length;
     }
   }
