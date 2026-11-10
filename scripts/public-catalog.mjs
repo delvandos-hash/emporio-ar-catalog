@@ -25,7 +25,7 @@ function publicSource(line, cat) {
   if (["masculino", "feminino", "unissex"].includes(ln) || ln.includes("perf") || c.includes("perf")) return "perfumaria";
   return "outros";
 }
-function publicLine(line, groups) {
+export function publicLine(line, groups) {
   const normalized = String(line || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (normalized.includes("masculino")) return "masculino";
   if (normalized.includes("feminino")) return "feminino";
