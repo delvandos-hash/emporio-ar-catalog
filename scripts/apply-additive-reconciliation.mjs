@@ -315,6 +315,9 @@ async function main() {
   const duplicateSourceKeys = new Set();
   const additions = [...internalKeys].filter(key => {
     if (liveKeys.has(key)) return false;
+    // Um public_id já publicado no snapshot conhecido não pode ser descartado
+    // por heurísticas de stock_ref/foto: ele deve voltar como o mesmo item.
+    if (baselinePublicIds.has(key)) return true;
     const row = (internalIndex.get(key) || [])[0];
     const stockRef = String(row?.publicItem?.stock_ref || "").trim();
     if (stockRef && liveStockRefs.has(norm(row?.publicGroup?.brand) + "|" + stockRef)) {
