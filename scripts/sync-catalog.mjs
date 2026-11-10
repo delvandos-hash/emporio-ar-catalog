@@ -2146,10 +2146,6 @@ async function main() {
   const liveFrannyIds = new Set();
   if (ADD_ROUPAS || ADD_FRANNY) {
     const chunks = [];
-    // mantém snapshot atual como base para não perder itens se um site falhar
-    if (Array.isArray(DATA.roupas) && DATA.roupas.length) {
-      chunks.push(DATA.roupas);
-    }
     if (ADD_ROUPAS) {
       console.log('Buscando Roupas na Sophia Moda...');
       try {
@@ -2181,6 +2177,10 @@ async function main() {
     } else {
       console.log('ADD_FRANNY=0 — pulando Franny');
     }
+    // As fontes recém-coletadas vêm primeiro: seus títulos, preços e dados
+    // atuais prevalecem. O snapshot entra por último apenas como fallback para
+    // fontes desativadas e registros legados sem ID.
+    if (Array.isArray(DATA.roupas) && DATA.roupas.length) chunks.push(DATA.roupas);
     if (chunks.length) {
       const prevRoupasSnap = Array.isArray(DATA.roupas) ? DATA.roupas : [];
       DATA.roupas = mergeRoupasGroups(chunks, prevRoupasSnap);
