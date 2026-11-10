@@ -6,6 +6,7 @@ const source = fs.readFileSync(new URL("./sync-stock.mjs", import.meta.url), "ut
 const fetchBrand = source.slice(source.indexOf("async function fetchBrand() {"), source.indexOf("\nfunction resolve(item"));
 
 test("sync de estoque só aceita Brand após confirmar fim da paginação", () => {
+  assert.match(fetchBrand, /pagina_especifica: ''/);
   assert.match(fetchBrand, /let completed = false/);
   assert.match(fetchBrand, /if \(!products\.length\)\s*\{\s*completed = true;/);
   assert.match(fetchBrand, /if \(!completed \|\| fetched === 0\)/);
