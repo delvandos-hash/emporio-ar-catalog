@@ -19,7 +19,7 @@ test("consulta de estoque encontra produto Dande após a página 15", async () =
       categoryRequests++;
       const page = Number(url.searchParams.get("page") || 1);
       const ids = page === 20
-        ? ["990091", "990092", "990093", "990094", "990095", "990096", "990097", targetId]
+        ? [targetId, "990091", "990092", "990093", "990094", "990095", "990096", "990097"]
         : Array.from({ length: 8 }, (_, i) => String(page * 1000 + i));
       const cards = ids.map(id => {
         const productLink = id === targetId ? '<a href="/produtos/item-teste/">' : '<a href="/produtos/outro/">';
