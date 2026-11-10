@@ -631,15 +631,35 @@ async function fetchImaratDetail(slug) {
   } catch { return null; }
 }
 
+async function fetchBrandRequest(url, options, retries = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.status >= 500 && attempt < retries) {
+        throw new Error(`Brand HTTP ${response.status}`);
+      }
+      return response;
+    } catch (error) {
+      lastErr = error;
+      if (attempt === retries) break;
+      const wait = 1200 * attempt;
+      console.warn(`Brand retry ${attempt}/${retries} em ${wait}ms: ${error.message}`);
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
+
 async function fetchBrandList() {
   const all = [];
-  const warm = await fetch(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, { headers: { 'User-Agent': 'EmporioAR-Sync/1.0' } });
+  const warm = await fetchBrandRequest(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, { headers: { 'User-Agent': 'EmporioAR-Sync/1.0' } });
   const setCookie = warm.headers.get('set-cookie') || '';
   const cookie = setCookie.split(',').map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
 
   let completed = false;
   for (let page = 1; page <= 80; page++) {
-    const res = await fetch(`${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`, {
+    const res = await fetchBrandRequest(`${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`, {
       method: 'POST',
       headers: {
         'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Content-Type': 'application/json',
