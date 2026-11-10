@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveLegacyStockMatch } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, legacyVolumeIdentity } from "./legacy-restore-identity.mjs";
 
 const row = (public_id, foto, brand = "Marca A") => ({
   group: { brand },
@@ -50,4 +50,16 @@ test("uses a unique origin_ref to resolve a legacy variant before ambiguous name
 test("fails closed when an explicit origin_ref has no exact internal match", () => {
   const a = { ...row("p_a", "foto-a"), publicItem: { public_id: "p_a", foto: "foto-a", origin_ref: "origin-a" } };
   assert.equal(resolveLegacyStockMatch([], [a], { public_id: "legacy", origin_ref: "origin-missing" }, [], "Marca A", [a]), null);
+});
+
+
+test("respeita volume explícito e não herda o volume do título quando o campo contém traço", () => {
+  const title = "BRAND 151 DELINA FEM 25ML";
+  assert.equal(legacyVolumeIdentity("—", title), "");
+  assert.equal(legacyVolumeIdentity("25ml", title), "25ml");
+  assert.equal(legacyVolumeIdentity("", title), "25ml");
+});
+
+test("volume explícito numérico é normalizado sem perder a identidade", () => {
+  assert.equal(legacyVolumeIdentity("25", "BRAND 151 DELINA FEM 25ML"), "25ml");
 });
