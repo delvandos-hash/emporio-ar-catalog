@@ -246,12 +246,15 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
           // stock_ref público já validado é a referência canônica do catálogo;
           // não a regenere apenas porque o ID da fonte foi corrigido.
           safeItem.stock_ref = existingStockRef;
-          if (["a", "b"].includes(item?.stock_route)) safeItem.stock_route = item.stock_route;
         } else if (liveRef) {
           safeItem.stock_ref = liveRef;
-          if (publicSource(line, group?.cat) === "roupas") {
-            safeItem.stock_route = String(item?.id_origem || "").toLowerCase().startsWith("franny-") ? "b" : "a";
-          }
+        }
+        // A rota da fonte de roupas é derivada do ID de origem mesmo quando
+        // stock_ref já existia. Isso evita enviar itens Franny para Sophia.
+        if (publicSource(line, group?.cat) === "roupas" && item?.id_origem) {
+          safeItem.stock_route = String(item.id_origem).toLowerCase().startsWith("franny-") ? "b" : "a";
+        } else if (["a", "b"].includes(item?.stock_route)) {
+          safeItem.stock_route = item.stock_route;
         }
         safeItem.fonte = publicSource(line, group?.cat);
         if (Array.isArray(safeItem.fotos)) {
