@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
-import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint } from './catalog-identity.mjs';
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1523,6 +1523,22 @@ async function main() {
   if (!m) throw new Error('DATA não encontrado');
   const DATA = JSON.parse(m[1]);
 
+  // Retira o cadastro incorreto já persistido antes da reconciliação histórica
+  // que corrige a grafia Atheri/Atherri. Isso impede que ele seja reatribuído ao ID correto.
+  let excludedAtherriRemoved = 0;
+  for (const groups of Object.values(DATA || {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const before = (group.items || []).length;
+      group.items = (group.items || []).filter(item => {
+        const sourceId = String(item?.id_origem ?? "").trim();
+        const confirmedImaratRecord = norm(item?.fonte) === "imarat" || sourceId === "1481";
+        return !(confirmedImaratRecord && isExcludedImaratAtherri(item, group.brand));
+      });
+      excludedAtherriRemoved += before - group.items.length;
+    }
+  }
+  console.log(`IMARAT_EXCLUDED_ATHERRI_REMOVED_FROM_EXISTING_DATA=${excludedAtherriRemoved}`);
+
   if (!SYNC_DANDE_ONLY) {
     if (!process.env.GIST_TOKEN && !SYNC_DRY_RUN) {
       throw new Error("GIST_TOKEN ausente; sincronização de produção bloqueada antes de qualquer publicação.");
@@ -1965,6 +1981,16 @@ async function main() {
       const precoVarejoOrig = (p.priceCents || 0) / 100;
       const precoAtacadoOrig = p.atacado && p.atacado.precoCents != null ? p.atacado.precoCents / 100 : Math.max(precoVarejoOrig - 30, 0);
       const prices = calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig);
+      if (isExcludedImaratAtherri({
+        id: p.id ?? p.productId ?? "",
+        nome, volume, varejo: prices.varejo, atacado: prices.atacado
+      }, brand)) {
+        console.log("IMARAT_ATHERRI_BLOCKED_FROM_REIMPORT=" + JSON.stringify({
+          id: String(p.id ?? p.productId ?? ""),
+          nome, volume, varejo: prices.varejo, atacado: prices.atacado
+        }));
+        continue;
+      }
       let detail = null;
       let imgsNew = imaratImagesFrom(p, null);
       let duplicado = false;
