@@ -63,3 +63,11 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+
+      - name: Guardar snapshot reconciliado para inspeção
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-reconcile-data-js-${{ github.run_id }}
+          path: js/data.js
+          retention-days: 7
