@@ -1950,12 +1950,20 @@ async function refreshVariationStock(p) {
     if (!currentProduct || (currentProduct.public_id || currentProduct.stock_ref) !== requestId) return;
     const previousByName = new Map((Array.isArray(p.variacoes) ? p.variacoes : [])
       .map(v => [normStockKey(v.nome), v]));
-    const variacoes = data.variacoes.map((v) => ({
-      ...(previousByName.get(normStockKey(v.nome)) || {}),
-      id: String(v.id || ''),
-      nome: String(v.nome || '—'),
-      estoque: Math.max(0, Math.floor(Number(v.estoque) || 0))
-    }));
+    const variacoes = data.variacoes.map((v) => {
+      const previous = previousByName.get(normStockKey(v.nome)) || {};
+      const livePhotos = [...new Set([
+        v.foto,
+        ...(Array.isArray(v.fotos) ? v.fotos : [])
+      ].map(resolveCatalogImageUrl).filter(Boolean))];
+      return {
+        ...previous,
+        id: String(v.id || ''),
+        nome: String(v.nome || '—'),
+        estoque: Math.max(0, Math.floor(Number(v.estoque) || 0)),
+        ...(livePhotos.length ? { foto: livePhotos[0], fotos: livePhotos } : {})
+      };
+    });
     const total = Number.isFinite(Number(data.total_estoque))
       ? Math.max(0, Math.floor(Number(data.total_estoque)))
       : variacoes.reduce((sum, v) => sum + v.estoque, 0);
