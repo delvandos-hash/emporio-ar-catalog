@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { toPublicCatalog } from "./public-catalog.mjs";
+import { toPublicCatalog, publicLine } from "./public-catalog.mjs";
 import { resolveLegacyStockMatch, hasPublicIdStockRefConflict } from "./legacy-restore-identity.mjs";
 import { atherriGistRecordKind, isCanonicalImaratAtherri } from "./catalog-identity.mjs";
 
@@ -91,18 +91,7 @@ function buildIndexes(DATA) {
   const stockIndex = new Map();
   const publicIdIndex = new Map();
   const originRefIndex = new Map();
-  const publicLineKey = line => {
-    const value = String(line || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
-    if (value.includes("masculino")) return "masculino";
-    if (value.includes("feminino")) return "feminino";
-    if (value.includes("unissex")) return "unissex";
-    if (value.includes("roup")) return "roupas";
-    if (value.includes("acessor")) return "acessorios";
-    if (value.includes("brand")) return "brand";
-    if (value.includes("perf")) return "perfumaria";
-    if (value.includes("scoop")) return "scoop premiado";
-    return value || "outros";
-  };
+  const publicLineKey = (line, group) => publicLine(line, [group]);
   const groupKey = (line, group) => publicLineKey(line) + "|" + norm(group?.brand) + "|" + norm(group?.cat);
   const projectedGroups = new Map();
   for (const [line, groups] of Object.entries(publicDATA)) {
