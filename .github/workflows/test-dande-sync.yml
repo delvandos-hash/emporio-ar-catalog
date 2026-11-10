@@ -16,8 +16,10 @@ on:
       - "js/cart-identity.mjs"
       - "scripts/cart-identity.test.mjs"
       - "scripts/public-catalog.mjs"
-      - "scripts/public-catalog.test.mjs"
+      - "scripts/public-catalog.test.mjs scripts/variation-stock.test.mjs"
       - "netlify/functions/dande-stock.mjs"
+      - "netlify/functions/roupas-stock.mjs"
+      - "scripts/variation-stock.test.mjs"
       - ".github/workflows/test-dande-sync.yml"
 
 permissions:
