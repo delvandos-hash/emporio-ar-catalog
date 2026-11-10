@@ -184,6 +184,22 @@ const imaratList = await fetchImaratList();
 console.log(`Produtos lidos da Imarat: ${imaratList.length}`);
 
 function sourceMatch(item, group) {
+  const itemSourceId = String(item?.id_origem || "").trim();
+  if (itemSourceId) {
+    const exactIdMatches = imaratList.filter(p =>
+      String(p?.id ?? p?.productId ?? p?.slug ?? "").trim() === itemSourceId
+    );
+    // Um ID de origem explícito é a identidade canônica: nunca substitua por
+    // outro SKU de mesmo nome, marca e volume se o ID não estiver na fonte.
+    if (exactIdMatches.length !== 1) return null;
+    const exact = exactIdMatches[0];
+    const catalogBrand = norm(group?.brand);
+    const sourceBrand = norm(exact?.brand);
+    if (catalogBrand && sourceBrand && !(
+      sourceBrand === catalogBrand || sourceBrand.includes(catalogBrand) || catalogBrand.includes(sourceBrand)
+    )) return null;
+    return exact;
+  }
   const name = norm(item?.nome);
   const itemVolume = volumeOf(item);
   const matches = imaratList.filter(p => {
