@@ -66,83 +66,78 @@ async function fetchBrand() {
   const map = {}; const byName = {};
   let fetched = 0;
   let cookie = '';
-  try {
-    const warm = await fetchWithRetry(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, {
-      headers: { 'User-Agent': 'EmporioAR-StockSync/1.0', Accept: 'text/html' },
-    });
-    const setCookie = warm.headers.getSetCookie?.() || [];
-    if (setCookie.length) {
-      cookie = setCookie.map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
-    } else {
-      const sc = warm.headers.get('set-cookie') || '';
-      cookie = sc.split(/,(?=[^;]+?=)/).map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
-    }
-    await warm.text().catch(() => {});
-  } catch (e) {
-    console.log('  ⚠ Brand warm-up falhou:', e.message || e);
-  }
 
+  const warm = await fetchWithRetry(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, {
+    headers: { 'User-Agent': 'EmporioAR-StockSync/1.0', Accept: 'text/html' },
+  });
+  if (!warm.ok) throw new Error(`Brand warm-up HTTP ${warm.status}`);
+  const setCookie = warm.headers.getSetCookie?.() || [];
+  if (setCookie.length) {
+    cookie = setCookie.map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
+  } else {
+    const sc = warm.headers.get('set-cookie') || '';
+    cookie = sc.split(/,(?=[^;]+?=)/).map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
+  }
+  await warm.text().catch(() => {});
+
+  let completed = false;
   for (let page = 1; page <= 80; page++) {
-    let res;
-    try {
-      res = await fetchWithRetry(
-        `${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`,
-        {
-          method: 'POST',
-          headers: {
-            'User-Agent': 'EmporioAR-StockSync/1.0',
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            Referer: `${BRAND_BASE}/c/atacado/${BRAND_SELLER}`,
-            Origin: BRAND_BASE,
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept-Charset': 'utf-8',
-            ...(cookie ? { Cookie: cookie } : {}),
-          },
-          body: '{}',
+    const res = await fetchWithRetry(
+      `${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'EmporioAR-StockSync/1.0',
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Referer: `${BRAND_BASE}/c/atacado/${BRAND_SELLER}`,
+          Origin: BRAND_BASE,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept-Charset': 'utf-8',
+          ...(cookie ? { Cookie: cookie } : {}),
         },
-        4
-      );
-    } catch (e) {
-      console.log(`  ⚠ Brand página ${page} falhou após retries: ${e.message || e.cause?.code || e}`);
-      break;
-    }
-    if (!res.ok) {
-      console.log(`  ⚠ Brand HTTP ${res.status} na página ${page}`);
-      break;
-    }
+        body: '{}',
+      },
+      4
+    );
+    if (!res.ok) throw new Error(`Brand HTTP ${res.status} na página ${page}`);
     const text = await res.text();
     if (!text || text.trimStart().startsWith('<!') || text.includes('<html')) {
-      console.log(`  ⚠ Brand página ${page}: HTML em vez de JSON`);
-      break;
+      throw new Error(`Brand página ${page}: HTML/vazio em vez de JSON; coleta incompleta`);
     }
     let data;
     try {
       data = JSON.parse(text);
     } catch {
-      console.log(`  ⚠ Brand página ${page}: JSON inválido`);
+      throw new Error(`Brand página ${page}: JSON inválido; coleta incompleta`);
+    }
+    const products = Array.isArray(data) ? data : data.produtos;
+    if (!Array.isArray(products)) {
+      throw new Error(`Brand página ${page}: estrutura de produtos inválida`);
+    }
+    if (!products.length) {
+      completed = true;
       break;
     }
-    const products = Array.isArray(data) ? data : (data.produtos || []);
-    if (!products.length) break;
     for (const p of products) {
       const name = p.nome || p.titulo || '';
       const cat = p.categoria_nome || p.categoria || '';
+      if (!name) throw new Error(`Brand página ${page}: produto sem nome; coleta inválida`);
       const disponivel =
         p.disponivel === false || p.estoque === 0 || p.total_estoque === 0
           ? 'Não'
           : 'Sim';
-      // prefer explicit stock fields when present
-      if (typeof p.total_estoque === 'number') {
-        // keep Sim/Não above
-      }
       map[`${norm(name)}|${norm(cat)}`] = disponivel;
       if (byName[norm(name)] !== 'Não') byName[norm(name)] = disponivel;
       fetched++;
     }
-    if (products.length < 5) break;
+    if (page === 80) throw new Error('Brand atingiu o limite de 80 páginas sem fim confirmado');
     await sleep(300 + Math.floor(Math.random() * 400));
   }
+  if (!completed || fetched === 0) {
+    throw new Error(`Coleta Brand incompleta: ${fetched} produtos e fim da paginação não confirmado`);
+  }
+  console.log(`Brand coleta completa: ${fetched} produtos; paginação encerrada com página vazia.`);
   return { map, byName, fetched };
 }
 
@@ -169,13 +164,8 @@ async function main() {
   console.log(`Imarat: ${imarat.fetched}/${imarat.total}`);
 
   console.log('Buscando Brand Collection...');
-  let brand = { map: {}, byName: {}, fetched: 0 };
-  try {
-    brand = await fetchBrand();
-    console.log(`Brand: ${brand.fetched}`);
-  } catch (e) {
-    console.log(`⚠ Brand indisponível (seguindo só com Imarat): ${e.message || e.cause?.code || e}`);
-  }
+  const brand = await fetchBrand();
+  console.log(`Brand: ${brand.fetched} (coleta completa)`);
 
   let raw = fs.readFileSync(dataPath, 'utf8');
   const m = raw.match(/export const DATA = (\{[\s\S]*?\});\s*\nexport const WHATSAPP/);
