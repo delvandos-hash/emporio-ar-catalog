@@ -369,7 +369,8 @@ console.log(`COMPARAÇÃO POR PUBLIC ID: data.js interno=${internalItemCount} ID
 const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
 const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, row: internalPublicIndex.get(key) }));
 const liveStockRefs = new Set(catalog.map(x => String(x.item?.stock_ref || "").trim()).filter(Boolean));
-const duplicateInternalSourceRows = internalOnlySourceRows.filter(({ row }) =>
+const duplicateInternalSourceRows = internalOnlySourceRows.filter(({ key, row }) =>
+  !baselinePublicIds.has(key) &&
   Boolean(String(row?.publicItem?.stock_ref || "").trim()) &&
   liveStockRefs.has(String(row.publicItem.stock_ref).trim())
 );
@@ -377,7 +378,8 @@ const liveLoosePhotoKeys = new Set(catalog.map(x => {
   const photo = publicPhotoFingerprint(x.item);
   return photo ? looseIdentity(x.line, x.group, x.item) + "|" + photo : "";
 }).filter(Boolean));
-const legacyBrandDuplicateRows = internalOnlySourceRows.filter(({ row }) => {
+const legacyBrandDuplicateRows = internalOnlySourceRows.filter(({ key, row }) => {
+  if (baselinePublicIds.has(key)) return false;
   if (norm(row?.item?.fonte) || !norm(row?.group?.cat).includes("brand")) return false;
   const photo = publicPhotoFingerprint(row?.publicItem);
   return Boolean(photo && liveLoosePhotoKeys.has(looseIdentity(row.line, row.group, row.item) + "|" + photo));
