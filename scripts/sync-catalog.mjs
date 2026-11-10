@@ -636,6 +636,7 @@ async function fetchBrandList() {
   const setCookie = warm.headers.get('set-cookie') || '';
   const cookie = setCookie.split(',').map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
 
+  let completed = false;
   for (let page = 1; page <= 80; page++) {
     const res = await fetch(`${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`, {
       method: 'POST',
@@ -646,17 +647,19 @@ async function fetchBrandList() {
       },
       body: JSON.stringify({ pagina_especifica: '' }),
     });
-    if (!res.ok) break;
+    if (!res.ok) throw new Error(`Brand HTTP ${res.status} na página ${page}`);
     const text = await res.text();
     const data = JSON.parse(text);
     const products = Array.isArray(data) ? data : data.produtos || [];
-    if (!products.length) break;
+    if (!products.length) { completed = true; break; }
+    if (page === 80) throw new Error('Brand atingiu o limite de 80 páginas sem fim confirmado');
     for (const p of products) {
         p.nome = limparTexto(p.nome);
         if (p.descricao) p.descricao = limparTexto(p.descricao);
     }
     all.push(...products);
   }
+  if (!completed) throw new Error('Paginação Brand incompleta; origem não foi percorrida até o fim.');
   return all;
 }
 
@@ -822,6 +825,7 @@ async function fetchSophiaRoupas() {
   for (const cat of SOPHIA_CATEGORIES) {
     console.log(`  Categoria Roupas: ${cat.nome}`);
     const items = [];
+    let completed = false;
     for (let page = 1; page <= 8; page++) {
       const url = `${SOPHIA_BASE}/c/atacado/carregar_produtos/${page}/${cat.id}/${SOPHIA_LOJA}?mobile=0`;
       try {
@@ -832,7 +836,7 @@ async function fetchSophiaRoupas() {
         });
 
         const produtos = data.produtos || [];
-        if (!produtos.length || data.acao === 'sem_mais_produtos') break;
+        if (!produtos.length) { completed = true; break; }
 
         for (const p of produtos) {
           const precoBase =
@@ -886,12 +890,15 @@ async function fetchSophiaRoupas() {
         }
 
         console.log(`    página ${page}: +${produtos.length}`);
+        if (data.acao === 'sem_mais_produtos') { completed = true; break; }
+        if (page === 8) throw new Error(`limite de 8 páginas atingido em ${cat.nome} sem marcador de fim`);
         await sleep(600 + Math.floor(Math.random() * 400));
       } catch (e) {
         console.log(`    ❌ página ${page}: ${e.message}`);
         break;
       }
     }
+    if (!completed) throw new Error(`paginação Sophia incompleta em ${cat.nome}`);
 
     if (items.length) {
       groups.push({
@@ -1039,11 +1046,12 @@ async function fetchFrannyRoupas() {
   const byId = new Map();
   for (const cat of FRANNY_CATEGORIES) {
     console.log(`  Franny cat ${cat.nome} (${cat.id})`);
+    let completed = false;
     for (let page = 1; page <= 30; page++) {
       try {
         const data = await fetchFacilZapPage(FRANNY_BASE, FRANNY_LOJA, cat.id, page, cookie);
         const produtos = data.produtos || [];
-        if (!produtos.length) break;
+        if (!produtos.length) { completed = true; break; }
         let novo = 0;
         for (const p of produtos) {
           const id = String(p.id || '');
@@ -1054,7 +1062,8 @@ async function fetchFrannyRoupas() {
           novo++;
         }
         console.log(`    p${page}: +${novo}`);
-        if (produtos.length < 5) break;
+        if (produtos.length < 5) { completed = true; break; }
+        if (page === 30) throw new Error(`limite de 30 páginas atingido em ${cat.nome}`);
         await sleep(400 + Math.floor(Math.random() * 300));
       } catch (e) {
         console.log(`    Franny erro p${page}: ${e.message}`);
@@ -1062,6 +1071,7 @@ async function fetchFrannyRoupas() {
         break;
       }
     }
+    if (!completed) throw new Error(`paginação Franny incompleta em ${cat.nome}`);
     await sleep(500);
   }
   const byCat = new Map();
@@ -1343,7 +1353,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
-        if (!list.length) break;
+        if (!list.length) { completed = true; break; }
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
           console.log(`    p${page}: página repetida; encerrando categoria`);
@@ -1452,14 +1462,17 @@ async function fetchDandeAcessorios(existingGroups = []) {
         // Sem link de paginação, encerra somente DEPOIS de salvar os itens desta página.
         if (!hasDandeNextPage(html, page)) {
           console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+          completed = true;
           break;
         }
+        if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com próxima página anunciada`);
         await sleep(400);
       } catch (e) {
         console.log(`    Dande erro ${cat.nome} p${page}: ${e.message}`);
         break;
       }
     }
+    if (!completed) throw new Error(`paginação Dande incompleta em ${cat.nome}`);
     DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
   }
 
@@ -2036,6 +2049,22 @@ async function main() {
   const brandList = SYNC_IMARAT_ONLY ? [] : await fetchBrandList();
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
+  const brandRootIds = new Set(brandList.map(p => String(p.id ?? p.productId ?? p.slug ?? '')).filter(Boolean));
+  let staleBrandRemoved = 0;
+  for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
+    if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
+    group.items = (group.items || []).filter(item => {
+      if (norm(item.fonte) !== 'brand') return true;
+      const id = String(item.id_origem || '').trim();
+      const exists = id ? brandRootIds.has(id) : brandList.some(p =>
+        norm(p.nome) === norm(item.nome) &&
+        norm(mapBrandSession(p.categoria_nome || p.categoria || '')) === norm(group.brand)
+      );
+      if (!exists) staleBrandRemoved++;
+      return exists;
+    });
+  }
+  console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
 
   let addedBrand = 0;
   for (const line of Object.keys(DATA)) {
@@ -2108,6 +2137,8 @@ async function main() {
   // ----- Roupas (Sophia + Franny) — merge, não sobrescreve -----
   let roupasCount = 0;
   let frannyCount = 0;
+  const liveSophiaIds = new Set();
+  const liveFrannyIds = new Set();
   if (ADD_ROUPAS || ADD_FRANNY) {
     const chunks = [];
     // mantém snapshot atual como base para não perder itens se um site falhar
@@ -2119,6 +2150,7 @@ async function main() {
       try {
         const sophiaGroups = await fetchSophiaRoupas();
         const n = sophiaGroups.reduce((s, g) => s + g.items.length, 0);
+        for (const g of sophiaGroups) for (const item of g.items || []) if (item.id_origem) liveSophiaIds.add(String(item.id_origem));
         roupasCount = n;
         if (n > 0) chunks.push(sophiaGroups);
         console.log(`Roupas Sophia: ${n} produtos`);
@@ -2133,6 +2165,7 @@ async function main() {
       try {
         const frannyGroups = await fetchFrannyRoupas();
         frannyCount = frannyGroups.reduce((s, g) => s + g.items.length, 0);
+        for (const g of frannyGroups) for (const item of g.items || []) if (item.id_origem) liveFrannyIds.add(String(item.id_origem));
         if (frannyCount > 0) chunks.push(frannyGroups);
         console.log(`Roupas Franny: ${frannyCount} produtos`);
       } catch (e) {
@@ -2144,6 +2177,23 @@ async function main() {
     if (chunks.length) {
       const prevRoupasSnap = Array.isArray(DATA.roupas) ? DATA.roupas : [];
       DATA.roupas = mergeRoupasGroups(chunks, prevRoupasSnap);
+      // Remove somente registros identificados da fonte cuja coleta completa
+      // acabou de ser validada. Legados sem ID ficam preservados para auditoria.
+      let staleClothesRemoved = 0;
+      for (const group of DATA.roupas) {
+        group.items = (group.items || []).filter(item => {
+          if (norm(item.fonte) !== 'roupas' || !String(item.id_origem || '').trim()) return true;
+          const id = String(item.id_origem);
+          const fromFranny = id.startsWith('franny-');
+          const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
+          if (!sourceEnabled) return true;
+          const exists = fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id);
+          if (!exists) staleClothesRemoved++;
+          return exists;
+        });
+      }
+      DATA.roupas = DATA.roupas.filter(group => (group.items || []).length > 0);
+      console.log(`Roupas fora da fonte raiz removidas após coleta completa: ${staleClothesRemoved}`);
       const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
       console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
     }
