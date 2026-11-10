@@ -1563,11 +1563,11 @@ async function main() {
         console.log("IDS DO GIST AINDA SEM ID INTERNO APÓS REKEY PRE-SYNC " + JSON.stringify(missingLiveItems));
       }
       console.log(`BASELINE POR PUBLIC_ID: data.js=${internalBaseline.count} IDs/${internalBaseline.items} itens; Gist=${liveBaseline.count} IDs/${liveBaseline.items} itens; IDs sem origem interna=${liveBaseline.missingIds}; IDs só no data.js=${onlyInternal}; IDs só no Gist=${onlyLive}`);
-      console.log(`CATALOG_BASELINE_RESTORE=${baselineRestoreEnabled} allowedInternalOnly=${allowedInternalOnly}`);
       const safeAdditiveBaseline = process.env.ALLOW_SAFE_ADDITIVE_BASELINE === "1";
       const baselineRestoreEnabled = process.env.CATALOG_BASELINE_RESTORE === "1";
       const allowedLiveOnly = safeAdditiveBaseline ? 1 : 0;
       const allowedInternalOnly = baselineRestoreEnabled ? 200 : 80;
+      console.log(`CATALOG_BASELINE_RESTORE=${baselineRestoreEnabled} allowedInternalOnly=${allowedInternalOnly}`);
       const baselineUnsafe =
         liveBaseline.missingIds > 0 ||
         onlyLive > allowedLiveOnly ||
