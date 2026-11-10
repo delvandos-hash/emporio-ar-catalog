@@ -92,3 +92,33 @@ export function exactCatalogFingerprint(item, brand, source, line = "", category
     item: stableFingerprintValue(item || {}),
   });
 }
+
+
+// Exclusão pontual do cadastro incorreto da Imarat.
+// O ID 1474 é o cadastro correto informado pelo responsável e nunca deve ser removido.
+export function isExcludedImaratAtherri(item, brand = "") {
+  const name = normalizeIdentity(item?.nome ?? item?.name ?? "");
+  const brandKey = normalizeIdentity(brand || item?.brand || "");
+  let volume = String(item?.volume ?? item?.sizeMl ?? "")
+    .toLowerCase().replace(/\s+/g, "").replace(",", ".");
+  if (volume && /^\d+(?:\.\d+)?$/.test(volume)) volume += "ml";
+
+  if (
+    brandKey !== "afeer" ||
+    name !== "miniatura atherri afeer" ||
+    volume !== "30ml"
+  ) return false;
+
+  const id = String(item?.id_origem ?? item?.id ?? item?.productId ?? "").trim();
+  if (id === "1474") return false;
+  if (id) return id === "1481";
+
+  const price = value => {
+    const raw = String(value ?? "").trim().replace(/[^0-9,.-]/g, "");
+    if (!raw) return NaN;
+    return Number(raw.includes(",")
+      ? raw.replace(/\./g, "").replace(",", ".")
+      : raw);
+  };
+  return price(item?.varejo) === 105 && price(item?.atacado) === 75;
+}

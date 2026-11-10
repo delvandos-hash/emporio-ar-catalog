@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalProductKey, normalProductNameVolumeKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource, exactCatalogFingerprint } from "./catalog-identity.mjs";
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from "./catalog-identity.mjs";
 
 test("perfumes exigem nome exato, volume e marca", () => {
   assert.equal(normalProductKey("Perfume Áureo 100ml", "100ml", "Marca A"), normalProductKey("PERFUME Aureo", "100ml", "Marca A"));
@@ -61,4 +61,18 @@ test("perfumes com mesma marca, nome e volume mas IDs de origem diferentes perma
 test("sem ID de origem, a identidade-base continua sendo o fallback conservador", () => {
   assert.equal(isDuplicateMiniSource([{ id_origem: "101" }], ""), true);
   assert.equal(isDuplicateMiniSource([{ id_origem: "" }], "102"), true);
+});
+
+
+test("bloqueia somente o cadastro Imarat incorreto da Miniatura Atherri Afeer", () => {
+  const wrong = { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "105,00", atacado: "75,00", id_origem: "1481" };
+  const correct = { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "95,00", atacado: "65,00", id_origem: "1474" };
+  assert.equal(isExcludedImaratAtherri(wrong, "Afeer"), true);
+  assert.equal(isExcludedImaratAtherri(correct, "Afeer"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "1474" }, "Afeer"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "9999" }, "Afeer"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "", varejo: "105,00", atacado: "75,00" }, "Afeer"), true);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, nome: "Miniatura Atherri Afeer Intense" }, "Afeer"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, nome: "Miniatura Atherri Afeer" }, "Outra Marca"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, volume: "50ml" }, "Afeer"), false);
 });
