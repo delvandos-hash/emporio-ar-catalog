@@ -1122,6 +1122,66 @@ function stampNovoDesde(obj, isNew, prev) {
   return obj;
 }
 
+
+/** Remove duplicatas de roupas entre Franny, Sophia e legacy-gist (mesmo nome). */
+function dedupeRoupasCrossSource(roupasGroups) {
+  const normName = (s) => String(s || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[“”"']/g, '')
+    .trim();
+  const score = (item) => {
+    const fonte = item?.fonte || '';
+    const oid = String(item?.id_origem || '');
+    let sc = 0;
+    if (fonte !== 'legacy-gist' && oid) sc += 100;
+    if (oid.startsWith('franny-')) sc += 10;
+    if (String(item?.disponivel || '').toLowerCase() === 'sim') sc += 20;
+    const est = Number(item?.total_estoque);
+    if (Number.isFinite(est)) sc += Math.min(est, 50);
+    const fotos = Array.isArray(item?.fotos) ? item.fotos.length : 0;
+    sc += Math.min(fotos, 10);
+    if (Array.isArray(item?.variacoes) && item.variacoes.length) sc += 5;
+    return sc;
+  };
+
+  const entries = [];
+  for (let gi = 0; gi < (roupasGroups || []).length; gi++) {
+    const g = roupasGroups[gi];
+    for (let ii = 0; ii < (g.items || []).length; ii++) {
+      entries.push({ gi, ii, item: g.items[ii] });
+    }
+  }
+  const byKey = new Map();
+  for (const e of entries) {
+    const k = normName(e.item?.nome);
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k).push(e);
+  }
+  const drop = new Set();
+  let removed = 0;
+  for (const [, lst] of byKey) {
+    if (lst.length < 2) continue;
+    const ranked = [...lst].sort((a, b) => score(b.item) - score(a.item));
+    for (const loser of ranked.slice(1)) {
+      drop.add(`${loser.gi}:${loser.ii}`);
+      removed++;
+    }
+  }
+  const out = [];
+  for (let gi = 0; gi < (roupasGroups || []).length; gi++) {
+    const g = roupasGroups[gi];
+    const items = [];
+    for (let ii = 0; ii < (g.items || []).length; ii++) {
+      if (drop.has(`${gi}:${ii}`)) continue;
+      items.push(g.items[ii]);
+    }
+    if (items.length) out.push({ ...g, items });
+  }
+  if (removed) console.log(`Roupas cross-source dedupe: ${removed} duplicata(s) removida(s)`);
+  return out;
+}
+
 function mergeRoupasGroups(listOfGroupArrays, prevRoupas = []) {
   const prevById = new Map();
   for (const g of prevRoupas || []) {
@@ -2389,7 +2449,7 @@ async function main() {
     if (Array.isArray(DATA.roupas) && DATA.roupas.length) chunks.push(DATA.roupas);
     if (chunks.length) {
       const prevRoupasSnap = Array.isArray(DATA.roupas) ? DATA.roupas : [];
-      DATA.roupas = mergeRoupasGroups(chunks, prevRoupasSnap);
+      DATA.roupas = dedupeRoupasCrossSource(mergeRoupasGroups(chunks, prevRoupasSnap));
       // Reconcilia também os registros antigos sem procedência: nome exato na
       // fonte + categoria quando possível. IDs diferentes continuam distintos.
       let staleClothesRemoved = 0;
