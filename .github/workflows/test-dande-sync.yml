@@ -10,6 +10,8 @@ on:
       - "js/app.js"
       - "js/dande-category-membership.mjs"
       - "scripts/dande-category-membership.test.mjs"
+      - "scripts/cart-identity.test.mjs"
+      - "js/cart-identity.mjs"
       - "netlify/functions/dande-stock.mjs"
       - "scripts/dande-stock-pagination.test.mjs"
       - ".github/workflows/test-dande-sync.yml"
@@ -36,7 +38,7 @@ jobs:
           node --check js/app.js
           node --check netlify/functions/dande-stock.mjs
       - name: Testar categorias cruzadas e paginação de estoque
-        run: node --test scripts/dande-category-membership.test.mjs scripts/dande-stock-pagination.test.mjs
+        run: node --test scripts/dande-category-membership.test.mjs scripts/cart-identity.test.mjs scripts/dande-stock-pagination.test.mjs
       - name: Executar sincronização em modo isolado
         run: node scripts/sync-catalog.mjs
         env:
