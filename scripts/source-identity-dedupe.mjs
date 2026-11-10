@@ -110,9 +110,11 @@ function removePhotoConfirmedDuplicates(DATA) {
 }
 
 /**
- * Remove only cross-group repetitions whose source identity proves they are
- * the same product: same source, brand, origin ID, exact normalized title
- * and volume. Different origin IDs, brands, titles or volumes are preserved.
+ * First removes repeated source IDs with exact commercial identity. A second,
+ * stricter visual pass removes separate Franny/Sophia listings only when source
+ * family, brand, category and title match, at least 90% of the smaller photo
+ * gallery overlaps, and at least 75% of the smaller variation set overlaps.
+ * Similar names alone, different photos, brands or categories are preserved.
  * Imarat has a dedicated reconciliation path and is intentionally excluded.
  */
 export function dedupeConfirmedSourceProducts(DATA) {
