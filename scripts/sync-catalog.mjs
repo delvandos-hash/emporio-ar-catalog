@@ -1227,7 +1227,7 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
       ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
       : '';
     const expectedTitle = norm(expectedCategory).replace(/s$/, '');
-    const normalizePath = value => String(value).replace(/\/+?/g, '/').replace(/\/+$/, '');
+    const normalizePath = value => String(value).replace(/\/+/g, '/').replace(/\/+$/, '');
     const requestedPath = normalizePath(path);
     const finalPath = normalizePath(new URL(res.url || url).pathname);
     const genericDandeTitle = actualTitle === 'dande acessorio' &&
