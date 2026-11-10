@@ -26,6 +26,44 @@ test("restores only missing public IDs and preserves the current version of exis
   assert.equal(result.data.feminino[0].items[1].nome, "Produto B");
 });
 
+test("rekeys an exact stock_ref match to the prior public ID without overwriting current fields", () => {
+  const current = {
+    roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+      { nome: "Bata Lara", volume: "—", stock_ref: "s_123", public_id: "p_new", varejo: "89,90" }
+    ] }]
+  };
+  const baseline = {
+    roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+      { nome: "Bata Lara", volume: "—", stock_ref: "s_123", public_id: "p_old", varejo: "84,90" }
+    ] }]
+  };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  assert.equal(result.rekeyedIds.length, 1);
+  assert.equal(result.rekeyedIds[0].from, "p_new");
+  assert.equal(result.rekeyedIds[0].to, "p_old");
+  assert.equal(result.restoredIds.length, 0);
+  assert.equal(result.data.roupas[0].items.length, 1);
+  assert.equal(result.data.roupas[0].items[0].public_id, "p_old");
+  assert.equal(result.data.roupas[0].items[0].varejo, "89,90");
+});
+
+test("does not rekey similar products when stock_ref or brand differs", () => {
+  const current = {
+    roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Outra marca", items: [
+      { nome: "Bata Lara", volume: "—", stock_ref: "s_different", public_id: "p_new" }
+    ] }]
+  };
+  const baseline = {
+    roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+      { nome: "Bata Lara", volume: "—", stock_ref: "s_123", public_id: "p_old" }
+    ] }]
+  };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  assert.equal(result.rekeyedIds.length, 0);
+  assert.deepEqual(result.restoredIds, ["p_old"]);
+  assert.equal(result.data.roupas.length, 2);
+});
+
 test("creates the original line and group when a known-good item is missing", () => {
   const result = mergeKnownGoodSnapshot({}, {
     unissex: [{ cat: "Scoop Premiado", brand: "EMPÓRIO A.R", items: [
