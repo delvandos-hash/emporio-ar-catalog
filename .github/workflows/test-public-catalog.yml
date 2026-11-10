@@ -42,5 +42,14 @@ jobs:
           CATALOG_BASELINE_PATH=/tmp/catalog-baseline-fixture/data.js CATALOG_CURRENT_DATA_PATH=/tmp/catalog-current-fixture.js node scripts/restore-catalog-baseline.mjs | tee /tmp/catalog-baseline-restore.log
           grep -q 'KNOWN_GOOD_BASELINE_PUBLIC_IDS=2158' /tmp/catalog-baseline-restore.log
           grep -q 'KNOWN_GOOD_BASELINE_REKEYED=0' /tmp/catalog-baseline-restore.log
-          grep -q 'KNOWN_GOOD_BASELINE_RESTORED=157' /tmp/catalog-baseline-restore.log
+          grep -Eq 'KNOWN_GOOD_BASELINE_RESTORED=[0-9]+' /tmp/catalog-baseline-restore.log
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { collectPublicIds, parseDataJsContent } from './scripts/catalog-baseline-restore.mjs';
+          const baseline = parseDataJsContent(fs.readFileSync('/tmp/catalog-baseline-fixture/data.js', 'utf8'));
+          const current = parseDataJsContent(fs.readFileSync('/tmp/catalog-current-fixture.js', 'utf8'));
+          const missing = [...collectPublicIds(baseline)].filter(id => !collectPublicIds(current).has(id));
+          if (missing.length) throw new Error(`Snapshot conhecido ainda tem ${missing.length} public_ids ausentes após restauração.`);
+          console.log(`SNAPSHOT_PUBLIC_IDS_PRESERVED=${collectPublicIds(baseline).size}`);
+          NODE
 
