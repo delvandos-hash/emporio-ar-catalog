@@ -96,7 +96,7 @@ async function fetchBrand() {
           'Accept-Charset': 'utf-8',
           ...(cookie ? { Cookie: cookie } : {}),
         },
-        body: '{}',
+        body: JSON.stringify({ pagina_especifica: '' }),
       },
       4
     );
