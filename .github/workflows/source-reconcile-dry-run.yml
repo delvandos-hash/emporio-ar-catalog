@@ -60,7 +60,10 @@ jobs:
         env:
           CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
       - name: Sincronizar todas as fontes sem publicar
-        run: node scripts/sync-catalog.mjs
+        run: |
+          node scripts/sync-catalog.mjs
+          mkdir -p /tmp/catalog-reconcile-report
+          touch /tmp/catalog-reconcile-report/sync-success
         env:
           SYNC_DRY_RUN: "1"
           CATALOG_BASELINE_RESTORE: ${{ github.event_name == 'pull_request' && '1' || '0' }}
@@ -99,15 +102,17 @@ jobs:
               fonte: item.fonte, source: item.source, varejo: item.varejo, atacado: item.atacado
             })))
           );
+          const syncCompleted = fs.existsSync("/tmp/catalog-reconcile-report/sync-success");
           const baselineRows = flatten(baseline);
           const currentRows = flatten(current);
           const currentIds = collectPublicIds(current);
           const baselineIds = collectPublicIds(baseline);
           const missing = baselineRows.filter(row => row.public_id && !currentIds.has(String(row.public_id)));
           const report = {
+            sync_completed: syncCompleted,
             baseline_public_ids: baselineIds.size,
             current_public_ids: currentIds.size,
-            missing_count: missing.length,
+            missing_count: syncCompleted ? missing.length : null,
             missing,
             possible_matches: missing.map(row => ({
               missing: row,
@@ -128,8 +133,9 @@ jobs:
           };
           fs.writeFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", JSON.stringify(report, null, 2));
           fs.copyFileSync("js/data.js", "/tmp/catalog-reconcile-report/current-data.js");
-          console.log(`BASELINE_PUBLIC_IDS_PRESERVED=${baselineIds.size - missing.length}/${baselineIds.size}`);
-          console.log(`BASELINE_PUBLIC_IDS_MISSING=${missing.length}`);
+          console.log(`SYNC_COMPLETED=${syncCompleted}`);
+          console.log(`BASELINE_PUBLIC_IDS_PRESERVED=${syncCompleted ? baselineIds.size - missing.length : "NOT_VERIFIED"}/${baselineIds.size}`);
+          console.log(`BASELINE_PUBLIC_IDS_MISSING=${syncCompleted ? missing.length : "NOT_VERIFIED"}`);
           for (const row of missing) console.log("MISSING_PUBLIC_ID=" + JSON.stringify(row));
           NODE
       - name: Confirmar que todos os IDs do snapshot anterior sobreviveram ao sync
@@ -138,6 +144,10 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           const report = JSON.parse(fs.readFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", "utf8"));
+          if (!report.sync_completed) {
+            console.error("Sincronização completa falhou; preservação de IDs não pode ser aprovada.");
+            process.exit(1);
+          }
           if (report.missing_count) {
             console.error("IDs do snapshot anterior ausentes após o dry-run: " + report.missing.map(row => row.public_id).join(","));
             process.exit(1);
