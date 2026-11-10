@@ -1961,6 +1961,7 @@ async function refreshVariationStock(p) {
         id: String(v.id || ''),
         nome: String(v.nome || '—'),
         estoque: Math.max(0, Math.floor(Number(v.estoque) || 0)),
+        ...(v.cor != null ? { cor: String(v.cor).slice(0, 80) } : {}),
         ...(livePhotos.length ? { foto: livePhotos[0], fotos: livePhotos } : {})
       };
     });
