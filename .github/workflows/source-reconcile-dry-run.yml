@@ -1,6 +1,12 @@
 name: Reconciliação de todas as fontes (dry-run, sem publicar)
 
 on:
+  push:
+    branches: [security/source-identity-dedupe-20261109]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - "scripts/source-identity-dedupe.mjs"
+      - ".github/workflows/source-reconcile-dry-run.yml"
   pull_request:
     branches: [main]
     paths:
