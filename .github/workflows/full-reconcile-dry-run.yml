@@ -2,7 +2,7 @@ name: Reconciliação completa em dry-run (sem publicar)
 
 on:
   push:
-    branches: [fix/reconciliation-mainline-identity-safe-20261109, security/pr77-brand-safe-stock-match, security/preflight-accepts-reconciliation-noop, security/block-public-id-collisions, security/audit-imarat-source-id-match, security/diagnose-isis-legacy-variants, main]
+    branches: [fix/reconciliation-mainline-identity-safe-20261109, security/pr77-brand-safe-stock-match, security/preflight-accepts-reconciliation-noop, security/block-public-id-collisions, security/audit-imarat-source-id-match, security/diagnose-isis-legacy-variants, security/brand-scoped-additive-stock-ref, main]
     paths:
       - "scripts/sync-catalog.mjs"
       - "scripts/audit-imarat-all-products.mjs"
@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   reconcile:
-    if: github.head_ref == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'security/pr77-brand-safe-stock-match' || github.ref_name == 'security/preflight-accepts-reconciliation-noop' || github.ref_name == 'security/block-public-id-collisions' || github.ref_name == 'security/audit-imarat-source-id-match' || github.ref_name == 'security/diagnose-isis-legacy-variants' || github.ref_name == 'main'
+    if: github.head_ref == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'fix/reconciliation-mainline-identity-safe-20261109' || github.ref_name == 'security/pr77-brand-safe-stock-match' || github.ref_name == 'security/preflight-accepts-reconciliation-noop' || github.ref_name == 'security/block-public-id-collisions' || github.ref_name == 'security/audit-imarat-source-id-match' || github.ref_name == 'security/diagnose-isis-legacy-variants' || github.ref_name == 'security/brand-scoped-additive-stock-ref' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

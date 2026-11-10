@@ -302,7 +302,7 @@ async function main() {
   const liveLoosePhotoKeys = new Set();
   for (const [line, groups] of Object.entries(liveDATA)) for (const group of groups || []) for (const item of group.items || []) {
     const ref = String(item?.stock_ref || "").trim();
-    if (ref) liveStockRefs.add(ref);
+    if (ref) liveStockRefs.add(norm(group?.brand) + "|" + ref);
     const photo = publicPhotoFingerprint(item);
     if (photo) liveLoosePhotoKeys.add(looseIdentity(line, group, item) + "|" + photo);
   }
@@ -311,7 +311,7 @@ async function main() {
     if (liveKeys.has(key)) return false;
     const row = (internalIndex.get(key) || [])[0];
     const stockRef = String(row?.publicItem?.stock_ref || "").trim();
-    if (stockRef && liveStockRefs.has(stockRef)) {
+    if (stockRef && liveStockRefs.has(norm(row?.publicGroup?.brand) + "|" + stockRef)) {
       duplicateSourceKeys.add(key);
       return false;
     }
