@@ -2793,7 +2793,8 @@ async function main() {
   // Executa após todas as fontes terem sido incorporadas ao DATA.
   // Apenas IDs de origem iguais e identidade comercial exata podem ser unidos.
   const sourceIdentityDedupe = dedupeConfirmedSourceProducts(DATA);
-  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);\n  console.log(`Duplicatas visuais confirmadas Franny/Sophia removidas: ${sourceIdentityDedupe.visualRemoved || 0}`);
+  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);
+  console.log(`Duplicatas visuais confirmadas Franny/Sophia removidas: ${sourceIdentityDedupe.visualRemoved || 0}`);
   for (const conflict of sourceIdentityDedupe.conflicts) {
     console.log('CONFLITO DE IDENTIDADE DA FONTE PRESERVADO: ' + JSON.stringify(conflict));
   }
