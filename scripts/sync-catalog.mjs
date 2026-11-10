@@ -12,6 +12,7 @@ import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
+import { shouldRemoveUnmatchedSourceItem } from './source-preservation.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -2122,6 +2123,7 @@ async function main() {
   if (!SYNC_IMARAT_ONLY) {
     if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
     let staleBrandRemoved = 0;
+    let staleBrandPreserved = 0;
     let legacyBrandMapped = 0;
     let brandSessionMoved = 0;
     const brandSessionMoves = [];
@@ -2136,8 +2138,12 @@ async function main() {
         }
         const hit = matches[0];
         if (!hit) {
-          staleBrandRemoved++;
-          return false;
+          if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+            staleBrandRemoved++;
+            return false;
+          }
+          staleBrandPreserved++;
+          return true;
         }
         item.fonte = 'brand';
         item.id_origem = String(hit.id ?? hit.productId ?? hit.slug ?? '');
@@ -2159,12 +2165,14 @@ async function main() {
       target.items.push(move.item);
     }
     console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
+    console.log(`Produtos Brand sem correspondência preservados: ${staleBrandPreserved}`);
     console.log(`Produtos Brand legados confirmados e reclassificados pela origem: ${legacyBrandMapped}`);
     console.log(`Produtos Brand movidos para a sessão correta da fonte: ${brandSessionMoved}`);
     // Registros antigos em outras categorias também podem pertencer à Brand
     // Collection. Só são movidos com ID ou nome+volume únicos na fonte raiz.
     let legacyBrandMoved = 0;
     let unverifiedLegacyRemoved = 0;
+    let unverifiedLegacyPreserved = 0;
     const unverifiedLegacyNames = [];
     const brandLegacyMoves = [];
     for (const line of Object.keys(DATA)) {
@@ -2185,8 +2193,14 @@ async function main() {
           }
           const hit = matches[0];
           if (!hit) {
-            unverifiedLegacyRemoved++;
-            unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome });
+            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+              unverifiedLegacyRemoved++;
+              unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, action: 'removed' });
+              continue;
+            }
+            unverifiedLegacyPreserved++;
+            kept.push(item);
+            unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, action: 'preserved_no_source_match' });
             continue;
           }
           const session = brandSession(hit);
@@ -2208,6 +2222,7 @@ async function main() {
     }
     console.log(`Produtos legados movidos para a sessão Brand confirmados na origem: ${legacyBrandMoved}`);
     console.log(`Registros legados sem correspondência em nenhuma fonte raiz removidos: ${unverifiedLegacyRemoved}`);
+    console.log(`Registros legados sem correspondência preservados: ${unverifiedLegacyPreserved}`);
     for (const item of unverifiedLegacyNames) {
       console.log('LEGADO SEM ORIGEM REMOVIDO: ' + JSON.stringify(item));
     }
@@ -2355,10 +2370,12 @@ async function main() {
       // Reconcilia também os registros antigos sem procedência: nome exato na
       // fonte + categoria quando possível. IDs diferentes continuam distintos.
       let staleClothesRemoved = 0;
+      let staleClothesPreserved = 0;
       let legacyClothesMapped = 0;
       let legacyClothesConfirmed = 0;
       let legacyClothesDuplicateRemoved = 0;
       let legacyClothesUnmatchedRemoved = 0;
+      let legacyClothesUnmatchedPreserved = 0;
       const legacyClothesMoves = [];
       for (const group of DATA.roupas) {
         const kept = [];
@@ -2369,8 +2386,11 @@ async function main() {
             const fromFranny = id.startsWith('franny-');
             const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
             const exists = !sourceEnabled || (fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id));
-            if (!exists) staleClothesRemoved++;
-            else kept.push(item);
+            if (!exists && shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) staleClothesRemoved++;
+            else {
+              if (!exists) staleClothesPreserved++;
+              kept.push(item);
+            }
             continue;
           }
           const isLegacy = source === '' || source === 'legacy gist' || (source === 'roupas' && !id);
@@ -2385,8 +2405,14 @@ async function main() {
             throw new Error(`LEGACY_ROUPAS_AMBIGUOUS: ${item.nome} aparece em ${matches.length} registros da fonte raiz; nenhum foi apagado.`);
           }
           if (!matches.length) {
-            staleClothesRemoved++;
-            legacyClothesUnmatchedRemoved++;
+            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+              staleClothesRemoved++;
+              legacyClothesUnmatchedRemoved++;
+              continue;
+            }
+            staleClothesPreserved++;
+            legacyClothesUnmatchedPreserved++;
+            kept.push(item);
             continue;
           }
           legacyClothesConfirmed++;
@@ -2432,9 +2458,11 @@ async function main() {
       }
       DATA.roupas = DATA.roupas.filter(group => (group.items || []).length > 0);
       console.log(`Roupas fora da fonte raiz removidas após coleta completa: ${staleClothesRemoved}`);
+      console.log(`Roupas sem correspondência preservadas: ${staleClothesPreserved}`);
       console.log(`Roupas legadas confirmadas pela fonte raiz: ${legacyClothesConfirmed}`);
       console.log(`Roupas legadas duplicadas removidas: ${legacyClothesDuplicateRemoved}`);
       console.log(`Roupas legadas sem correspondência removidas: ${legacyClothesUnmatchedRemoved}`);
+      console.log(`Roupas legadas sem correspondência preservadas: ${legacyClothesUnmatchedPreserved}`);
       console.log(`Roupas legadas reclassificadas sem cópia atual: ${legacyClothesMapped}`);
       const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
       console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
