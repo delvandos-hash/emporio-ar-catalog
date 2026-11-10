@@ -12,6 +12,7 @@ import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
+import { shouldRemoveUnmatchedSourceItem } from './source-preservation.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -204,7 +205,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
         if (liveItem.stock_ref && item.stock_ref !== liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
         if (liveItem.stock_route && item.stock_route !== liveItem.stock_route) item.stock_route = liveItem.stock_route;
-        if (liveItem.public_id && item.public_id !== liveItem.public_id) item.public_id = liveItem.public_id;
+        if (liveItem.public_id && item.public_id !== liveItem.public_id && item._preserve_public_id !== true) item.public_id = liveItem.public_id;
       }
     }
   }
@@ -630,15 +631,35 @@ async function fetchImaratDetail(slug) {
   } catch { return null; }
 }
 
+async function fetchBrandRequest(url, options, retries = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.status >= 500 && attempt < retries) {
+        throw new Error(`Brand HTTP ${response.status}`);
+      }
+      return response;
+    } catch (error) {
+      lastErr = error;
+      if (attempt === retries) break;
+      const wait = 1200 * attempt;
+      console.warn(`Brand retry ${attempt}/${retries} em ${wait}ms: ${error.message}`);
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
+
 async function fetchBrandList() {
   const all = [];
-  const warm = await fetch(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, { headers: { 'User-Agent': 'EmporioAR-Sync/1.0' } });
+  const warm = await fetchBrandRequest(`${BRAND_BASE}/c/atacado/${BRAND_SELLER}`, { headers: { 'User-Agent': 'EmporioAR-Sync/1.0' } });
   const setCookie = warm.headers.get('set-cookie') || '';
   const cookie = setCookie.split(',').map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
 
   let completed = false;
   for (let page = 1; page <= 80; page++) {
-    const res = await fetch(`${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`, {
+    const res = await fetchBrandRequest(`${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`, {
       method: 'POST',
       headers: {
         'User-Agent': 'EmporioAR-Sync/1.0', 'Accept': 'application/json', 'Content-Type': 'application/json',
@@ -1563,12 +1584,15 @@ async function main() {
       }
       console.log(`BASELINE POR PUBLIC_ID: data.js=${internalBaseline.count} IDs/${internalBaseline.items} itens; Gist=${liveBaseline.count} IDs/${liveBaseline.items} itens; IDs sem origem interna=${liveBaseline.missingIds}; IDs só no data.js=${onlyInternal}; IDs só no Gist=${onlyLive}`);
       const safeAdditiveBaseline = process.env.ALLOW_SAFE_ADDITIVE_BASELINE === "1";
+      const baselineRestoreEnabled = process.env.CATALOG_BASELINE_RESTORE === "1";
       const allowedLiveOnly = safeAdditiveBaseline ? 1 : 0;
+      const allowedInternalOnly = baselineRestoreEnabled ? 200 : 80;
+      console.log(`CATALOG_BASELINE_RESTORE=${baselineRestoreEnabled} allowedInternalOnly=${allowedInternalOnly}`);
       const baselineUnsafe =
         liveBaseline.missingIds > 0 ||
         onlyLive > allowedLiveOnly ||
-        onlyInternal > 80 ||
-        Math.abs(liveBaseline.count - internalBaseline.count) > 80 ||
+        onlyInternal > allowedInternalOnly ||
+        Math.abs(liveBaseline.count - internalBaseline.count) > allowedInternalOnly ||
         (safeAdditiveBaseline && preSyncPreservation.ambiguous > 0);
       if (!SYNC_DRY_RUN && baselineUnsafe) {
         throw new Error("SINCRONIZAÇÃO BLOQUEADA: baseline não passou pelos limites de segurança. Excesso de IDs sem correspondência, ambiguidades ou divergência acima do limite; nenhum dado foi publicado.");
@@ -2122,6 +2146,7 @@ async function main() {
   if (!SYNC_IMARAT_ONLY) {
     if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
     let staleBrandRemoved = 0;
+    let staleBrandPreserved = 0;
     let legacyBrandMapped = 0;
     let brandSessionMoved = 0;
     const brandSessionMoves = [];
@@ -2136,8 +2161,12 @@ async function main() {
         }
         const hit = matches[0];
         if (!hit) {
-          staleBrandRemoved++;
-          return false;
+          if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+            staleBrandRemoved++;
+            return false;
+          }
+          staleBrandPreserved++;
+          return true;
         }
         item.fonte = 'brand';
         item.id_origem = String(hit.id ?? hit.productId ?? hit.slug ?? '');
@@ -2159,12 +2188,14 @@ async function main() {
       target.items.push(move.item);
     }
     console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
+    console.log(`Produtos Brand sem correspondência preservados: ${staleBrandPreserved}`);
     console.log(`Produtos Brand legados confirmados e reclassificados pela origem: ${legacyBrandMapped}`);
     console.log(`Produtos Brand movidos para a sessão correta da fonte: ${brandSessionMoved}`);
     // Registros antigos em outras categorias também podem pertencer à Brand
     // Collection. Só são movidos com ID ou nome+volume únicos na fonte raiz.
     let legacyBrandMoved = 0;
     let unverifiedLegacyRemoved = 0;
+    let unverifiedLegacyPreserved = 0;
     const unverifiedLegacyNames = [];
     const brandLegacyMoves = [];
     for (const line of Object.keys(DATA)) {
@@ -2185,8 +2216,14 @@ async function main() {
           }
           const hit = matches[0];
           if (!hit) {
-            unverifiedLegacyRemoved++;
-            unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome });
+            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+              unverifiedLegacyRemoved++;
+              unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, action: 'removed' });
+              continue;
+            }
+            unverifiedLegacyPreserved++;
+            kept.push(item);
+            unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, action: 'preserved_no_source_match' });
             continue;
           }
           const session = brandSession(hit);
@@ -2208,6 +2245,7 @@ async function main() {
     }
     console.log(`Produtos legados movidos para a sessão Brand confirmados na origem: ${legacyBrandMoved}`);
     console.log(`Registros legados sem correspondência em nenhuma fonte raiz removidos: ${unverifiedLegacyRemoved}`);
+    console.log(`Registros legados sem correspondência preservados: ${unverifiedLegacyPreserved}`);
     for (const item of unverifiedLegacyNames) {
       console.log('LEGADO SEM ORIGEM REMOVIDO: ' + JSON.stringify(item));
     }
@@ -2355,10 +2393,14 @@ async function main() {
       // Reconcilia também os registros antigos sem procedência: nome exato na
       // fonte + categoria quando possível. IDs diferentes continuam distintos.
       let staleClothesRemoved = 0;
+      let staleClothesPreserved = 0;
       let legacyClothesMapped = 0;
       let legacyClothesConfirmed = 0;
       let legacyClothesDuplicateRemoved = 0;
+      let legacyClothesPublicIdsRekeyed = 0;
+      let legacyClothesIdentityConflictsPreserved = 0;
       let legacyClothesUnmatchedRemoved = 0;
+      let legacyClothesUnmatchedPreserved = 0;
       const legacyClothesMoves = [];
       for (const group of DATA.roupas) {
         const kept = [];
@@ -2369,8 +2411,11 @@ async function main() {
             const fromFranny = id.startsWith('franny-');
             const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
             const exists = !sourceEnabled || (fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id));
-            if (!exists) staleClothesRemoved++;
-            else kept.push(item);
+            if (!exists && shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) staleClothesRemoved++;
+            else {
+              if (!exists) staleClothesPreserved++;
+              kept.push(item);
+            }
             continue;
           }
           const isLegacy = source === '' || source === 'legacy gist' || (source === 'roupas' && !id);
@@ -2385,20 +2430,81 @@ async function main() {
             throw new Error(`LEGACY_ROUPAS_AMBIGUOUS: ${item.nome} aparece em ${matches.length} registros da fonte raiz; nenhum foi apagado.`);
           }
           if (!matches.length) {
-            staleClothesRemoved++;
-            legacyClothesUnmatchedRemoved++;
+            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+              staleClothesRemoved++;
+              legacyClothesUnmatchedRemoved++;
+              continue;
+            }
+            staleClothesPreserved++;
+            legacyClothesUnmatchedPreserved++;
+            kept.push(item);
             continue;
           }
           legacyClothesConfirmed++;
           const root = matches[0];
           const rootId = String(root.item.id_origem || '').trim();
           if (!rootId) throw new Error(`LEGACY_ROUPAS_WITHOUT_SOURCE_ID: ${item.nome}; nenhuma exclusão automática foi aplicada.`);
-          const alreadyPresent = DATA.roupas.some(g =>
-            (g.items || []).some(existing => existing !== item && String(existing.id_origem || '') === rootId)
+          const existingRows = DATA.roupas.flatMap(existingGroup =>
+            (existingGroup.items || [])
+              .filter(existing => existing !== item && String(existing.id_origem || '') === rootId)
+              .map(existing => ({ group: existingGroup, item: existing }))
           );
-          if (alreadyPresent) {
-            staleClothesRemoved++;
-            legacyClothesDuplicateRemoved++;
+          if (existingRows.length > 1) {
+            throw new Error(`LEGACY_ROUPAS_SOURCE_ID_AMBIGUOUS: ${item.nome} / ${rootId} aparece em ${existingRows.length} registros; nenhum foi removido.`);
+          }
+          if (existingRows.length === 1) {
+            const existingRow = existingRows[0];
+            const existingItem = existingRow.item;
+            const sameGroup = norm(existingRow.group.cat) === norm(group.cat) &&
+              norm(existingRow.group.brand) === norm(group.brand);
+            const oldStockRef = String(item.stock_ref || '').trim();
+            const currentStockRef = String(existingItem.stock_ref || '').trim();
+            const sameStockRef = Boolean(oldStockRef && currentStockRef && oldStockRef === currentStockRef);
+            const sameName = norm(existingItem.nome) === norm(item.nome);
+            const sameVolume = norm(existingItem.volume || '—') === norm(item.volume || '—');
+            if (sameGroup && sameStockRef && sameName && sameVolume) {
+              const oldPublicId = String(item.public_id || '').trim();
+              if (oldPublicId) {
+                const collision = Object.values(DATA).some(groups =>
+                  (groups || []).some(candidateGroup =>
+                    (candidateGroup.items || []).some(candidate =>
+                      candidate !== item && candidate !== existingItem &&
+                      String(candidate.public_id || '').trim() === oldPublicId
+                    )
+                  )
+                );
+                if (collision) throw new Error(`LEGACY_ROUPAS_PUBLIC_ID_COLLISION: ${oldPublicId}; nenhum ID foi sobrescrito.`);
+                existingItem.public_id = oldPublicId;
+                existingItem._preserve_public_id = true;
+                legacyClothesPublicIdsRekeyed++;
+              }
+              const manualPrice = item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
+              if (manualPrice) {
+                existingItem.varejo = item.varejo;
+                existingItem.atacado = item.atacado;
+                existingItem.precoManual = true;
+              }
+              const mergedPhotos = [...new Set([
+                ...(Array.isArray(existingItem.fotos) ? existingItem.fotos : []),
+                existingItem.foto || '',
+                ...(Array.isArray(item.fotos) ? item.fotos : []),
+                item.foto || ''
+              ].filter(Boolean))];
+              if (mergedPhotos.length) existingItem.fotos = mergedPhotos;
+              if (!existingItem.foto && item.foto) existingItem.foto = item.foto;
+              if ((!Array.isArray(existingItem.variacoes) || !existingItem.variacoes.length) &&
+                  Array.isArray(item.variacoes) && item.variacoes.length) {
+                existingItem.variacoes = [...item.variacoes];
+              }
+              if (!oldPublicId) staleClothesRemoved++;
+              legacyClothesDuplicateRemoved++;
+              continue;
+            }
+            // ID de origem semelhante não basta: sem stock_ref e grupo idênticos,
+            // mantém a representação legada para revisão, sem colapsar produtos.
+            staleClothesPreserved++;
+            legacyClothesIdentityConflictsPreserved++;
+            kept.push(item);
             continue;
           }
           const manualPrice = item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
@@ -2432,9 +2538,13 @@ async function main() {
       }
       DATA.roupas = DATA.roupas.filter(group => (group.items || []).length > 0);
       console.log(`Roupas fora da fonte raiz removidas após coleta completa: ${staleClothesRemoved}`);
+      console.log(`Roupas sem correspondência preservadas: ${staleClothesPreserved}`);
       console.log(`Roupas legadas confirmadas pela fonte raiz: ${legacyClothesConfirmed}`);
       console.log(`Roupas legadas duplicadas removidas: ${legacyClothesDuplicateRemoved}`);
+      console.log(`Roupas legadas com public_id anterior reatribuído por stock_ref exato: ${legacyClothesPublicIdsRekeyed}`);
+      console.log(`Roupas com ID de origem semelhante, mas sem stock_ref/grupo exato, preservadas: ${legacyClothesIdentityConflictsPreserved}`);
       console.log(`Roupas legadas sem correspondência removidas: ${legacyClothesUnmatchedRemoved}`);
+      console.log(`Roupas legadas sem correspondência preservadas: ${legacyClothesUnmatchedPreserved}`);
       console.log(`Roupas legadas reclassificadas sem cópia atual: ${legacyClothesMapped}`);
       const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
       console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
@@ -2810,6 +2920,11 @@ async function main() {
   const livePreservation = preserveLivePublicFields(DATA, LIVE_GIST_DATA);
   if (livePreservation.ambiguous) {
     throw new Error(`Preservação de dados públicos ambígua em ${livePreservation.ambiguous} variantes; publicação bloqueada.`);
+  }
+  for (const groups of Object.values(DATA)) {
+    for (const group of groups || []) {
+      for (const item of group.items || []) delete item._preserve_public_id;
+    }
   }
 
   const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount}+${frannyCount} Roupas +${acessoriosCount} Acc | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';

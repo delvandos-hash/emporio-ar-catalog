@@ -55,13 +55,36 @@ test("reconciliação aditiva reidentifica variantes sem remover conteúdo exist
   assert.match(apply, /SOURCE_CONFIRMED_ADDITIONS=/);
 });
 
-test("auditoria compara IDs públicos únicos e só libera fontes confirmadas", () => {
+test("auditoria compara IDs públicos e aceita fontes confirmadas ou snapshot conhecido", () => {
   assert.match(audit, /internalPublicIndex/);
   assert.match(audit, /rekeyLiveVariants/);
   assert.doesNotMatch(audit, /rekeyAudit\.unmatched\s*===\s*0/);
   assert.match(audit, /VARIANTE GIST SEM CORRESPONDÊNCIA INEQUÍVOCA/);
-  assert.match(audit, /internalOnlyKeys\.length <= 80/);
-  assert.match(audit, /Math\.abs\(catalog\.length - internalItemCount\) <= 80/);
+  assert.match(audit, /baselinePublicIds\.has\(key\)/);
+  assert.match(audit, /internalOnlyLimit = baselineRestoreEnabled \? 200 : 80/);
+  assert.match(audit, /Math\.abs\(catalog\.length - internalItemCount\) <= internalOnlyLimit/);
+});
+
+
+test("sincronização preserva itens sem correspondência na fonte em vez de excluí-los", () => {
+  assert.match(sync, /shouldRemoveUnmatchedSourceItem/);
+  assert.match(sync, /staleBrandPreserved/);
+  assert.match(sync, /unverifiedLegacyPreserved/);
+  assert.match(sync, /staleClothesPreserved/);
+  assert.match(sync, /legacyClothesUnmatchedPreserved/);
+});
+
+test("consolidação de roupas transfere public_id antigo apenas com stock_ref e grupo exatos", () => {
+  assert.match(sync, /sameGroup && sameStockRef && sameName && sameVolume/);
+  assert.match(sync, /existingItem\.public_id = oldPublicId/);
+  assert.match(sync, /existingItem\._preserve_public_id = true/);
+  assert.match(sync, /item\._preserve_public_id !== true/);
+  assert.match(sync, /legacyClothesPublicIdsRekeyed/);
+});
+
+test("restauração do snapshot tem precedência sobre heurísticas de stock_ref e foto", () => {
+  assert.match(apply, /if \(baselinePublicIds\.has\(key\)\) return true/);
+  assert.match(audit, /!baselinePublicIds\.has\(key\)/);
 });
 
 test("sincronização preserva preços e imagens públicas e remove apenas cópias exatas", () => {

@@ -3,11 +3,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
 import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
+import { collectPublicIds, parseDataJsContent } from "./catalog-baseline-restore.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
 const ALLOWED_SOURCES = new Set(["imarat", "brand", "roupas", "acessorios"]);
+const baselinePath = process.env.CATALOG_BASELINE_PATH || "";
+const baselinePublicIds = baselinePath ? collectPublicIds(parseDataJsContent(fs.readFileSync(baselinePath, "utf8"))) : new Set();
 
 function norm(value) {
   return String(value || "").toLowerCase().normalize("NFD")
@@ -312,6 +315,9 @@ async function main() {
   const duplicateSourceKeys = new Set();
   const additions = [...internalKeys].filter(key => {
     if (liveKeys.has(key)) return false;
+    // Um public_id já publicado no snapshot conhecido não pode ser descartado
+    // por heurísticas de stock_ref/foto: ele deve voltar como o mesmo item.
+    if (baselinePublicIds.has(key)) return true;
     const row = (internalIndex.get(key) || [])[0];
     const stockRef = String(row?.publicItem?.stock_ref || "").trim();
     if (stockRef && liveStockRefs.has(norm(row?.publicGroup?.brand) + "|" + stockRef)) {
@@ -336,9 +342,11 @@ async function main() {
     console.log("ADDITIVE_RECONCILIATION_NOOP=true; nenhum item novo; Gist já reconciliado; nenhuma gravação necessária.");
     return;
   }
-  if (additions.length > 80) {
-    throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=80).`);
+  const additionsLimit = baselinePath ? 200 : 80;
+  if (additions.length > additionsLimit) {
+    throw new Error(`Publicação bloqueada: quantidade de novos itens fora do limite aditivo (novos=${additions.length}, máximo=${additionsLimit}).`);
   }
+  const baselineRestorationAdditions = additions.filter(key => baselinePublicIds.has(key)).length;
 
   function effectiveAdditiveSource(row) {
   const source = norm(row?.item?.fonte);
@@ -351,8 +359,11 @@ for (const key of additions) {
     if (rows.length !== 1) throw new Error(`Publicação bloqueada: identidade interna ambígua: ${key}`);
     const { item } = rows[0];
     const source = effectiveAdditiveSource(rows[0]);
-    if (!ALLOWED_SOURCES.has(source)) throw new Error(`Publicação bloqueada: fonte não confirmada para ${key}: ${source || "vazia"}`);
-    if (source !== "brand" && !String(item.id_origem || "").trim()) {
+    const restoredFromKnownGoodBaseline = baselinePublicIds.has(key);
+    if (!ALLOWED_SOURCES.has(source) && !restoredFromKnownGoodBaseline) {
+      throw new Error(`Publicação bloqueada: fonte não confirmada para ${key}: ${source || "vazia"}`);
+    }
+    if (source !== "brand" && !String(item.id_origem || "").trim() && !restoredFromKnownGoodBaseline) {
       throw new Error(`Publicação bloqueada: produto sem ID de origem: ${key}`);
     }
   }
@@ -390,6 +401,7 @@ for (const key of additions) {
   console.log(`GIST_EXACT_DUPLICATES_REMOVED=${exactLiveDuplicatesRemoved}`);
   console.log(`GIST_VARIANTS_REKEYED=${rekeyedVariants} GIST_VARIANTS_PRESERVED_WITHOUT_REKEY=${unmatchedLiveVariants}`);
   console.log(`SOURCE_CONFIRMED_ADDITIONS=${appended}`);
+  console.log(`KNOWN_GOOD_BASELINE_RESTORATION_ADDITIONS=${baselineRestorationAdditions}`);
   console.log(`DUPLICATE_SOURCE_REPRESENTATIONS_SKIPPED=${duplicateSourceKeys.size}`);
   console.log("GIST mantém todos os conteúdos existentes; apenas IDs de variantes são separados e novos itens confirmados são adicionados.");
 

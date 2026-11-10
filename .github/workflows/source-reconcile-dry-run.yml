@@ -13,10 +13,14 @@ on:
       - "scripts/sync-catalog.mjs"
       - "scripts/source-identity-dedupe.mjs"
       - "scripts/source-identity-dedupe.test.mjs"
+      - "scripts/catalog-baseline-restore.mjs"
+      - "scripts/catalog-baseline-restore.test.mjs"
+      - "scripts/restore-catalog-baseline.mjs"
       - ".github/workflows/source-reconcile-dry-run.yml"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: source-reconcile-dry-run-${{ github.event.pull_request.number }}
@@ -39,11 +43,31 @@ jobs:
         run: |
           node --check scripts/sync-catalog.mjs
           node --check scripts/source-identity-dedupe.mjs
-          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs
-      - name: Sincronizar todas as fontes sem publicar
-        run: node scripts/sync-catalog.mjs
+          node --check scripts/catalog-baseline-restore.mjs
+          node --check scripts/restore-catalog-baseline.mjs
+          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs scripts/catalog-baseline-restore.test.mjs
+      - name: Baixar snapshot anterior conhecido para reconciliação
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: full-reconcile-data-js-42874130855
+          run-id: 42874130855
+          github-token: ${{ github.token }}
+          path: /tmp/catalog-baseline
+      - name: Restaurar IDs públicos do snapshot conhecido
+        if: github.event_name == 'pull_request'
+        run: node scripts/restore-catalog-baseline.mjs
+        env:
+          CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
+      - name: Sincronizar todas as fontes e reaplicar IDs do snapshot sem publicar
+        run: |
+          node scripts/sync-catalog.mjs
+          CATALOG_BASELINE_PATH=/tmp/catalog-baseline/data.js CATALOG_BASELINE_RESTORE_FINAL=1 node scripts/restore-catalog-baseline.mjs
+          mkdir -p /tmp/catalog-reconcile-report
+          touch /tmp/catalog-reconcile-report/sync-success
         env:
           SYNC_DRY_RUN: "1"
+          CATALOG_BASELINE_RESTORE: ${{ github.event_name == 'pull_request' && '1' || '0' }}
           SYNC_SKIP_DETAILS: "1"
           SYNC_IMARAT_ONLY: "0"
           SYNC_DANDE_ONLY: "0"
@@ -63,3 +87,77 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+      - name: Diagnosticar IDs ausentes do snapshot anterior
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          mkdir -p /tmp/catalog-reconcile-report
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { collectPublicIds, parseDataJsContent } from "./scripts/catalog-baseline-restore.mjs";
+          const baseline = parseDataJsContent(fs.readFileSync("/tmp/catalog-baseline/data.js", "utf8"));
+          const current = parseDataJsContent(fs.readFileSync("js/data.js", "utf8"));
+          const flatten = data => Object.entries(data).flatMap(([line, groups]) =>
+            (groups || []).flatMap(group => (group.items || []).map(item => ({
+              line, cat: group.cat, brand: group.brand, nome: item.nome, volume: item.volume,
+              public_id: item.public_id, stock_ref: item.stock_ref, id_origem: item.id_origem,
+              fonte: item.fonte, source: item.source, varejo: item.varejo, atacado: item.atacado
+            })))
+          );
+          const syncCompleted = fs.existsSync("/tmp/catalog-reconcile-report/sync-success");
+          const baselineRows = flatten(baseline);
+          const currentRows = flatten(current);
+          const currentIds = collectPublicIds(current);
+          const baselineIds = collectPublicIds(baseline);
+          const missing = baselineRows.filter(row => row.public_id && !currentIds.has(String(row.public_id)));
+          const report = {
+            sync_completed: syncCompleted,
+            baseline_public_ids: baselineIds.size,
+            current_public_ids: currentIds.size,
+            missing_count: syncCompleted ? missing.length : null,
+            missing,
+            possible_matches: missing.map(row => ({
+              missing: row,
+              by_stock_ref: currentRows.filter(candidate =>
+                row.stock_ref && String(candidate.stock_ref || '') === String(row.stock_ref)
+              ),
+              by_origin_id: currentRows.filter(candidate =>
+                row.id_origem && String(candidate.id_origem || '') === String(row.id_origem)
+              ),
+              by_exact_catalog_identity: currentRows.filter(candidate =>
+                String(candidate.line || '') === String(row.line || '') &&
+                String(candidate.cat || '') === String(row.cat || '') &&
+                String(candidate.brand || '') === String(row.brand || '') &&
+                String(candidate.nome || '').trim().toLowerCase() === String(row.nome || '').trim().toLowerCase() &&
+                String(candidate.volume || '—').trim().toLowerCase() === String(row.volume || '—').trim().toLowerCase()
+              )
+            }))
+          };
+          fs.writeFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", JSON.stringify(report, null, 2));
+          fs.copyFileSync("js/data.js", "/tmp/catalog-reconcile-report/current-data.js");
+          console.log(`SYNC_COMPLETED=${syncCompleted}`);
+          console.log(`BASELINE_PUBLIC_IDS_PRESERVED=${syncCompleted ? baselineIds.size - missing.length : "NOT_VERIFIED"}/${baselineIds.size}`);
+          console.log(`BASELINE_PUBLIC_IDS_MISSING=${syncCompleted ? missing.length : "NOT_VERIFIED"}`);
+          for (const row of missing) console.log("MISSING_PUBLIC_ID=" + JSON.stringify(row));
+          NODE
+      - name: Confirmar que todos os IDs do snapshot anterior sobreviveram ao sync
+        if: github.event_name == 'pull_request'
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", "utf8"));
+          if (!report.sync_completed) {
+            console.error("Sincronização completa falhou; preservação de IDs não pode ser aprovada.");
+            process.exit(1);
+          }
+          if (report.missing_count) {
+            console.error("IDs do snapshot anterior ausentes após o dry-run: " + report.missing.map(row => row.public_id).join(","));
+            process.exit(1);
+          }
+          NODE
+      - name: Anexar diagnóstico da reconciliação
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-reconcile-missing-id-diagnostic
+          path: /tmp/catalog-reconcile-report/
+          if-no-files-found: warn

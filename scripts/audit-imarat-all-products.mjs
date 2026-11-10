@@ -2,12 +2,16 @@ import { readFileSync } from "node:fs";
 import { toPublicCatalog } from "./public-catalog.mjs";
 import { findExactInternalPriceMatch, findImaratSourceByOriginRef } from "./audit-catalog-match.mjs";
 import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
+import { collectPublicIds, parseDataJsContent } from "./catalog-baseline-restore.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
 const GIST_TOKEN = process.env.GIST_TOKEN;
 if (!IMARAT_API) throw new Error("IMARAT_API_URL não configurado.");
 if (!GIST_TOKEN) throw new Error("GIST_TOKEN não configurado.");
+const baselinePath = process.env.CATALOG_BASELINE_PATH || "";
+const baselinePublicIds = baselinePath ? collectPublicIds(parseDataJsContent(readFileSync(baselinePath, "utf8"))) : new Set();
+const baselineRestoreEnabled = Boolean(baselinePath);
 
 const norm = (s) => String(s || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -365,7 +369,8 @@ console.log(`COMPARAÇÃO POR PUBLIC ID: data.js interno=${internalItemCount} ID
 const allowedAdditiveSources = new Set(["imarat", "brand", "roupas", "acessorios"]);
 const internalOnlySourceRows = internalOnlyKeys.map(key => ({ key, row: internalPublicIndex.get(key) }));
 const liveStockRefs = new Set(catalog.map(x => String(x.item?.stock_ref || "").trim()).filter(Boolean));
-const duplicateInternalSourceRows = internalOnlySourceRows.filter(({ row }) =>
+const duplicateInternalSourceRows = internalOnlySourceRows.filter(({ key, row }) =>
+  !baselinePublicIds.has(key) &&
   Boolean(String(row?.publicItem?.stock_ref || "").trim()) &&
   liveStockRefs.has(String(row.publicItem.stock_ref).trim())
 );
@@ -373,7 +378,8 @@ const liveLoosePhotoKeys = new Set(catalog.map(x => {
   const photo = publicPhotoFingerprint(x.item);
   return photo ? looseIdentity(x.line, x.group, x.item) + "|" + photo : "";
 }).filter(Boolean));
-const legacyBrandDuplicateRows = internalOnlySourceRows.filter(({ row }) => {
+const legacyBrandDuplicateRows = internalOnlySourceRows.filter(({ key, row }) => {
+  if (baselinePublicIds.has(key)) return false;
   if (norm(row?.item?.fonte) || !norm(row?.group?.cat).includes("brand")) return false;
   const photo = publicPhotoFingerprint(row?.publicItem);
   return Boolean(photo && liveLoosePhotoKeys.has(looseIdentity(row.line, row.group, row.item) + "|" + photo));
@@ -389,21 +395,25 @@ function effectiveAdditiveSource(row) {
   if (source) return source;
   return norm(row?.group?.cat) === "brand" && KNOWN_BRAND_GROUPS.has(norm(row?.group?.brand)) ? "brand" : "";
 }
-const internalOnlySourceConfirmed = eligibleInternalOnlyRows.every(({ row }) =>
-  Boolean(row) &&
-  allowedAdditiveSources.has(effectiveAdditiveSource(row)) &&
-  (effectiveAdditiveSource(row) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
+const internalOnlySourceConfirmed = eligibleInternalOnlyRows.every(({ key, row }) =>
+  baselinePublicIds.has(key) || (
+    Boolean(row) &&
+    allowedAdditiveSources.has(effectiveAdditiveSource(row)) &&
+    (effectiveAdditiveSource(row) === "brand" || Boolean(String(row.item?.id_origem || "").trim()))
+  )
 );
+const internalOnlyLimit = baselineRestoreEnabled ? 200 : 80;
 const additiveReconciliationSafe =
-  // Ambiguidades de rekey não bloqueiam a preservação: os itens permanecem no Gist
-  // e a publicação aditiva só prossegue se nenhum ID público ficar sem representação.
+  // IDs do snapshot anterior são restauráveis porque já foram publicados com public_id estável.
+  // Os demais itens continuam sujeitos à confirmação normal de origem.
   liveOnlyKeys.length === 0 &&
   publicIdIdentityConflicts.length === 0 &&
   internalPublicIdIdentityConflicts.length === 0 &&
-  eligibleInternalOnlyRows.length <= 80 &&
-  internalOnlyKeys.length <= 80 &&
-  Math.abs(catalog.length - internalItemCount) <= 80 &&
+  eligibleInternalOnlyRows.length <= internalOnlyLimit &&
+  internalOnlyKeys.length <= internalOnlyLimit &&
+  Math.abs(catalog.length - internalItemCount) <= internalOnlyLimit &&
   internalOnlySourceConfirmed;
+console.log(`KNOWN_GOOD_BASELINE_IDS=${baselinePublicIds.size} baselineRestore=${baselineRestoreEnabled}`);
 console.log(`ADDITIVE_RECONCILIATION_SAFE=${additiveReconciliationSafe} liveOnly=${liveOnlyKeys.length} internalOnly=${internalOnlyKeys.length} duplicateSourceRepresentations=${duplicateInternalSourceRows.length} legacyBrandRepresentations=${legacyBrandDuplicateRows.length} eligibleInternalOnly=${eligibleInternalOnlyRows.length} sourceConfirmed=${internalOnlySourceConfirmed} countDelta=${Math.abs(catalog.length - internalItemCount)}`);
 for (const row of internalOnlySourceRows) {
   const item = row.row?.item || {};
