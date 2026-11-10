@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalProductKey, normalProductNameVolumeKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri, isCanonicalImaratAtherri, isCanonicalAtherriGistRecord, isExcludedAtherriGistRecord } from "./catalog-identity.mjs";
+import { normalProductKey, normalProductNameVolumeKey, miniIdentityKey, miniIdentityBaseKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri, isCanonicalImaratAtherri, isCanonicalAtherriGistRecord, isExcludedAtherriGistRecord, atherriGistRecordKind } from "./catalog-identity.mjs";
 
 test("perfumes exigem nome exato, volume e marca", () => {
   assert.equal(normalProductKey("Perfume Áureo 100ml", "100ml", "Marca A"), normalProductKey("PERFUME Aureo", "100ml", "Marca A"));
@@ -92,4 +92,8 @@ test("separa o registro Gist incorreto do correto por origin_ref estável", () =
   assert.equal(isExcludedAtherriGistRecord(wrong, "Afeer"), true);
   assert.equal(isExcludedAtherriGistRecord({ ...wrong, brand: "Outra Marca" }, "Outra Marca"), false);
   assert.equal(isCanonicalImaratAtherri({ ...correct, fonte: "imarat", id_origem: "1474" }, "Afeer"), true);
+  assert.equal(atherriGistRecordKind(correct, "Afeer"), "canonical");
+  assert.equal(atherriGistRecordKind(wrong, "Afeer"), "excluded");
+  assert.equal(atherriGistRecordKind({ ...correct, origin_ref: "o_unknown" }, "Afeer"), "ambiguous");
+  assert.equal(atherriGistRecordKind(correct, "Outra Marca"), "unrelated");
 });
