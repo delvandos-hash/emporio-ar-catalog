@@ -265,11 +265,15 @@ for(const [line,groups] of Object.entries(DATA)) {
     if(!name) continue;
     const volume=String(item.volume||volumeFrom(null,name));
     const internalKey=[norm(line),norm(group.brand),norm(group.cat),norm(name),volumeMatch(volume,name)].join("|");
-    const internal=internalIndex.get(internalKey)?.[0];
+    const internalCandidates=internalIndex.get(internalKey)||[];
+    const internal=internalCandidates.find(candidate =>
+      String(candidate.varejo??"")===String(item.varejo??"") &&
+      String(candidate.atacado??"")===String(item.atacado??"")
+    ) || internalCandidates[0] || null;
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
-      source:"",originId:"",manual:internal?.precoManual??false,
+      source:"",originId:String(internal?.id_origem||""),manual:internal?.precoManual??false,
       key:syncKey(name,volume,group.cat,group.brand),item
     });
   }
@@ -416,6 +420,15 @@ function sourceBrandMatches(catalogBrand,sourceBrand) {
   return Boolean(b && s && b===s);
 }
 function matchSourceForCatalog(item) {
+  const sourceId=String(item.originId||"").trim();
+  if(sourceId) {
+    const exactIdMatches=source.filter(p=>String(p.id??p.productId??p.slug??"").trim()===sourceId);
+    if(exactIdMatches.length!==1) return null;
+    const exact=exactIdMatches[0];
+    if(!sourceBrandMatches(item.brand,exact.brand)) return null;
+    if(!volumeCompatible(volumeFrom(item.volume,item.name),volumeFrom(exact.sizeMl,exact.name))) return null;
+    return exact;
+  }
   const itemVolume=volumeFrom(item.volume,item.name);
   const itemKey=sourceTitleKey(item.name,item.category,item.brand);
   const generic=["outros","outra"].includes(norm(item.brand));
