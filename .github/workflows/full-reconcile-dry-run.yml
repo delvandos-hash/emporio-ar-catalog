@@ -5,10 +5,12 @@ on:
     branches: [fix/reconciliation-mainline-identity-safe-20261109, security/pr77-brand-safe-stock-match, security/preflight-accepts-reconciliation-noop, security/block-public-id-collisions, security/audit-imarat-source-id-match, security/diagnose-isis-legacy-variants, security/brand-scoped-additive-stock-ref, security/brand-scoped-public-id-origin, security/legacy-brand-151-delina-resolution-20261110, main]
     paths:
       - "scripts/sync-catalog.mjs"
+      - "scripts/dande-url.mjs"
+      - "scripts/dande-url.test.mjs"
       - "scripts/audit-imarat-all-products.mjs"
       - "scripts/restore-gist-only-legacy.mjs"
       - "scripts/legacy-restore-identity.mjs"
-      - "scripts/legacy-restore-identity.test.mjs"
+      - "scripts/legacy-restore-identity.test.mjs scripts/dande-url.test.mjs"
       - "scripts/apply-additive-reconciliation.mjs"
       - "scripts/public-catalog.mjs"
       - "scripts/public-catalog.test.mjs"
@@ -44,6 +46,7 @@ jobs:
       - name: Validar sintaxe e testes
         run: |
           node --check scripts/sync-catalog.mjs
+          node --check scripts/dande-url.mjs
           node --check scripts/restore-gist-only-legacy.mjs
           node --check scripts/legacy-restore-identity.mjs
           node --check scripts/apply-additive-reconciliation.mjs
