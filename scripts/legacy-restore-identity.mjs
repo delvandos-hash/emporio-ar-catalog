@@ -10,6 +10,19 @@ export function legacyPhotoFingerprint(item) {
 
 // A referência de estoque pode ser compartilhada ou colidir entre marcas.
 // Nenhum public_id/stock_ref é suficiente para cruzar a fronteira de marca.
+export function hasPublicIdStockRefConflict(publicIdMatches, publicItem, expectedBrand = "") {
+  const brandKey = normalizeBrand(expectedBrand);
+  const publicId = String(publicItem?.public_id || "").trim();
+  const incomingStock = String(publicItem?.stock_ref || "").trim();
+  if (!brandKey || !publicId || !incomingStock) return false;
+  const sameBrand = row => normalizeBrand(row?.group?.brand ?? row?.publicItem?.brand ?? row?.brand) === brandKey;
+  const matches = [...new Set((Array.isArray(publicIdMatches) ? publicIdMatches : []).filter(sameBrand))]
+    .filter(row => String(row?.publicItem?.public_id || "").trim() === publicId);
+  if (matches.length !== 1) return false;
+  const existingStock = String(matches[0]?.publicItem?.stock_ref || "").trim();
+  return Boolean(existingStock && existingStock !== incomingStock);
+}
+
 export function resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches = [], expectedBrand = "") {
   const brandKey = normalizeBrand(expectedBrand);
   if (!brandKey) return null;
@@ -19,6 +32,13 @@ export function resolveLegacyStockMatch(stockMatches, identityMatches, publicIte
   const scopedPublicId = publicIdMatches.filter(sameBrand);
 
   const publicId = String(publicItem?.public_id || "").trim();
+  const publicIdStockConflict = hasPublicIdStockRefConflict(scopedPublicId, publicItem, expectedBrand);
+  if (publicIdStockConflict) {
+    // O mesmo public_id com stock_ref diferente representa duas linhas vivas
+    // distintas até prova em contrário. Não funde nem sobrescreve a identidade.
+    if (scopedStock.length === 1) return scopedStock[0];
+    return null;
+  }
   if (publicId) {
     const byPublicId = [...new Set([...scopedStock, ...scopedIdentity, ...scopedPublicId])]
       .filter(row => String(row?.publicItem?.public_id || "").trim() === publicId);

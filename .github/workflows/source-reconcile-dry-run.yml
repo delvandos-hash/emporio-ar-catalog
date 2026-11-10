@@ -8,6 +8,11 @@ on:
       - "scripts/dande-url.mjs"
       - "scripts/dande-url.test.mjs"
       - "scripts/source-identity-dedupe.mjs"
+      - "scripts/legacy-restore-identity.mjs"
+      - "scripts/legacy-restore-identity.test.mjs"
+      - "scripts/restore-gist-only-legacy.mjs"
+      - "scripts/brand-image-extraction.mjs"
+      - "scripts/brand-image-extraction.test.mjs"
       - ".github/workflows/source-reconcile-dry-run.yml"
   pull_request:
     branches: [main]
@@ -15,6 +20,11 @@ on:
       - "scripts/sync-catalog.mjs"
       - "scripts/source-identity-dedupe.mjs"
       - "scripts/source-identity-dedupe.test.mjs"
+      - "scripts/legacy-restore-identity.mjs"
+      - "scripts/legacy-restore-identity.test.mjs"
+      - "scripts/restore-gist-only-legacy.mjs"
+      - "scripts/brand-image-extraction.mjs"
+      - "scripts/brand-image-extraction.test.mjs"
       - ".github/workflows/source-reconcile-dry-run.yml"
 
 permissions:
@@ -42,7 +52,10 @@ jobs:
           node --check scripts/sync-catalog.mjs
           node --check scripts/dande-url.mjs
           node --check scripts/source-identity-dedupe.mjs
-          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs scripts/dande-url.test.mjs
+          node --check scripts/legacy-restore-identity.mjs
+          node --check scripts/restore-gist-only-legacy.mjs
+          node --check scripts/brand-image-extraction.mjs
+          node --test scripts/catalog-identity.test.mjs scripts/source-identity-dedupe.test.mjs scripts/dande-url.test.mjs scripts/legacy-restore-identity.test.mjs scripts/brand-image-extraction.test.mjs
       - name: Sincronizar todas as fontes sem publicar
         run: node scripts/sync-catalog.mjs
         env:
@@ -66,6 +79,11 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
+
+      - name: Preservar itens públicos legados no snapshot após a sincronização (sem publicar)
+        run: node scripts/restore-gist-only-legacy.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
 
       - name: Guardar snapshot reconciliado para inspeção
         if: success()

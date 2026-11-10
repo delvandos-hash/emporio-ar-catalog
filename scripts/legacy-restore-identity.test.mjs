@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveLegacyStockMatch } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, hasPublicIdStockRefConflict } from "./legacy-restore-identity.mjs";
 
 const row = (public_id, foto, brand = "Marca A") => ({
   group: { brand },
@@ -57,4 +57,22 @@ test("continua bloqueando quando duas correspondências com fonte e IDs distinto
     resolveLegacyStockMatch([], [a, b], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
     null
   );
+});
+
+
+test("não funde public_id repetido quando stock_ref identifica outra linha viva", () => {
+  const existing = row("p_shared", "foto-igual");
+  existing.publicItem.stock_ref = "s_original";
+  const incoming = { public_id: "p_shared", stock_ref: "s_outra", foto: "foto-igual" };
+  assert.equal(hasPublicIdStockRefConflict([existing], incoming, "Marca A"), true);
+  assert.equal(resolveLegacyStockMatch([], [existing], incoming, [existing], "Marca A"), null);
+});
+
+test("resolve a linha preservada pelo stock_ref depois do rekey seguro do public_id", () => {
+  const existing = row("p_shared", "foto-igual");
+  existing.publicItem.stock_ref = "s_original";
+  const preserved = row("p_rekeyed", "foto-igual");
+  preserved.publicItem.stock_ref = "s_outra";
+  const incoming = { public_id: "p_shared", stock_ref: "s_outra", foto: "foto-igual" };
+  assert.equal(resolveLegacyStockMatch([preserved], [existing, preserved], incoming, [existing], "Marca A"), preserved);
 });

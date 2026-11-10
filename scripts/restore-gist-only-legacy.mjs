@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
-import { resolveLegacyStockMatch } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, hasPublicIdStockRefConflict } from "./legacy-restore-identity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
@@ -60,9 +60,9 @@ function mergePublicFields(target, publicItem) {
   if (publicItem.stock_route && target.stock_route !== publicItem.stock_route) target.stock_route = publicItem.stock_route;
   if (publicItem.public_id) target.public_id = publicItem.public_id;
 }
-function legacyFromPublic(item) {
+function legacyFromPublic(item, { rekeyPublicId = false } = {}) {
   return {
-    ...(item.public_id ? { public_id: item.public_id } : {}),
+    ...(!rekeyPublicId && item.public_id ? { public_id: item.public_id } : {}),
     nome: item.nome,
     volume: item.volume || "—",
     varejo: item.varejo,
@@ -147,7 +147,7 @@ async function fetchGist(token) {
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("DATA pública inválida");
   return DATA;
 }
-function addLegacy(DATA, line, group, publicItem) {
+function addLegacy(DATA, line, group, publicItem, options = {}) {
   if (!Array.isArray(DATA[line])) DATA[line] = [];
   const cat = String(group.cat || "Roupas");
   let target = DATA[line].find(g => norm(g.brand) === norm(group.brand) && norm(g.cat) === norm(cat));
@@ -155,7 +155,7 @@ function addLegacy(DATA, line, group, publicItem) {
     target = { brand: group.brand || "Empório A.R", cat, items: [] };
     DATA[line].push(target);
   }
-  const legacy = legacyFromPublic(publicItem);
+  const legacy = legacyFromPublic(publicItem, options);
   target.items.push(legacy);
   return legacy;
 }
@@ -187,6 +187,19 @@ async function main() {
         if (resolved) {
           mergePublicFields(resolved.item, publicItem);
           merged++;
+          continue;
+        }
+        const publicIdStockConflict = hasPublicIdStockRefConflict(publicIdMatches, publicItem, group?.brand);
+        if (publicIdStockConflict && !stockMatches.length) {
+          // Preserva separadamente a linha viva que colidiu em public_id,
+          // removendo o ID repetido para gerar uma chave estável pelo stock_ref.
+          addLegacy(DATA, line, group, publicItem, { rekeyPublicId: true });
+          restored++;
+          console.log("LEGACY_GIST_PUBLIC_ID_STOCK_CONFLICT_PRESERVED " + JSON.stringify({
+            line, brand: group.brand, cat: group.cat, nome: publicItem.nome,
+            public_id: publicItem.public_id, stock_ref: stockRef
+          }));
+          indexes = buildIndexes(DATA);
           continue;
         }
         if (candidates.length) {

@@ -13,6 +13,7 @@ import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 import { buildDandeUrl } from './dande-url.mjs';
+import { brandImageCandidates } from './brand-image-extraction.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -2345,7 +2346,13 @@ async function main() {
       if ((candidateOriginId && existingBrandSourceIds.has(sourceIdKey)) ||
           isDuplicateMiniSource(brandCandidates, candidateOriginId)) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
-      const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
+      const line = genderLine(nome + ' ' + session);
+      const fotos = [...new Set(brandImageCandidates(p, CDN_IMAGE_BASE).map(sanitizePublicImageUrl).filter(Boolean))];
+      const foto = fotos[0] || '';
+      if (!foto) {
+        const imageFields = Object.keys(p).filter(key => /(image|imagem|foto|img|thumb|photo|media)/i.test(key));
+        console.log(`BRAND_IMAGE_MISSING id=${candidateOriginId} nome=${nome} imageFields=${imageFields.join(',')}`);
+      }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
       const group = ensureBrandGroup(DATA, line, session, 'Brand');
       group.items.push(stampNovoDesde({ 
@@ -2356,6 +2363,7 @@ async function main() {
           disponivel: brandDisponivel(p), 
           notas: notas.slice(0, 500), 
           foto,
+          ...(fotos.length ? { fotos } : {}),
           fonte: 'brand',
           id_origem: String(p.id ?? p.productId ?? p.slug ?? ""),
       }, true));
