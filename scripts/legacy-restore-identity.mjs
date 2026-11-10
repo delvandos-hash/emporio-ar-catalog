@@ -9,14 +9,13 @@ function normalizeBrand(value) {
 export function legacyVolumeIdentity(value, name = "") {
   const raw = String(value ?? "").trim();
   if (raw) {
-    const normalized = /^\\d+(?:[.,]\\d+)?$/.test(raw) ? raw + "ml" : raw;
-    const explicit = normalized.match(/(\\d+(?:[.,]\\d+)?)\\s*(ml|g)\\b/i);
+    const normalized = /^\d+(?:[.,]\d+)?$/.test(raw) ? raw + "ml" : raw;
+    const explicit = normalized.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
     return explicit ? String(Number(explicit[1].replace(",", "."))) + explicit[2].toLowerCase() : "";
   }
-  const fromName = String(name ?? "").match(/(\\d+(?:[.,]\\d+)?)\\s*(ml|g)\\b/i);
+  const fromName = String(name ?? "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
   return fromName ? String(Number(fromName[1].replace(",", "."))) + fromName[2].toLowerCase() : "";
 }
-
 export function legacyPhotoFingerprint(item) {
   const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
   return [...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort().join("~");
