@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
 import { resolveLegacyStockMatch, hasPublicIdStockRefConflict } from "./legacy-restore-identity.mjs";
+import { atherriGistRecordKind, isCanonicalImaratAtherri } from "./catalog-identity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
@@ -88,6 +89,7 @@ function buildIndexes(DATA) {
   const identityIndex = new Map();
   const stockIndex = new Map();
   const publicIdIndex = new Map();
+  const originRefIndex = new Map();
   const buckets = new Map();
   for (const [line, groups] of Object.entries(publicDATA)) {
     for (const group of groups || []) for (const publicItem of group.items || []) {
@@ -112,9 +114,14 @@ function buildIndexes(DATA) {
         if (!publicIdIndex.has(publicItem.public_id)) publicIdIndex.set(publicItem.public_id, []);
         publicIdIndex.get(publicItem.public_id).push(row);
       }
+      const originRef = String(publicItem.origin_ref || "").trim();
+      if (originRef) {
+        if (!originRefIndex.has(originRef)) originRefIndex.set(originRef, []);
+        originRefIndex.get(originRef).push(row);
+      }
     }
   }
-  return { publicDATA, identityIndex, stockIndex, publicIdIndex };
+  return { publicDATA, identityIndex, stockIndex, publicIdIndex, originRefIndex };
 }
 function readInternal() {
   const raw = fs.readFileSync(dataPath, "utf8");
@@ -168,7 +175,7 @@ async function main() {
   const { DATA, whatsapp, brand } = readInternal();
   const liveDATA = await fetchGist(token);
   let indexes = buildIndexes(DATA);
-  let restored = 0, merged = 0;
+  let restored = 0, merged = 0, excludedAtherri = 0;
   const ambiguous = [];
 
   // Recupera todos os registros legados do Gist em modo append-only.
@@ -178,6 +185,39 @@ async function main() {
       // Nenhuma linha, marca ou categoria é descartada: Gist é a referência pública a preservar.
       for (const publicItem of Array.isArray(group?.items) ? group.items : []) {
         if (!publicItem?.nome) continue;
+        const atherriKind = atherriGistRecordKind(publicItem, group?.brand);
+        if (atherriKind === "excluded") {
+          excludedAtherri++;
+          console.log("LEGACY_GIST_ATHERRI_EXCLUDED_BY_ORIGIN_REF " + JSON.stringify({
+            line, brand: group.brand, cat: group.cat, nome: publicItem.nome,
+            origin_ref: publicItem.origin_ref || ""
+          }));
+          continue;
+        }
+        if (atherriKind === "ambiguous") {
+          ambiguous.push({
+            line, brand: group.brand, cat: group.cat, nome: publicItem.nome,
+            origin_ref: publicItem.origin_ref || "",
+            reason: "Atherri Afeer sem origin_ref canônico ou excluído conhecido"
+          });
+          continue;
+        }
+        if (atherriKind === "canonical") {
+          const originRef = String(publicItem.origin_ref || "").trim();
+          const canonicalMatches = (indexes.originRefIndex.get(originRef) || [])
+            .filter(row => isCanonicalImaratAtherri(row.item, row.group?.brand));
+          if (canonicalMatches.length !== 1) {
+            ambiguous.push({
+              line, brand: group.brand, cat: group.cat, nome: publicItem.nome,
+              origin_ref: originRef, canonicalMatches: canonicalMatches.length,
+              reason: "origin_ref canônico não aponta para exatamente um produto Imarat ID 1474"
+            });
+            continue;
+          }
+          mergePublicFields(canonicalMatches[0].item, publicItem);
+          merged++;
+          continue;
+        }
         const key = identity(line, group, publicItem);
         const stockRef = String(publicItem.stock_ref || "").trim();
         const stockMatches = stockRef ? (indexes.stockIndex.get(stockRef) || []) : [];
@@ -227,6 +267,29 @@ async function main() {
     for (const group of groups || []) {
       // Verifica todas as linhas e categorias contra o Gist.
       for (const item of group.items || []) {
+        const atherriKind = atherriGistRecordKind(item, group?.brand);
+        if (atherriKind === "excluded") continue;
+        if (atherriKind === "ambiguous") {
+          missing.push({
+            line, brand: group.brand, cat: group.cat, nome: item.nome,
+            origin_ref: item.origin_ref || "",
+            reason: "Atherri Afeer sem origin_ref canônico ou excluído conhecido"
+          });
+          continue;
+        }
+        if (atherriKind === "canonical") {
+          const originRef = String(item.origin_ref || "").trim();
+          const canonicalMatches = (check.originRefIndex.get(originRef) || [])
+            .filter(row => isCanonicalImaratAtherri(row.item, row.group?.brand));
+          if (canonicalMatches.length !== 1) {
+            missing.push({
+              line, brand: group.brand, cat: group.cat, nome: item.nome,
+              origin_ref: originRef, canonicalMatches: canonicalMatches.length,
+              reason: "origin_ref canônico sem representação única no ID Imarat 1474"
+            });
+          }
+          continue;
+        }
         const stockRef = String(item.stock_ref || "").trim();
         const stockMatches = stockRef ? (check.stockIndex.get(stockRef) || []) : [];
         const key = identity(line, group, item);
@@ -249,6 +312,7 @@ async function main() {
   const out = "/** Empório A.R — recuperação aditiva de legado Gist " + new Date().toISOString() + " */\n" +
     "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
   fs.writeFileSync(dataPath, out, "utf8");
+  console.log(`LEGACY_GIST_ATHERRI_EXCLUDED=${excludedAtherri}`);
   console.log(`LEGACY_GIST_RESTORED=${restored} LEGACY_GIST_MERGED=${merged}`);
   console.log("LEGACY_GIST_PRESERVATION_SCOPE=all-lines-all-brands-all-categories");
   console.log("Todos os itens públicos de todas as linhas, marcas e categorias permanecem representados no data.js.");
