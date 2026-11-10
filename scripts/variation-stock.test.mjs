@@ -73,3 +73,32 @@ test("endpoints de estoque não devolvem identificadores internos nas respostas"
   assert.doesNotMatch(dande, /erro:\s*"produto não encontrado",\s*id/);
   assert.doesNotMatch(dande, /id:\s*stockRef\s*\|\|\s*resolvedId/);
 });
+
+
+test("roupas devolvem fotos sanitizadas por variação sem expor IDs internos", () => {
+  process.env.CDN_IMAGE_BASE_URL = "https://images-primary.example/";
+  const result = buildVariacoes({
+    variacoes: {
+      "sku-private-blue": {
+        nome: "Azul M",
+        cor: "Azul",
+        imagem: "/roupas/azul.webp",
+        imagens: [{ url: "/roupas/azul-costas.webp" }, "https://images-primary.example/roupas/azul-detalhe.webp"]
+      }
+    },
+    estoque: { "sku-private-blue": 2 }
+  });
+  assert.deepEqual(result.variacoes, [{
+    id: "v1",
+    nome: "Azul M",
+    cor: "Azul",
+    estoque: 2,
+    foto: "/api/product-image?source=a&path=%2Froupas%2Fazul.webp",
+    fotos: [
+      "/api/product-image?source=a&path=%2Froupas%2Fazul.webp",
+      "/api/product-image?source=a&path=%2Froupas%2Fazul-costas.webp",
+      "/api/product-image?source=a&path=%2Froupas%2Fazul-detalhe.webp"
+    ]
+  }]);
+  assert.equal(JSON.stringify(result).includes("sku-private"), false);
+});
