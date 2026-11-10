@@ -144,7 +144,7 @@ export default async (req) => {
             throw new Error(`paginação Dande interrompida em ${cat.nome}, página ${page} (HTTP ${pageRes.status})`);
           }
           const pageHtml = await pageRes.text();
-          const ids = [...pageHtml.matchAll(/data-product-id="(\\d+)"/g)].map((m) => m[1]);
+          const ids = [...pageHtml.matchAll(/data-product-id="(\d+)"/g)].map((m) => m[1]);
           if (!ids.length) {
             categoryCompleted = true;
             break;
