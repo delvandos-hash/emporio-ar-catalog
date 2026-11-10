@@ -82,42 +82,56 @@ function legacyFromPublic(item, { rekeyPublicId = false } = {}) {
   };
 }
 function buildIndexes(DATA) {
-  // O índice de restauração precisa manter uma linha por registro interno.
-  // A deduplicação visual só deve ocorrer na projeção pública final, nunca ao
-  // construir os candidatos usados para preservar preços, fotos e IDs do Gist.
+  // A projeção pública pode normalizar linha, volume e campos de apresentação.
+  // Por isso, a associação interna↔pública é posicional dentro de cada grupo,
+  // cuja ordem é preservada por toPublicCatalog; identidade textual é usada
+  // apenas para indexar candidatos depois da associação.
   const publicDATA = toPublicCatalog(DATA, { dedupeClothing: false });
   const identityIndex = new Map();
   const stockIndex = new Map();
   const publicIdIndex = new Map();
   const originRefIndex = new Map();
-  const buckets = new Map();
-  for (const [line, groups] of Object.entries(publicDATA)) {
-    for (const group of groups || []) for (const publicItem of group.items || []) {
-      const key = identity(line, group, publicItem);
-      if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push(publicItem);
+  const normGroup = group => norm(group?.brand) + "|" + norm(group?.cat);
+  const projectedGroups = new Map();
+  for (const groups of Object.values(publicDATA)) {
+    for (const group of groups || []) {
+      const key = normGroup(group);
+      if (!projectedGroups.has(key)) projectedGroups.set(key, []);
+      projectedGroups.get(key).push(group);
     }
   }
-  for (const [line, groups] of Object.entries(DATA)) {
-    for (const group of groups || []) for (const item of group.items || []) {
-      const key = identity(line, group, item);
-      const publicItem = buckets.get(key)?.shift();
-      if (!publicItem) throw new Error("Não foi possível mapear item interno para catálogo público: " + key);
-      const row = { line, group, item, publicItem };
-      if (!identityIndex.has(key)) identityIndex.set(key, []);
-      identityIndex.get(key).push(row);
-      if (publicItem.stock_ref) {
-        if (!stockIndex.has(publicItem.stock_ref)) stockIndex.set(publicItem.stock_ref, []);
-        stockIndex.get(publicItem.stock_ref).push(row);
+  for (const groups of Object.values(DATA)) {
+    for (const group of groups || []) {
+      const keyGroup = normGroup(group);
+      const projected = projectedGroups.get(keyGroup)?.shift();
+      const items = Array.isArray(group?.items) ? group.items : [];
+      const publicItems = Array.isArray(projected?.items) ? projected.items : [];
+      if (!projected || publicItems.length !== items.length) {
+        throw new Error("Projeção pública não preservou a estrutura do grupo: " +
+          JSON.stringify({ group: keyGroup, internal: items.length, projected: publicItems.length }));
       }
-      if (publicItem.public_id) {
-        if (!publicIdIndex.has(publicItem.public_id)) publicIdIndex.set(publicItem.public_id, []);
-        publicIdIndex.get(publicItem.public_id).push(row);
-      }
-      const originRef = String(publicItem.origin_ref || "").trim();
-      if (originRef) {
-        if (!originRefIndex.has(originRef)) originRefIndex.set(originRef, []);
-        originRefIndex.get(originRef).push(row);
+      for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        const publicItem = publicItems[index];
+        const key = identity(group?.line || "", group, item);
+        const line = Object.entries(DATA).find(([, list]) => list === groups)?.[0] || "";
+        const actualKey = identity(line, group, item);
+        const row = { line, group, item, publicItem };
+        if (!identityIndex.has(actualKey)) identityIndex.set(actualKey, []);
+        identityIndex.get(actualKey).push(row);
+        if (publicItem.stock_ref) {
+          if (!stockIndex.has(publicItem.stock_ref)) stockIndex.set(publicItem.stock_ref, []);
+          stockIndex.get(publicItem.stock_ref).push(row);
+        }
+        if (publicItem.public_id) {
+          if (!publicIdIndex.has(publicItem.public_id)) publicIdIndex.set(publicItem.public_id, []);
+          publicIdIndex.get(publicItem.public_id).push(row);
+        }
+        const originRef = String(publicItem.origin_ref || "").trim();
+        if (originRef) {
+          if (!originRefIndex.has(originRef)) originRefIndex.set(originRef, []);
+          originRefIndex.get(originRef).push(row);
+        }
       }
     }
   }
