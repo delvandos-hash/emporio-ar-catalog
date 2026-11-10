@@ -56,3 +56,22 @@ test("não deduplica registros sem ID ou sem fonte comprovada", () => {
   assert.equal(result.removed, 0);
   assert.equal(data.roupas.reduce((n, g) => n + g.items.length, 0), 2);
 });
+
+test("preserva Scoop Premiado como produto próprio mesmo sem fonte, ID ou foto", () => {
+  const scoop = product({
+    nome: "Scoop Premiado",
+    volume: "—",
+    fonte: "",
+    id_origem: "",
+    foto: undefined,
+    fotos: undefined
+  });
+  const data = { feminino: [
+    { cat: "Scoop Premiado", brand: "Empório A.R", items: [scoop] }
+  ] };
+  const result = dedupeConfirmedSourceProducts(data);
+  assert.equal(result.removed, 0);
+  assert.equal(data.feminino[0].items.length, 1);
+  assert.equal(data.feminino[0].items[0].nome, "Scoop Premiado");
+  assert.equal(data.feminino[0].items[0].foto, undefined);
+});
