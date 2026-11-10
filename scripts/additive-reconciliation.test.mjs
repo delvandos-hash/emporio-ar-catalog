@@ -170,3 +170,20 @@ test("preflight aceita tanto dry-run quanto no-op seguro da reconciliação", ()
   const workflow = readFileSync(new URL("../.github/workflows/sync-stock.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes("grep -Eq 'ADDITIVE_RECONCILIATION_(DRY_RUN|NOOP)=true'"));
 });
+
+
+
+
+test("auditoria aceita public_id repetido para a mesma origem em categorias diferentes", () => {
+  assert.match(audit, /function publicIdRowsConflict\(rows\)/);
+  assert.match(audit, /origin\|" \+ brand \+ "\|" \+ name \+ "\|" \+ origin/);
+  assert.match(audit, /publicIdIdentityConflicts\.length === 0/);
+  assert.match(audit, /internalPublicIdIdentityConflicts\.length === 0/);
+  assert.match(audit, /PUBLIC_ID_DUPLICATE_REPRESENTATION_GROUPS=/);
+});
+
+test("auditoria bloqueia public_id repetido entre identidades de origem diferentes", () => {
+  assert.match(audit, /PUBLIC_ID_IDENTITY_CONFLICT_GROUPS=/);
+  assert.match(audit, /INTERNAL_PUBLIC_ID_IDENTITY_CONFLICT_GROUPS=/);
+  assert.match(audit, /return identities\.some\(identity => !identity\) \|\| new Set\(identities\)\.size > 1/);
+});

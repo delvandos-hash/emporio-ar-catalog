@@ -286,9 +286,42 @@ for (const item of catalog) {
   });
 }
 const publicIdCollisions = [...publicIdCollisionMap].filter(([, rows]) => rows.length > 1);
-console.log(`PUBLIC_ID_COLLISION_GROUPS=${publicIdCollisions.length}`);
-for (const [public_id, rows] of publicIdCollisions) {
-  console.log("PUBLIC_ID_COLLISION_DETAIL " + JSON.stringify({ public_id, rows }));
+function publicIdRowsConflict(rows) {
+  const identities = rows.map(row => {
+    const brand = norm(row.brand), name = norm(row.name);
+    const origin = String(row.origin_ref || "").trim();
+    const stock = String(row.stock_ref || "").trim();
+    if (origin) return "origin|" + brand + "|" + name + "|" + origin;
+    if (stock) return "stock|" + brand + "|" + name + "|" + stock;
+    return "";
+  });
+  return identities.some(identity => !identity) || new Set(identities).size > 1;
+}
+const publicIdIdentityConflicts = publicIdCollisions.filter(([, rows]) => publicIdRowsConflict(rows));
+console.log(`PUBLIC_ID_DUPLICATE_REPRESENTATION_GROUPS=${publicIdCollisions.length - publicIdIdentityConflicts.length}`);
+console.log(`PUBLIC_ID_IDENTITY_CONFLICT_GROUPS=${publicIdIdentityConflicts.length}`);
+for (const [public_id, rows] of publicIdIdentityConflicts) {
+  console.log("PUBLIC_ID_IDENTITY_CONFLICT_DETAIL " + JSON.stringify({ public_id, rows }));
+}
+
+const internalPublicIdCollisionMap = new Map();
+for (const [line, groups] of Object.entries(internalPublicData)) {
+  for (const group of groups || []) for (const item of group.items || []) {
+    const id = String(item?.public_id || "").trim();
+    if (!id) continue;
+    if (!internalPublicIdCollisionMap.has(id)) internalPublicIdCollisionMap.set(id, []);
+    internalPublicIdCollisionMap.get(id).push({
+      line, brand: group.brand || "", category: group.cat || "", name: item.nome || "",
+      origin_ref: item.origin_ref || "", stock_ref: item.stock_ref || ""
+    });
+  }
+}
+const internalPublicIdCollisions = [...internalPublicIdCollisionMap].filter(([, rows]) => rows.length > 1);
+const internalPublicIdIdentityConflicts = internalPublicIdCollisions.filter(([, rows]) => publicIdRowsConflict(rows));
+console.log(`INTERNAL_PUBLIC_ID_DUPLICATE_REPRESENTATION_GROUPS=${internalPublicIdCollisions.length - internalPublicIdIdentityConflicts.length}`);
+console.log(`INTERNAL_PUBLIC_ID_IDENTITY_CONFLICT_GROUPS=${internalPublicIdIdentityConflicts.length}`);
+for (const [public_id, rows] of internalPublicIdIdentityConflicts) {
+  console.log("INTERNAL_PUBLIC_ID_IDENTITY_CONFLICT_DETAIL " + JSON.stringify({ public_id, rows }));
 }
 const internalItemCount=internalPublicIndex.size;
 const liveKeySet=new Set(catalog.map(x=>String(x.item.public_id||"")));
@@ -331,6 +364,8 @@ const additiveReconciliationSafe =
   // Ambiguidades de rekey não bloqueiam a preservação: os itens permanecem no Gist
   // e a publicação aditiva só prossegue se nenhum ID público ficar sem representação.
   liveOnlyKeys.length === 0 &&
+  publicIdIdentityConflicts.length === 0 &&
+  internalPublicIdIdentityConflicts.length === 0 &&
   eligibleInternalOnlyRows.length <= 80 &&
   internalOnlyKeys.length <= 80 &&
   Math.abs(catalog.length - internalItemCount) <= 80 &&

@@ -202,3 +202,17 @@ test("mesmo origin_ref pode aparecer em categorias distintas sem virar ambiguida
   assert.match(source, /sameBrandOrigins\[0\]\.item/);
   assert.match(source, /IDs\/origens de marcas diferentes nunca são cruzados/);
 });
+
+
+test("auditoria de miniaturas prioriza id_origem e não associa outro SKU de mesmo nome", () => {
+  const miniAudit = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
+  assert.match(miniAudit, /const itemSourceId = String\(item\?\.id_origem \|\| ""\)\.trim\(\)/);
+  assert.match(miniAudit, /exactIdMatches\.length !== 1\) return null/);
+  assert.match(miniAudit, /String\(p\?\.id \?\? p\?\.productId \?\? p\?\.slug \?\? ""\)\.trim\(\) === itemSourceId/);
+});
+
+
+test("auditoria de miniaturas usa a identidade interna pareada para consultar o SKU exato", () => {
+  const miniAudit = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
+  assert.match(miniAudit, /const source = sourceMatch\(internal \|\| item, group\)/);
+});

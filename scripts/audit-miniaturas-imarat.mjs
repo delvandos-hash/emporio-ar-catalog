@@ -184,6 +184,22 @@ const imaratList = await fetchImaratList();
 console.log(`Produtos lidos da Imarat: ${imaratList.length}`);
 
 function sourceMatch(item, group) {
+  const itemSourceId = String(item?.id_origem || "").trim();
+  if (itemSourceId) {
+    const exactIdMatches = imaratList.filter(p =>
+      String(p?.id ?? p?.productId ?? p?.slug ?? "").trim() === itemSourceId
+    );
+    // Um ID de origem explícito é a identidade canônica: nunca substitua por
+    // outro SKU de mesmo nome, marca e volume se o ID não estiver na fonte.
+    if (exactIdMatches.length !== 1) return null;
+    const exact = exactIdMatches[0];
+    const catalogBrand = norm(group?.brand);
+    const sourceBrand = norm(exact?.brand);
+    if (catalogBrand && sourceBrand && !(
+      sourceBrand === catalogBrand || sourceBrand.includes(catalogBrand) || catalogBrand.includes(sourceBrand)
+    )) return null;
+    return exact;
+  }
   const name = norm(item?.nome);
   const itemVolume = volumeOf(item);
   const matches = imaratList.filter(p => {
@@ -214,12 +230,14 @@ for (const [line, groups] of Object.entries(DATA)) {
       if (!isMini(item, group)) continue;
       const name = baseMiniName(item.nome);
       if (!name) continue;
-      const source = sourceMatch(item, group);
       const internalKey = [norm(line), norm(group.brand), name, volumeOf(item)].join("|");
       const internalCandidates = internalIndex.get(internalKey) || [];
       const internal = internalCandidates.find(candidate =>
         String(candidate.varejo) === String(item.varejo) && String(candidate.atacado) === String(item.atacado)
       ) || internalCandidates[0] || null;
+      // O Gist público não expõe id_origem; use a identidade interna já
+      // pareada para consultar a fonte pelo SKU exato, sem colapsar homônimos.
+      const source = sourceMatch(internal || item, group);
       if (internal) internalMatches++;
       let expected = null;
       if (source) {
