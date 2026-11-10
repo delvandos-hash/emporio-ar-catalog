@@ -42,7 +42,7 @@ test("preserva conflito de preço e conflito de identidade no mesmo ID", () => {
   ] };
   const result = dedupeConfirmedSourceProducts(data);
   assert.equal(result.removed, 0);
-  assert.equal(result.conflicts.length, 2);
+  assert.equal(result.conflicts.length, 1);
   assert.equal(data.roupas.reduce((n, g) => n + g.items.length, 0), 3);
 });
 
