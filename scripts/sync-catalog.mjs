@@ -2048,25 +2048,27 @@ async function main() {
 
   console.log('Buscando Brand Collection...');
   const brandList = SYNC_IMARAT_ONLY ? [] : await fetchBrandList();
-  if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
-  const brandRootIds = new Set(brandList.map(p => String(p.id ?? p.productId ?? p.slug ?? '')).filter(Boolean));
-  let staleBrandRemoved = 0;
-  for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
-    if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
-    group.items = (group.items || []).filter(item => {
-      if (norm(item.fonte) !== 'brand') return true;
-      const id = String(item.id_origem || '').trim();
-      const exists = id ? brandRootIds.has(id) : brandList.some(p =>
-        norm(p.nome) === norm(item.nome) &&
-        norm(mapBrandSession(p.categoria_nome || p.categoria || '')) === norm(group.brand)
-      );
-      if (!exists) staleBrandRemoved++;
-      return exists;
-    });
+  if (!SYNC_IMARAT_ONLY) {
+    if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
+    const brandRootIds = new Set(brandList.map(p => String(p.id ?? p.productId ?? p.slug ?? '')).filter(Boolean));
+    let staleBrandRemoved = 0;
+    for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
+      if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
+      group.items = (group.items || []).filter(item => {
+        if (norm(item.fonte) !== 'brand') return true;
+        const id = String(item.id_origem || '').trim();
+        const exists = id ? brandRootIds.has(id) : brandList.some(p =>
+          norm(p.nome) === norm(item.nome) &&
+          norm(mapBrandSession(p.categoria_nome || p.categoria || '')) === norm(group.brand)
+        );
+        if (!exists) staleBrandRemoved++;
+        return exists;
+      });
+    }
+    console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
   }
-  console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
 
   let addedBrand = 0;
   for (const line of Object.keys(DATA)) {
@@ -2213,12 +2215,9 @@ async function main() {
       const prevAcc = Array.isArray(DATA.acessorios) ? DATA.acessorios : [];
       const accGroups = await fetchDandeAcessorios(prevAcc);
       acessoriosCount = accGroups.reduce((s, g) => s + g.items.length, 0);
-      if (acessoriosCount > 0) {
-        DATA.acessorios = accGroups;
-        console.log(`Acessórios Dande: ${acessoriosCount} produtos em ${accGroups.length} categorias`);
-      } else {
-        console.log('Acessórios Dande: 0 (mantendo snapshot)');
-      }
+      if (!acessoriosCount) throw new Error('Dande retornou zero produtos; não é seguro reconciliar a fonte.');
+      DATA.acessorios = accGroups;
+      console.log(`Acessórios Dande: ${acessoriosCount} produtos em ${accGroups.length} categorias`);
     } catch (e) {
       console.log(`❌ Erro Dande: ${e.message} (mantendo snapshot)`);
     }
