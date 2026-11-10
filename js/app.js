@@ -5,6 +5,7 @@
 import { validateProductPrices, parsePrice as parsePriceStrict } from './prices.js';
 import { isFavoriteId, toggleFavoriteIds, filterFavoriteGroups, collectFavoriteProducts } from './favorites.js';
 import { expandDandeCategoryGroups } from './dande-category-membership.mjs';
+import { cartProductKey } from './cart-identity.mjs';
 
 async function loadCatalogData() {
   // O catálogo só é carregado pela API pública sanitizada.
@@ -1009,7 +1010,7 @@ function allGroups(forceAll = false) {
 }
 
 function cartKey(p) {
-  return `${p.brand}|${p.nome}|${p.volume || ''}`;
+  return cartProductKey(p);
 }
 
 function isProductInCart(product, selectedVariations = null) {
