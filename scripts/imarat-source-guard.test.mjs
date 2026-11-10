@@ -216,3 +216,10 @@ test("auditoria de miniaturas usa a identidade interna pareada para consultar o 
   const miniAudit = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
   assert.match(miniAudit, /const source = sourceMatch\(internal \|\| item, group\)/);
 });
+
+
+test("auditoria global prioriza id_origem e não confunde produtos homônimos", () => {
+  assert.match(auditAllSource, /originId:String\(internal\?\.id_origem\|\|""\)/);
+  assert.match(auditAllSource, /const sourceId=String\(item\.originId\|\|""\)\.trim\(\)/);
+  assert.match(auditAllSource, /exactIdMatches\.length!==1\) return null/);
+});
