@@ -22,6 +22,15 @@ const result = mergeKnownGoodSnapshot(current, baseline);
 if (result.restoredIds.length > 200) {
   throw new Error("Restauração excede limite seguro de 200 itens: " + result.restoredIds.length);
 }
+if (process.env.CATALOG_BASELINE_RESTORE_FINAL === "1") {
+  // Na etapa pós-sync, os IDs já não precisam proteger preserveLivePublicFields.
+  // Remove o marcador interno antes de persistir o snapshot de homologação.
+  for (const groups of Object.values(result.data || {})) {
+    for (const group of groups || []) {
+      for (const item of group.items || []) delete item._preserve_public_id;
+    }
+  }
+}
 const next = serializeDataJsContent(currentRaw, result.data);
 fs.writeFileSync(currentPath, next, "utf8");
 console.log("KNOWN_GOOD_BASELINE_PUBLIC_IDS=" + result.baselineIds.size);
