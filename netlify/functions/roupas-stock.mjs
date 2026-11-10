@@ -41,6 +41,30 @@ const SOURCES = {
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+const CATEGORY_IDS = {
+  sophia: {
+    "VESTIDOS": ["108042"],
+    "MACACAO MACAQUINHOS": ["108328"],
+    "CONJUNTOS": ["108333"],
+    "BLUSA CAMISA CROPPED": ["108339"],
+    "CALCA SHORT": ["108338"],
+    "URBANA JEANS": ["379539"],
+  },
+  franny: {
+    "VESTIDOS": ["265229"],
+    "CONJUNTOS": ["265231"],
+    "BLUSA CAMISA CROPPED": ["347434", "265225"],
+    "CALCA SHORT": ["304447", "265226", "265230"],
+    "SAIAS": ["265227"],
+    "BODY": ["265228"],
+    "JAQUETAS": ["266049"],
+  },
+};
+function normalizeCategory(value) {
+  return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
+    .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+}
+
 
 function parseId(raw) {
   const s = String(raw || "").trim();
@@ -76,7 +100,9 @@ async function fetchCategoryPage(src, catId, page, cookie) {
     headers: {
       "User-Agent": UA,
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      Origin: src.base === process.env.SOPHIA_FALLBACK_URL ? process.env.SOPHIA_FALLBACK_ORIGIN : src.base,
+      Origin: src.base === process.env.SOPHIA_FALLBACK_URL && process.env.SOPHIA_FALLBACK_ORIGIN
+        ? process.env.SOPHIA_FALLBACK_ORIGIN
+        : src.base,
       Referer: `${src.base}/c/atacado/${src.loja}`,
       "X-Requested-With": "XMLHttpRequest",
       Accept: "application/json, text/javascript, */*; q=0.01",
@@ -156,7 +182,6 @@ export default async (req) => {
     const sourceParam = url.searchParams.get("source") || "";
     const parsed = rawId ? parseId(rawId) : { source: sourceParam === "b" ? "franny" : "sophia", id: "" };
     const { source, id } = parsed;
-    if (!process.env.SOPHIA_PRIMARY_URL || !process.env.SOPHIA_FALLBACK_URL || !process.env.SOPHIA_FALLBACK_ORIGIN || !process.env.FRANNY_BASE_URL) throw new Error("Origens de roupas não configuradas no ambiente privado.");
     const src = SOURCES[source];
     if (!src || (!id && !stockRef)) {
       return new Response(JSON.stringify({ erro: "fonte/id inválidos" }), {
@@ -165,17 +190,24 @@ export default async (req) => {
       });
     }
 
-    const bases =
-      source === "sophia" && Array.isArray(src.bases) && src.bases.length
-        ? src.bases
-        : [src.base];
+    const bases = (source === "sophia" ? src.bases : [src.base])
+      .filter(base => typeof base === "string" && /^https?:\\/\\//i.test(base));
+    if (!bases.length) {
+      return new Response(JSON.stringify({ erro: "origem não configurada", codigo: "SOURCE_NOT_CONFIGURED" }), {
+        status: 503, headers,
+      });
+    }
+    const requestedCategory = normalizeCategory(url.searchParams.get("category"));
+    const preferred = CATEGORY_IDS[source]?.[requestedCategory] || [];
+    const orderedCategories = [...new Set([...preferred, ...src.categories.filter(id => !preferred.includes(id))])];
+    let anyBaseUsable = false;
 
     for (const base of bases) {
       const srcTry = { ...src, base };
       const cookie = await warmUp(srcTry);
       let baseUsable = false;
 
-      for (const catId of srcTry.categories) {
+      for (const catId of orderedCategories) {
         const maxCategoryPages = source === "franny" ? 30 : 8;
         for (let page = 1; page <= maxCategoryPages; page++) {
           let data;
@@ -186,6 +218,7 @@ export default async (req) => {
           }
           if (!data) break;
           baseUsable = true;
+          anyBaseUsable = true;
           const produtos = data.produtos || [];
           if (!produtos.length) break;
 
@@ -245,13 +278,19 @@ export default async (req) => {
       // base não respondeu JSON → tenta próxima
     }
 
+    if (!anyBaseUsable) {
+      return new Response(JSON.stringify({ erro: "fonte de estoque indisponível", codigo: "UPSTREAM_UNAVAILABLE" }), {
+        status: 502, headers,
+      });
+    }
     return new Response(
-      JSON.stringify({ erro: "produto não encontrado" }),
+      JSON.stringify({ erro: "produto não encontrado", codigo: "PRODUCT_NOT_FOUND" }),
       { status: 404, headers }
     );
   } catch (error) {
+    console.error("ROUPAS_STOCK_FAILURE", error?.message || "unknown");
     return new Response(
-      JSON.stringify({ erro: "falha inesperada" }),
+      JSON.stringify({ erro: "falha inesperada", codigo: "INTERNAL_ERROR" }),
       { status: 500, headers }
     );
   }
