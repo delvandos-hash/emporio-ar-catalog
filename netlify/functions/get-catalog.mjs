@@ -29,7 +29,8 @@ export function filterExcludedAtherri(DATA) {
       const items = Array.isArray(group?.items) ? group.items : [];
       const kept = items.filter(item => {
         const sourceId = String(item?.id_origem ?? "").trim();
-        const isImarat = String(item?.fonte ?? "").trim().toLowerCase() === "imarat" || sourceId === "1481";
+        const sourceName = String(item?.fonte ?? "").trim().toLowerCase();
+        const isImarat = sourceName === "imarat" || (!sourceName && sourceId === "1481");
         const exclude = isImarat && isExcludedImaratAtherri(item, group?.brand);
         if (exclude) removed++;
         return !exclude;
