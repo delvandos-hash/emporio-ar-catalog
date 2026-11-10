@@ -83,7 +83,7 @@ function publicVariantToken(item) {
 
 function dedupeText(value) {
   return String(value ?? "").toLowerCase().normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 }
 function publicPhotoSet(item) {
   return new Set([...(Array.isArray(item?.fotos) ? item.fotos : []), item?.foto]
@@ -296,5 +296,6 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       return safeGroup;
     }));
   }
-  dedupePublicClothing(publicData);\n  return publicData;
+  dedupePublicClothing(publicData);
+  return publicData;
 }
