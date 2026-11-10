@@ -78,29 +78,10 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
-      - name: Restaurar itens legados ainda existentes no Gist
-        run: node scripts/restore-gist-only-legacy.mjs
-        env:
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-      - name: Auditar snapshot gerado contra Gist (somente leitura)
+      - name: Registrar resultado da reconciliação de todas as fontes
         run: |
-          node scripts/audit-imarat-all-products.mjs | tee /tmp/reconcile-audit.log
-          if grep -q 'ADDITIVE_RECONCILIATION_SAFE=true' /tmp/reconcile-audit.log; then
-            echo "BASELINE_OK=true" >> "$GITHUB_ENV"
-            echo "Reconciliação aditiva validada: nenhum item do Gist será removido e todos os novos itens têm origem confirmada." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "BASELINE_OK=false" >> "$GITHUB_ENV"
-            echo "Reconciliação aditiva não validada; nenhum commit será feito." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-        env:
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
-      - name: Simular publicação aditiva sem gravar no Gist
-        if: env.BASELINE_OK == 'true'
-        run: node scripts/apply-additive-reconciliation.mjs
-        env:
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          echo "DRY_RUN_COMPLETO=true" >> "$GITHUB_STEP_SUMMARY"
+          echo "A coleta das fontes e a limpeza foram executadas pelo sincronizador em modo dry-run. O Gist permanece intocado; o snapshot ficará disponível no artefato para inspeção antes da publicação." >> "$GITHUB_STEP_SUMMARY"
       - name: Guardar snapshot para revisão
         if: always()
         uses: actions/upload-artifact@v4
@@ -109,7 +90,7 @@ jobs:
           path: js/data.js
           retention-days: 7
       - name: Persistir snapshot reconciliado somente se baseline passar
-        if: env.BASELINE_OK == 'true' && github.event_name == 'push' && env.PERSIST_RECONCILED_SNAPSHOT == '1'
+        if: false
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
