@@ -215,8 +215,11 @@ async function main() {
         const stockMatches = stockRef ? (check.stockIndex.get(stockRef) || []) : [];
         const key = identity(line, group, item);
         const identityMatches = check.identityIndex.get(key) || [];
-        if (!stockMatches.length && !identityMatches.length) {
-          missing.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, stock_ref: stockRef, public_id: item.public_id || "" });
+        const publicId = String(item.public_id || "").trim();
+        const publicIdMatches = publicId ? (check.publicIdIndex.get(publicId) || []) : [];
+        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, item, publicIdMatches, group?.brand);
+        if (!resolved) {
+          missing.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, stock_ref: stockRef, public_id: publicId });
         }
       }
     }
