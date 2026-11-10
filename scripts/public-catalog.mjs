@@ -89,9 +89,15 @@ function publicPhotoSet(item) {
   return new Set([...(Array.isArray(item?.fotos) ? item.fotos : []), item?.foto]
     .map(value => String(value ?? "").trim()).filter(Boolean));
 }
-function publicVariationSet(item) {
-  return new Set((Array.isArray(item?.variacoes) ? item.variacoes : [])
-    .map(variation => dedupeText(variation?.nome)).filter(Boolean));
+function publicVariationFingerprint(item) {
+  const rows = (Array.isArray(item?.variacoes) ? item.variacoes : [])
+    .map(variation => ({
+      nome: dedupeText(variation?.nome),
+      estoque: Math.max(0, Math.floor(Number(variation?.estoque) || 0))
+    }))
+    .filter(variation => variation.nome)
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return rows.length ? JSON.stringify(rows) : "";
 }
 function publicClothingSource(item) {
   if (item?.stock_route === "b") return "franny";
@@ -120,12 +126,27 @@ function dedupePublicClothing(DATA) {
           dedupeText(a.group?.brand) !== dedupeText(b.group?.brand) ||
           dedupeText(a.group?.cat) !== dedupeText(b.group?.cat) ||
           dedupeText(a.item?.nome) !== dedupeText(b.item?.nome)) continue;
+
+      // Nome, galeria e variantes parecidas não substituem a identidade da origem.
+      // IDs diferentes (ou ausentes), stock_ref divergente, preços divergentes ou
+      // variantes/estoques diferentes devem permanecer como produtos separados.
+      const sourceIdA = String(a.item?.id_origem || "").trim();
+      const sourceIdB = String(b.item?.id_origem || "").trim();
+      if (!sourceIdA || sourceIdA !== sourceIdB) continue;
+      const stockRefA = String(a.item?.stock_ref || "").trim();
+      const stockRefB = String(b.item?.stock_ref || "").trim();
+      if (stockRefA && stockRefB && stockRefA !== stockRefB) continue;
+      if (String(a.item?.varejo ?? "").trim() !== String(b.item?.varejo ?? "").trim() ||
+          String(a.item?.atacado ?? "").trim() !== String(b.item?.atacado ?? "").trim()) continue;
+      const manualA = a.item?.precoManual === true || a.item?.precoManual === "true" || a.item?.precoManual === 1 || a.item?.precoManual === "1";
+      const manualB = b.item?.precoManual === true || b.item?.precoManual === "true" || b.item?.precoManual === 1 || b.item?.precoManual === "1";
+      if (manualA !== manualB) continue;
+
       const photosA = publicPhotoSet(a.item), photosB = publicPhotoSet(b.item);
-      const varsA = publicVariationSet(a.item), varsB = publicVariationSet(b.item);
-      if (photosA.size < 2 || photosB.size < 2 || !varsA.size || !varsB.size) continue;
+      const varsA = publicVariationFingerprint(a.item), varsB = publicVariationFingerprint(b.item);
+      if (photosA.size < 2 || photosB.size < 2 || !varsA || varsA !== varsB) continue;
       const photoOverlap = [...photosA].filter(value => photosB.has(value)).length / Math.min(photosA.size, photosB.size);
-      const variationOverlap = [...varsA].filter(value => varsB.has(value)).length / Math.min(varsA.size, varsB.size);
-      if (photoOverlap < 0.9 || variationOverlap < 0.75) continue;
+      if (photoOverlap < 0.9) continue;
       const scoreA = [publicVariationStock(a.item), photosA.size];
       const scoreB = [publicVariationStock(b.item), photosB.size];
       const keeper = scoreA[0] > scoreB[0] || (scoreA[0] === scoreB[0] && scoreA[1] >= scoreB[1]) ? a : b;
@@ -299,6 +320,6 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       return safeGroup;
     }));
   }
-  dedupePublicClothing(publicData);
+  if (imageOptions?.dedupeClothing !== false) dedupePublicClothing(publicData);
   return publicData;
 }
