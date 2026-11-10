@@ -36,6 +36,19 @@ export function resolveLegacyStockMatch(stockMatches, identityMatches, publicIte
   if (photo && candidates.length > 1) {
     const byPhoto = candidates.filter(row => legacyPhotoFingerprint(row?.publicItem) === photo);
     if (byPhoto.length === 1) return byPhoto[0];
+
+    // Se o Gist antigo e um registro atual da fonte raiz compartilham a
+    // mesma identidade e fotografia, prioriza o único registro com origem
+    // confirmada (fonte + ID). Isso evita manter uma cópia legada duplicada,
+    // sem escolher entre duas variantes reais da origem.
+    if (byPhoto.length > 1) {
+      const sourceConfirmed = byPhoto.filter(row =>
+        String(row?.item?.fonte || "").trim() &&
+        normalizeBrand(row?.item?.fonte) !== "legacy gist" &&
+        String(row?.item?.id_origem || "").trim()
+      );
+      if (sourceConfirmed.length === 1) return sourceConfirmed[0];
+    }
   }
   return null;
 }
