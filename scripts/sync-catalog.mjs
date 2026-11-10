@@ -11,6 +11,7 @@ import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint } from './catalog-identity.mjs';
+import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1900,6 +1901,15 @@ async function main() {
     }
   }
   console.log(`Duplicatas integralmente idênticas removidas: ${exactDuplicatesRemoved}`);
+
+  // Deduplica também representações repetidas confirmadas pelo mesmo ID da
+  // fonte raiz, mesmo quando aparecem em categorias/linhas diferentes.
+  // IDs diferentes, marcas, nomes ou volumes divergentes são preservados.
+  const sourceIdentityDedupe = dedupeConfirmedSourceProducts(DATA);
+  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);
+  for (const conflict of sourceIdentityDedupe.conflicts) {
+    console.log('CONFLITO DE IDENTIDADE DA FONTE PRESERVADO: ' + JSON.stringify(conflict));
+  }
 
   const indexNormal = new Map();
   const indexNameVolume = new Map();
