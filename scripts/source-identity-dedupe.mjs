@@ -91,6 +91,7 @@ export function dedupeConfirmedSourceProducts(DATA) {
         let keeper = prior.item;
         if (manualPrice(item) && !manualPrice(prior.item)) {
           keeper = item;
+          mergeDetails(keeper, prior.item);
           if (prior.group === group) {
             const priorIndex = kept.indexOf(prior.item);
             if (priorIndex >= 0) kept.splice(priorIndex, 1);
