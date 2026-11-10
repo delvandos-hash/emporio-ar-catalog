@@ -328,3 +328,27 @@ test("publica somente nomes permitidos das categorias de origem Dande", () => {
   assert.equal(JSON.stringify(result).includes("375085902"), false);
   assert.equal(JSON.stringify(result).includes("categoria-interna"), false);
 });
+
+
+test("preserva fotos públicas das variações e descarta URLs não autorizadas", () => {
+  const result = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "Roupas", items: [{
+      nome: "Vestido",
+      variacoes: [{
+        id: "cor-privada", nome: "Azul M", estoque: 2, cor: "Azul",
+        foto: "https://images-primary.example/variacoes/azul.webp",
+        fotos: [
+          "https://images-secondary.example/variacoes/azul-2.webp",
+          "https://host-nao-autorizado.example/track"
+        ],
+        sku: "não publicar"
+      }]
+    }]}]
+  });
+  const variation = result.roupas[0].items[0].variacoes[0];
+  assert.equal(variation.foto, "/api/product-image?source=a&path=%2Fvariacoes%2Fazul.webp");
+  assert.deepEqual(variation.fotos, ["/api/product-image?source=b&path=%2Fvariacoes%2Fazul-2.webp"]);
+  assert.equal(variation.cor, "Azul");
+  assert.equal("sku" in variation, false);
+  assert.equal(JSON.stringify(result).includes("cor-privada"), false);
+});
