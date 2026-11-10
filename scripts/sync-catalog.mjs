@@ -2440,7 +2440,9 @@ async function main() {
             const oldStockRef = String(item.stock_ref || '').trim();
             const currentStockRef = String(existingItem.stock_ref || '').trim();
             const sameStockRef = Boolean(oldStockRef && currentStockRef && oldStockRef === currentStockRef);
-            if (sameGroup && sameStockRef) {
+            const sameName = norm(existingItem.nome) === norm(item.nome);
+            const sameVolume = norm(existingItem.volume || '—') === norm(item.volume || '—');
+            if (sameGroup && sameStockRef && sameName && sameVolume) {
               const oldPublicId = String(item.public_id || '').trim();
               if (oldPublicId) {
                 const collision = Object.values(DATA).some(groups =>
