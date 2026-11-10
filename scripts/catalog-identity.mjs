@@ -125,7 +125,7 @@ export function isExcludedImaratAtherri(item, brand = "") {
 const ATHERRI_CORRECT_ORIGIN_REF = "o_9e8adfbf4a5157cb7a048f8f";
 const ATHERRI_EXCLUDED_ORIGIN_REF = "o_b8e0e31ca9e4dfafe8a7ecc7";
 
-function isAtherriAfeerIdentity(item, brand = "") {
+export function isAtherriAfeerIdentity(item, brand = "") {
   const name = normalizeIdentity(item?.nome ?? item?.name ?? "");
   const brandKey = normalizeIdentity(brand || item?.brand || "");
   let volume = String(item?.volume ?? item?.sizeMl ?? "")
@@ -148,4 +148,13 @@ export function isCanonicalAtherriGistRecord(item, brand = "") {
 export function isExcludedAtherriGistRecord(item, brand = "") {
   return isAtherriAfeerIdentity(item, brand) &&
     String(item?.origin_ref || "").trim() === ATHERRI_EXCLUDED_ORIGIN_REF;
+}
+
+// Classificação fechada para os dois registros Atherri Afeer de 30ml no Gist.
+// Um registro com origem desconhecida nunca deve ser restaurado por semelhança de nome.
+export function atherriGistRecordKind(item, brand = "") {
+  if (!isAtherriAfeerIdentity(item, brand)) return "unrelated";
+  if (isExcludedAtherriGistRecord(item, brand)) return "excluded";
+  if (isCanonicalAtherriGistRecord(item, brand)) return "canonical";
+  return "ambiguous";
 }
