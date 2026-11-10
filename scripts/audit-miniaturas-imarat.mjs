@@ -230,12 +230,14 @@ for (const [line, groups] of Object.entries(DATA)) {
       if (!isMini(item, group)) continue;
       const name = baseMiniName(item.nome);
       if (!name) continue;
-      const source = sourceMatch(item, group);
       const internalKey = [norm(line), norm(group.brand), name, volumeOf(item)].join("|");
       const internalCandidates = internalIndex.get(internalKey) || [];
       const internal = internalCandidates.find(candidate =>
         String(candidate.varejo) === String(item.varejo) && String(candidate.atacado) === String(item.atacado)
       ) || internalCandidates[0] || null;
+      // O Gist público não expõe id_origem; use a identidade interna já
+      // pareada para consultar a fonte pelo SKU exato, sem colapsar homônimos.
+      const source = sourceMatch(internal || item, group);
       if (internal) internalMatches++;
       let expected = null;
       if (source) {
