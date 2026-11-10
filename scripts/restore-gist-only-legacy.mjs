@@ -91,18 +91,30 @@ function buildIndexes(DATA) {
   const stockIndex = new Map();
   const publicIdIndex = new Map();
   const originRefIndex = new Map();
-  const normGroup = group => norm(group?.brand) + "|" + norm(group?.cat);
+  const publicLineKey = line => {
+    const value = String(line || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
+    if (value.includes("masculino")) return "masculino";
+    if (value.includes("feminino")) return "feminino";
+    if (value.includes("unissex")) return "unissex";
+    if (value.includes("roup")) return "roupas";
+    if (value.includes("acessor")) return "acessorios";
+    if (value.includes("brand")) return "brand";
+    if (value.includes("perf")) return "perfumaria";
+    if (value.includes("scoop")) return "scoop premiado";
+    return value || "outros";
+  };
+  const groupKey = (line, group) => publicLineKey(line) + "|" + norm(group?.brand) + "|" + norm(group?.cat);
   const projectedGroups = new Map();
-  for (const groups of Object.values(publicDATA)) {
+  for (const [line, groups] of Object.entries(publicDATA)) {
     for (const group of groups || []) {
-      const key = normGroup(group);
+      const key = groupKey(line, group);
       if (!projectedGroups.has(key)) projectedGroups.set(key, []);
       projectedGroups.get(key).push(group);
     }
   }
-  for (const groups of Object.values(DATA)) {
+  for (const [line, groups] of Object.entries(DATA)) {
     for (const group of groups || []) {
-      const keyGroup = normGroup(group);
+      const keyGroup = groupKey(line, group);
       const projected = projectedGroups.get(keyGroup)?.shift();
       const items = Array.isArray(group?.items) ? group.items : [];
       const publicItems = Array.isArray(projected?.items) ? projected.items : [];
@@ -113,8 +125,6 @@ function buildIndexes(DATA) {
       for (let index = 0; index < items.length; index++) {
         const item = items[index];
         const publicItem = publicItems[index];
-        const key = identity(group?.line || "", group, item);
-        const line = Object.entries(DATA).find(([, list]) => list === groups)?.[0] || "";
         const actualKey = identity(line, group, item);
         const row = { line, group, item, publicItem };
         if (!identityIndex.has(actualKey)) identityIndex.set(actualKey, []);
