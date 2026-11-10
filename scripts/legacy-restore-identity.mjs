@@ -10,13 +10,22 @@ export function legacyPhotoFingerprint(item) {
 
 // A referência de estoque pode ser compartilhada ou colidir entre marcas.
 // Nenhum public_id/stock_ref é suficiente para cruzar a fronteira de marca.
-export function resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches = [], expectedBrand = "") {
+export function resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches = [], expectedBrand = "", originRefMatches = []) {
   const brandKey = normalizeBrand(expectedBrand);
   if (!brandKey) return null;
   const sameBrand = row => normalizeBrand(row?.group?.brand ?? row?.publicItem?.brand ?? row?.brand) === brandKey;
   const scopedStock = stockMatches.filter(sameBrand);
   const scopedIdentity = identityMatches.filter(sameBrand);
   const scopedPublicId = publicIdMatches.filter(sameBrand);
+  const originRef = String(publicItem?.origin_ref || "").trim();
+  if (originRef) {
+    const scopedOrigin = originRefMatches.filter(row =>
+      sameBrand(row) && String(row?.publicItem?.origin_ref || "").trim() === originRef
+    );
+    // Uma referência de origem explícita deve resolver exatamente uma linha.
+    // Se não resolver, não recuamos para nome/foto e não escolhemos variante.
+    return scopedOrigin.length === 1 ? scopedOrigin[0] : null;
+  }
 
   const publicId = String(publicItem?.public_id || "").trim();
   if (publicId) {

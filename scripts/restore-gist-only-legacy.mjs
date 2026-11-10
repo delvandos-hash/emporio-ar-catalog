@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
 import { resolveLegacyStockMatch } from "./legacy-restore-identity.mjs";
+import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
@@ -85,6 +86,7 @@ function buildIndexes(DATA) {
   const identityIndex = new Map();
   const stockIndex = new Map();
   const publicIdIndex = new Map();
+  const originRefIndex = new Map();
   const buckets = new Map();
   for (const [line, groups] of Object.entries(publicDATA)) {
     for (const group of groups || []) for (const publicItem of group.items || []) {
@@ -109,9 +111,13 @@ function buildIndexes(DATA) {
         if (!publicIdIndex.has(publicItem.public_id)) publicIdIndex.set(publicItem.public_id, []);
         publicIdIndex.get(publicItem.public_id).push(row);
       }
+      if (publicItem.origin_ref) {
+        if (!originRefIndex.has(publicItem.origin_ref)) originRefIndex.set(publicItem.origin_ref, []);
+        originRefIndex.get(publicItem.origin_ref).push(row);
+      }
     }
   }
-  return { publicDATA, identityIndex, stockIndex, publicIdIndex };
+  return { publicDATA, identityIndex, stockIndex, publicIdIndex, originRefIndex };
 }
 function readInternal() {
   const raw = fs.readFileSync(dataPath, "utf8");
@@ -164,6 +170,8 @@ async function main() {
   if (!token) throw new Error("GIST_TOKEN ausente");
   const { DATA, whatsapp, brand } = readInternal();
   const liveDATA = await fetchGist(token);
+  const excludedAtherri = removeExcludedLegacyAtherri(liveDATA);
+  console.log(`LEGACY_EXCLUDED_ATHERRI_1481=${excludedAtherri}`);
   let indexes = buildIndexes(DATA);
   let restored = 0, merged = 0;
   const ambiguous = [];
@@ -182,8 +190,11 @@ async function main() {
         const publicIdMatches = String(publicItem.public_id || "").trim()
           ? (indexes.publicIdIndex.get(String(publicItem.public_id).trim()) || [])
           : [];
-        const candidates = [...new Set([...stockMatches, ...identityMatches, ...publicIdMatches])];
-        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches, group?.brand);
+        const originRefMatches = String(publicItem.origin_ref || "").trim()
+          ? (indexes.originRefIndex.get(String(publicItem.origin_ref).trim()) || [])
+          : [];
+        const candidates = [...new Set([...stockMatches, ...identityMatches, ...publicIdMatches, ...originRefMatches])];
+        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, publicItem, publicIdMatches, group?.brand, originRefMatches);
         if (resolved) {
           mergePublicFields(resolved.item, publicItem);
           merged++;
@@ -217,7 +228,9 @@ async function main() {
         const identityMatches = check.identityIndex.get(key) || [];
         const publicId = String(item.public_id || "").trim();
         const publicIdMatches = publicId ? (check.publicIdIndex.get(publicId) || []) : [];
-        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, item, publicIdMatches, group?.brand);
+        const originRef = String(item.origin_ref || "").trim();
+        const originRefMatches = originRef ? (check.originRefIndex.get(originRef) || []) : [];
+        const resolved = resolveLegacyStockMatch(stockMatches, identityMatches, item, publicIdMatches, group?.brand, originRefMatches);
         if (!resolved) {
           missing.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, stock_ref: stockRef, public_id: publicId });
         }

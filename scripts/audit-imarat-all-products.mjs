@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { toPublicCatalog } from "./public-catalog.mjs";
+import { findExactInternalPriceMatch, findImaratSourceByOriginRef } from "./audit-catalog-match.mjs";
+import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
@@ -268,6 +270,8 @@ for(const [line,groups] of Object.entries(INTERNAL_DATA)) {
   }
 }
 const DATA=await fetchLiveCatalog();
+const excludedAtherri = removeExcludedLegacyAtherri(DATA);
+console.log(`LEGACY_EXCLUDED_ATHERRI_1481_FROM_AUDIT=${excludedAtherri}`);
 const internalPublicData=toPublicCatalog(INTERNAL_DATA);
 const rekeyAudit=rekeyLiveVariants(DATA,internalPublicData);
 console.log(`GIST_VARIANTS_REKEYABLE=${rekeyAudit.rekeyed} unmatchedLiveVariants=${rekeyAudit.unmatched}`);
@@ -292,10 +296,10 @@ for(const [line,groups] of Object.entries(DATA)) {
     const volume=String(item.volume||volumeFrom(null,name));
     const internalKey=[norm(line),norm(group.brand),norm(group.cat),norm(name),volumeMatch(volume,name)].join("|");
     const internalCandidates=internalIndex.get(internalKey)||[];
-    const internal=internalCandidates.find(candidate =>
-      String(candidate.varejo??"")===String(item.varejo??"") &&
-      String(candidate.atacado??"")===String(item.atacado??"")
-    ) || internalCandidates[0] || null;
+    // Nunca atribua um ID de origem apenas porque o nome/volume coincide.
+    // Se os preços não identificam uma única variante interna, a origem fica
+    // sem correspondência e a auditoria não pode fabricar uma duplicidade.
+    const internal=findExactInternalPriceMatch(internalCandidates,item);
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
@@ -446,6 +450,14 @@ function sourceBrandMatches(catalogBrand,sourceBrand) {
   return Boolean(b && s && b===s);
 }
 function matchSourceForCatalog(item) {
+  const originRef = String(item.item?.origin_ref || "").trim();
+  if (originRef) {
+    const exactOrigin = findImaratSourceByOriginRef(source, originRef);
+    if (!exactOrigin) return null;
+    if (!sourceBrandMatches(item.brand, exactOrigin.brand)) return null;
+    if (!volumeCompatible(volumeFrom(item.volume,item.name), volumeFrom(exactOrigin.sizeMl,exactOrigin.name))) return null;
+    return exactOrigin;
+  }
   const sourceId=String(item.originId||"").trim();
   if(sourceId) {
     const exactIdMatches=source.filter(p=>String(p.id??p.productId??p.slug??"").trim()===sourceId);
@@ -523,7 +535,10 @@ for(const item of matchedCatalog) {
   if(!miniGlobalGroups.has(key)) miniGlobalGroups.set(key,[]);
   miniGlobalGroups.get(key).push(item);
 }
-const confirmedMiniDuplicates=[...miniGlobalGroups].filter(([,items])=>items.length>1);
+const confirmedMiniDuplicates=[...miniGlobalGroups].filter(([,items])=>{
+  const identities=items.filter(x=>x.matchedSource).map(x=>sourceIdentity(x.matchedSource));
+  return identities.length>1 && new Set(identities).size===1;
+});
 const sourceDistinctCollisions=catalogCollisionGroups.filter(([,items])=>{
   const matched=items.filter(x=>x.matchedSource);
   if(matched.length<2) return false;
