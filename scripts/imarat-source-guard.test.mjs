@@ -223,3 +223,9 @@ test("auditoria global prioriza id_origem e não confunde produtos homônimos", 
   assert.match(auditAllSource, /const sourceId=String\(item\.originId\|\|""\)\.trim\(\)/);
   assert.match(auditAllSource, /exactIdMatches\.length!==1\) return null/);
 });
+
+
+test("reconciliação emite diagnóstico somente leitura para variantes legadas ISIS MAKEUP", () => {
+  assert.match(additiveReconciliation, /ISIS_GIST_VARIANT_DIAGNOSTIC/);
+  assert.match(additiveReconciliation, /internalCandidates: sameNameInternal\.map/);
+});
