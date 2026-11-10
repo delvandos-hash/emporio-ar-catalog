@@ -69,7 +69,8 @@ test("bloqueia somente a miniatura Atherri Afeer incorreta da Imarat e preserva 
   const correct = { nome: "Miniatura Atherri Afeer", volume: "30ml", varejo: "95,00", atacado: "65,00", id_origem: "1474" };
   assert.equal(isExcludedImaratAtherri(wrong, "Afeer"), true);
   assert.equal(isExcludedImaratAtherri(correct, "Afeer"), false);
-  assert.equal(isExcludedImaratAtherri({ ...wrong, varejo: "95,00", atacado: "65,00" }, "Afeer"), false);
+  assert.equal(isExcludedImaratAtherri({ ...wrong, varejo: "95,00", atacado: "65,00" }, "Afeer"), true); // ID 1481 permanece bloqueado mesmo se o fornecedor alterar preços
+  assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "9999", varejo: "105,00", atacado: "75,00" }, "Afeer"), true);
   assert.equal(isExcludedImaratAtherri({ ...wrong, id_origem: "9999" }, "Afeer"), true);
   assert.equal(isExcludedImaratAtherri({ ...wrong, nome: "Miniatura Atherri Afeer Intense" }, "Afeer"), false);
   assert.equal(isExcludedImaratAtherri({ ...wrong, nome: "Miniatura Atherri Afeer" }, "Outra Marca"), false);
