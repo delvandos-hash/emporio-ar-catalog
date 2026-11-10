@@ -8,7 +8,7 @@ const DANDE_CATEGORY_NAMES = new Set([
   "Conjuntos", "Lançamentos", "Masculinos", "Prata 925", "Pulseiras",
   "Semijoia Italiana", "Tornozeleiras"
 ]);
-const VARIATION_FIELDS = new Set(["nome", "estoque"]);
+const VARIATION_FIELDS = new Set(["nome", "estoque", "foto", "fotos", "cor"]);
 
 function pick(value, allowed) {
   const out = {};
@@ -209,6 +209,17 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
             if (clean.nome != null) clean.nome = String(clean.nome).slice(0, 120);
             const stock = Number(variation?.estoque);
             clean.estoque = Number.isFinite(stock) && stock >= 0 ? Math.floor(stock) : 0;
+            if (clean.foto != null) {
+              const safePhoto = sanitizePublicImageUrl(String(clean.foto), imageOptions);
+              if (safePhoto) clean.foto = safePhoto;
+              else delete clean.foto;
+            }
+            if (Array.isArray(clean.fotos)) {
+              clean.fotos = clean.fotos.map(url => sanitizePublicImageUrl(String(url), imageOptions)).filter(Boolean);
+              if (!clean.fotos.length) delete clean.fotos;
+            } else delete clean.fotos;
+            if (!clean.foto && clean.fotos?.length) clean.foto = clean.fotos[0];
+            if (clean.cor != null) clean.cor = String(clean.cor).slice(0, 80);
             return clean;
           });
         } else delete safeItem.variacoes;
