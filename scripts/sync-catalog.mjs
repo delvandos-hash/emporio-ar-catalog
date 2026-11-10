@@ -1072,6 +1072,21 @@ async function fetchFrannyRoupas() {
     if (!completed) throw new Error(`paginação Franny incompleta em ${cat.nome}`);
     await sleep(500);
   }
+  // Auditoria por ID de origem: identifica produtos legitimamente listados em
+  // mais de uma categoria sem alterar a deduplicação global do catálogo.
+  const categoryMembershipsById = new Map();
+  for (const [category, ids] of DANDE_SCRAPE_IDS) {
+    for (const id of ids) {
+      if (!categoryMembershipsById.has(id)) categoryMembershipsById.set(id, []);
+      categoryMembershipsById.get(id).push(category);
+    }
+  }
+  const crossListed = [...categoryMembershipsById.entries()].filter(([, categories]) => categories.length > 1);
+  console.log(`DANDE_CATEGORY_AUDIT unique_source_ids=${categoryMembershipsById.size} cross_listed_ids=${crossListed.length}`);
+  for (const [id, categories] of crossListed) {
+    console.log(`DANDE_CATEGORY_CROSSLIST id=${id} categories=${categories.join(' | ')}`);
+  }
+
   const byCat = new Map();
   for (const item of byId.values()) {
     const cat = item.cat || 'OUTROS';
@@ -1145,6 +1160,7 @@ function dandePathOnly(value) {
 
 const DANDE_SCRAPE_COUNTS = new Map();
 const DANDE_SCRAPE_NAMES = new Map();
+const DANDE_SCRAPE_IDS = new Map();
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -1357,6 +1373,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const seenPageSignatures = new Set();
     let categoryAdded = 0;
     const categoryNames = [];
+    const categoryIds = new Set();
     let completed = false;
     for (let page = 1; page <= 80; page++) {
       try {
@@ -1382,7 +1399,10 @@ async function fetchDandeAcessorios(existingGroups = []) {
           console.log(`    p${page}: nenhum ID novo; encerrando categoria`);
           break;
         }
-        for (const p of newProducts) seenCategoryIds.add(p.id);
+        for (const p of newProducts) {
+          seenCategoryIds.add(p.id);
+          categoryIds.add(String(p.id));
+        }
 
         let added = 0;
         for (const p of newProducts) {
@@ -1495,6 +1515,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     if (!completed) throw new Error(`paginação Dande incompleta em ${cat.nome}`);
     DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
     DANDE_SCRAPE_NAMES.set(cat.nome, categoryNames);
+    DANDE_SCRAPE_IDS.set(cat.nome, categoryIds);
   }
 
   const byCat = new Map();
