@@ -11,6 +11,7 @@ import { toPublicCatalog } from './public-catalog.mjs';
 import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint } from './catalog-identity.mjs';
+import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -635,6 +636,7 @@ async function fetchBrandList() {
   const setCookie = warm.headers.get('set-cookie') || '';
   const cookie = setCookie.split(',').map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
 
+  let completed = false;
   for (let page = 1; page <= 80; page++) {
     const res = await fetch(`${BRAND_BASE}/c/atacado/carregar_produtos/${page}/todas/${BRAND_SELLER}`, {
       method: 'POST',
@@ -645,17 +647,19 @@ async function fetchBrandList() {
       },
       body: JSON.stringify({ pagina_especifica: '' }),
     });
-    if (!res.ok) break;
+    if (!res.ok) throw new Error(`Brand HTTP ${res.status} na página ${page}`);
     const text = await res.text();
     const data = JSON.parse(text);
     const products = Array.isArray(data) ? data : data.produtos || [];
-    if (!products.length) break;
+    if (!products.length) { completed = true; break; }
+    if (page === 80) throw new Error('Brand atingiu o limite de 80 páginas sem fim confirmado');
     for (const p of products) {
         p.nome = limparTexto(p.nome);
         if (p.descricao) p.descricao = limparTexto(p.descricao);
     }
     all.push(...products);
   }
+  if (!completed) throw new Error('Paginação Brand incompleta; origem não foi percorrida até o fim.');
   return all;
 }
 
@@ -821,6 +825,7 @@ async function fetchSophiaRoupas() {
   for (const cat of SOPHIA_CATEGORIES) {
     console.log(`  Categoria Roupas: ${cat.nome}`);
     const items = [];
+    let completed = false;
     for (let page = 1; page <= 8; page++) {
       const url = `${SOPHIA_BASE}/c/atacado/carregar_produtos/${page}/${cat.id}/${SOPHIA_LOJA}?mobile=0`;
       try {
@@ -831,7 +836,7 @@ async function fetchSophiaRoupas() {
         });
 
         const produtos = data.produtos || [];
-        if (!produtos.length || data.acao === 'sem_mais_produtos') break;
+        if (!produtos.length) { completed = true; break; }
 
         for (const p of produtos) {
           const precoBase =
@@ -885,12 +890,14 @@ async function fetchSophiaRoupas() {
         }
 
         console.log(`    página ${page}: +${produtos.length}`);
+        if (data.acao === 'sem_mais_produtos') { completed = true; break; }
+        if (page === 8) throw new Error(`limite de 8 páginas atingido em ${cat.nome} sem marcador de fim`);
         await sleep(600 + Math.floor(Math.random() * 400));
       } catch (e) {
-        console.log(`    ❌ página ${page}: ${e.message}`);
-        break;
+        throw new Error(`Sophia ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
+    if (!completed) throw new Error(`paginação Sophia incompleta em ${cat.nome}`);
 
     if (items.length) {
       groups.push({
@@ -1038,11 +1045,12 @@ async function fetchFrannyRoupas() {
   const byId = new Map();
   for (const cat of FRANNY_CATEGORIES) {
     console.log(`  Franny cat ${cat.nome} (${cat.id})`);
+    let completed = false;
     for (let page = 1; page <= 30; page++) {
       try {
         const data = await fetchFacilZapPage(FRANNY_BASE, FRANNY_LOJA, cat.id, page, cookie);
         const produtos = data.produtos || [];
-        if (!produtos.length) break;
+        if (!produtos.length) { completed = true; break; }
         let novo = 0;
         for (const p of produtos) {
           const id = String(p.id || '');
@@ -1053,14 +1061,14 @@ async function fetchFrannyRoupas() {
           novo++;
         }
         console.log(`    p${page}: +${novo}`);
-        if (produtos.length < 5) break;
+        if (produtos.length < 5) { completed = true; break; }
+        if (page === 30) throw new Error(`limite de 30 páginas atingido em ${cat.nome}`);
         await sleep(400 + Math.floor(Math.random() * 300));
       } catch (e) {
-        console.log(`    Franny erro p${page}: ${e.message}`);
-        try { cookie = await warmFacilZap(FRANNY_BASE, FRANNY_LOJA); } catch (_) {}
-        break;
+        throw new Error(`Franny ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
+    if (!completed) throw new Error(`paginação Franny incompleta em ${cat.nome}`);
     await sleep(500);
   }
   const byCat = new Map();
@@ -1219,8 +1227,13 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
       ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
       : '';
     const expectedTitle = norm(expectedCategory).replace(/s$/, '');
-    if (!actualTitle || actualTitle !== expectedTitle) {
-      throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}")`);
+    const normalizePath = value => String(value).replace(/\/+/g, '/').replace(/\/+$/, '');
+    const requestedPath = normalizePath(path);
+    const finalPath = normalizePath(new URL(res.url || url).pathname);
+    const genericDandeTitle = actualTitle === 'dande acessorio' &&
+      finalPath === requestedPath && /data-product-id="\d+"/.test(html);
+    if (!actualTitle || (actualTitle !== expectedTitle && !genericDandeTitle)) {
+      throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}", rota final: "${finalPath}")`);
     }
   }
   return html;
@@ -1338,11 +1351,12 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const seenCategoryIds = new Set();
     const seenPageSignatures = new Set();
     let categoryAdded = 0;
+    let completed = false;
     for (let page = 1; page <= 15; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
-        if (!list.length) break;
+        if (!list.length) { completed = true; break; }
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
           console.log(`    p${page}: página repetida; encerrando categoria`);
@@ -1451,14 +1465,16 @@ async function fetchDandeAcessorios(existingGroups = []) {
         // Sem link de paginação, encerra somente DEPOIS de salvar os itens desta página.
         if (!hasDandeNextPage(html, page)) {
           console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+          completed = true;
           break;
         }
+        if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com próxima página anunciada`);
         await sleep(400);
       } catch (e) {
-        console.log(`    Dande erro ${cat.nome} p${page}: ${e.message}`);
-        break;
+        throw new Error(`Dande ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
+    if (!completed) throw new Error(`paginação Dande incompleta em ${cat.nome}`);
     DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
   }
 
@@ -1715,6 +1731,14 @@ async function main() {
         }
         // Em grupos genéricos, só aceita associação se o nome for único em toda a API.
         if (!hit && ['outros', 'outra'].includes(b) && candidatosNomeExato.length === 1) {
+          hit = candidatosNomeExato[0];
+        }
+        // Compatibilidade apenas para registros legados sem procedência:
+        // Empório A.R pode ser um agrupador antigo, mas nunca é tratado como
+        // marca genérica para itens que já têm fonte confirmada.
+        const legacyWithoutSource = !String(it.fonte || '').trim() || norm(it.fonte) === 'legacy gist';
+        if (!hit && line !== 'roupas' && legacyWithoutSource && b === 'emporio a r' &&
+            candidatosNomeExato.length === 1) {
           hit = candidatosNomeExato[0];
         }
         // Correções pontuais validadas no catálogo: transposição em Tharwah
@@ -2035,15 +2059,158 @@ async function main() {
   const brandList = SYNC_IMARAT_ONLY ? [] : await fetchBrandList();
   const brandAllowed = brandList.filter(isAllowedBrandProduct);
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
+    const brandSession = p => {
+      let session = mapBrandSession(p.categoria_nome || p.categoria || '');
+      if (!session && norm(p.nome).includes('tubete')) session = 'TUBETES BRAND';
+      return session;
+    };
+    const findBrandRootMatches = (item, group) => {
+      const id = String(item.id_origem || item.id || '').trim();
+      const itemVolume = volumeMatch(item.volume, item.nome);
+      if (id) {
+        const byId = brandList.filter(p => String(p.id ?? p.productId ?? p.slug ?? '').trim() === id);
+        if (byId.length) return byId;
+      }
+      const exact = p => norm(p.nome) === norm(item.nome) &&
+        volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume;
+      const inSession = brandList.filter(p => norm(brandSession(p)) === norm(group.brand) && exact(p));
+      return inSession.length ? inSession : brandList.filter(exact);
+    };
+    const findBrandRootMatch = (item, group) => {
+      const matches = findBrandRootMatches(item, group);
+      return matches.length === 1 ? matches[0] : null;
+    };
+    const findAnyBrandRootMatches = item => {
+      const id = String(item.id_origem || item.id || '').trim();
+      if (id) {
+        const byId = brandList.filter(p => String(p.id ?? p.productId ?? p.slug ?? '').trim() === id);
+        if (byId.length) return byId;
+      }
+      const itemVolume = volumeMatch(item.volume, item.nome);
+      return brandList.filter(p =>
+        norm(p.nome) === norm(item.nome) &&
+        volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume
+      );
+    };
+  if (!SYNC_IMARAT_ONLY) {
+    if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
+    let staleBrandRemoved = 0;
+    let legacyBrandMapped = 0;
+    let brandSessionMoved = 0;
+    const brandSessionMoves = [];
+    for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
+      if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
+      group.items = (group.items || []).filter(item => {
+        const source = norm(item.fonte);
+        if (source !== 'brand' && source !== '' && source !== 'legacy gist') return true;
+        const matches = findBrandRootMatches(item, group);
+        if (matches.length > 1) {
+          throw new Error(`LEGACY_BRAND_AMBIGUOUS: ${group.brand} / ${item.nome} / ${matches.length} IDs da fonte`);
+        }
+        const hit = matches[0];
+        if (!hit) {
+          staleBrandRemoved++;
+          return false;
+        }
+        item.fonte = 'brand';
+        item.id_origem = String(hit.id ?? hit.productId ?? hit.slug ?? '');
+        item.nome = hit.nome;
+        const sourceVolume = volumeFrom(null, hit.nome);
+        if (sourceVolume) item.volume = sourceVolume;
+        if (source !== 'brand') legacyBrandMapped++;
+        const targetSession = brandSession(hit);
+        if (targetSession && norm(targetSession) !== norm(group.brand)) {
+          brandSessionMoves.push({ line, session: targetSession, item });
+          brandSessionMoved++;
+          return false;
+        }
+        return true;
+      });
+    }
+    for (const move of brandSessionMoves) {
+      const target = ensureBrandGroup(DATA, move.line, move.session, 'Brand');
+      target.items.push(move.item);
+    }
+    console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
+    console.log(`Produtos Brand legados confirmados e reclassificados pela origem: ${legacyBrandMapped}`);
+    console.log(`Produtos Brand movidos para a sessão correta da fonte: ${brandSessionMoved}`);
+    // Registros antigos em outras categorias também podem pertencer à Brand
+    // Collection. Só são movidos com ID ou nome+volume únicos na fonte raiz.
+    let legacyBrandMoved = 0;
+    let unverifiedLegacyRemoved = 0;
+    const unverifiedLegacyNames = [];
+    const brandLegacyMoves = [];
+    for (const line of Object.keys(DATA)) {
+      if (line === 'roupas') continue;
+      for (const group of DATA[line] || []) {
+        if (group.cat === 'Brand' || String(group.cat || '').startsWith('Brand') ||
+            norm(group.cat) === 'scoop premiado') continue;
+        const kept = [];
+        for (const item of group.items || []) {
+          const source = norm(item.fonte);
+          if (source !== '' && source !== 'legacy gist' && source !== 'brand') {
+            kept.push(item);
+            continue;
+          }
+          const matches = findAnyBrandRootMatches(item);
+          if (matches.length > 1) {
+            throw new Error(`LEGACY_BRAND_CROSS_CATEGORY_AMBIGUOUS: ${item.nome} / ${matches.length} IDs da fonte`);
+          }
+          const hit = matches[0];
+          if (!hit) {
+            unverifiedLegacyRemoved++;
+            unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome });
+            continue;
+          }
+          const session = brandSession(hit);
+          if (!session) throw new Error(`LEGACY_BRAND_WITHOUT_SESSION: ${item.nome}`);
+          item.fonte = 'brand';
+          item.id_origem = String(hit.id ?? hit.productId ?? hit.slug ?? '');
+          item.nome = hit.nome;
+          const sourceVolume = volumeFrom(null, hit.nome);
+          if (sourceVolume) item.volume = sourceVolume;
+          brandLegacyMoves.push({ line, session, item });
+          legacyBrandMoved++;
+        }
+        group.items = kept;
+      }
+    }
+    for (const move of brandLegacyMoves) {
+      const target = ensureBrandGroup(DATA, move.line, move.session, 'Brand');
+      target.items.push(move.item);
+    }
+    console.log(`Produtos legados movidos para a sessão Brand confirmados na origem: ${legacyBrandMoved}`);
+    console.log(`Registros legados sem correspondência em nenhuma fonte raiz removidos: ${unverifiedLegacyRemoved}`);
+    for (const item of unverifiedLegacyNames) {
+      console.log('LEGADO SEM ORIGEM REMOVIDO: ' + JSON.stringify(item));
+    }
+  }
 
   let addedBrand = 0;
+  const existingBrandSourceIds = new Set();
+  for (const groups of Object.values(DATA)) for (const group of groups || []) {
+    if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
+    for (const item of group.items || []) {
+      const id = String(item.id_origem || '').trim();
+      if (id && norm(item.fonte) === 'brand') existingBrandSourceIds.add(norm(group.brand) + '|' + id);
+    }
+  }
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
       for (let i = 0; i < g.items.length; i++) {
-        const it = g.items[i]; const n = norm(it.nome); const hit = brandList.find((p) => norm(p.nome) === n) || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
+        const it = g.items[i]; const hit = findBrandRootMatch(it, g);
         if (!hit) continue;
-        it.nome = hit.nome; 
+        it.nome = hit.nome;
+        const sourceVolume = volumeFrom(null, hit.nome);
+        if (sourceVolume) it.volume = sourceVolume;
+        const manualPrice = it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1;
+        if (!manualPrice) {
+          const originalPrice = typeof hit.preco === 'number' ? hit.preco : parseOrig(hit.preco);
+          const prices = priceBrand(originalPrice, isArabicMiniBrand(hit, g.brand), g.brand);
+          it.varejo = prices.varejo;
+          it.atacado = prices.atacado;
+        }
         if (hit.descricao) it.notas = String(hit.descricao).trim().slice(0, 500);
         const disp = brandDisponivel(hit); if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
       }
@@ -2058,9 +2225,7 @@ async function main() {
     for (const g of DATA[line] || []) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
       for (const it of g.items || []) {
-        const n = norm(it.nome);
-        const hit = brandList.find((p) => norm(p.nome) === n)
-          || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
+        const hit = findBrandRootMatch(it, g);
         if (!hit) {
           if ((it.disponivel || 'Sim') !== 'Não') {
             it.disponivel = 'Não';
@@ -2079,7 +2244,10 @@ async function main() {
       const volume = volumeFrom(null, nome);
       const brandKey = normalProductKey(nome, volume, session);
       const brandCandidates = indexNormal.get(brandKey) || [];
-      if (isDuplicateMiniSource(brandCandidates, p.id ?? p.productId ?? p.slug ?? "")) continue;
+      const candidateOriginId = String(p.id ?? p.productId ?? p.slug ?? '').trim();
+      const sourceIdKey = norm(session) + '|' + candidateOriginId;
+      if ((candidateOriginId && existingBrandSourceIds.has(sourceIdKey)) ||
+          isDuplicateMiniSource(brandCandidates, candidateOriginId)) continue;
       const orig = typeof p.preco === 'number' ? p.preco : parseOrig(p.preco); const prices = priceBrand(orig, isArabicMiniBrand(p, session), session);
       const line = genderLine(nome + ' ' + session); let foto = ''; if (p.imagens && p.imagens[0]) { const img = p.imagens[0]; foto = img.startsWith('http') ? img : `${CDN_IMAGE_BASE}${img}?width=700&height=700&quality=85&format=webp`; }
       const notas = (p.descricao && String(p.descricao).trim()) || '';
@@ -2100,6 +2268,7 @@ async function main() {
       const nameVolumeKey = normalProductNameVolumeKey(nome, volume);
       if (!indexNameVolume.has(nameVolumeKey)) indexNameVolume.set(nameVolumeKey, []);
       indexNameVolume.get(nameVolumeKey).push({ id_origem: String(p.id ?? p.productId ?? p.slug ?? "") });
+      if (candidateOriginId) existingBrandSourceIds.add(sourceIdKey);
       addedBrand++;
     }
   }
@@ -2107,22 +2276,26 @@ async function main() {
   // ----- Roupas (Sophia + Franny) — merge, não sobrescreve -----
   let roupasCount = 0;
   let frannyCount = 0;
+  const liveSophiaIds = new Set();
+  const liveFrannyIds = new Set();
+  const liveRoupasProducts = [];
   if (ADD_ROUPAS || ADD_FRANNY) {
     const chunks = [];
-    // mantém snapshot atual como base para não perder itens se um site falhar
-    if (Array.isArray(DATA.roupas) && DATA.roupas.length) {
-      chunks.push(DATA.roupas);
-    }
     if (ADD_ROUPAS) {
       console.log('Buscando Roupas na Sophia Moda...');
       try {
         const sophiaGroups = await fetchSophiaRoupas();
         const n = sophiaGroups.reduce((s, g) => s + g.items.length, 0);
+        if (!n) throw new Error('Sophia retornou zero produtos; não é seguro reconciliar a fonte.');
+        for (const g of sophiaGroups) for (const item of g.items || []) {
+          if (item.id_origem) liveSophiaIds.add(String(item.id_origem));
+          liveRoupasProducts.push({ cat: g.cat, item });
+        }
         roupasCount = n;
         if (n > 0) chunks.push(sophiaGroups);
         console.log(`Roupas Sophia: ${n} produtos`);
       } catch (e) {
-        console.log(`❌ Erro Sophia: ${e.message} (mantendo snapshot)`);
+        throw new Error(`Coleta Sophia incompleta; sincronização bloqueada: ${e.message}`);
       }
     } else {
       console.log('ADD_ROUPAS=0 — pulando Sophia');
@@ -2132,17 +2305,110 @@ async function main() {
       try {
         const frannyGroups = await fetchFrannyRoupas();
         frannyCount = frannyGroups.reduce((s, g) => s + g.items.length, 0);
+        if (!frannyCount) throw new Error('Franny retornou zero produtos; não é seguro reconciliar a fonte.');
+        for (const g of frannyGroups) for (const item of g.items || []) {
+          if (item.id_origem) liveFrannyIds.add(String(item.id_origem));
+          liveRoupasProducts.push({ cat: g.cat, item });
+        }
         if (frannyCount > 0) chunks.push(frannyGroups);
         console.log(`Roupas Franny: ${frannyCount} produtos`);
       } catch (e) {
-        console.log(`❌ Erro Franny: ${e.message} (mantendo snapshot)`);
+        throw new Error(`Coleta Franny incompleta; sincronização bloqueada: ${e.message}`);
       }
     } else {
       console.log('ADD_FRANNY=0 — pulando Franny');
     }
+    // As fontes recém-coletadas vêm primeiro: seus títulos, preços e dados
+    // atuais prevalecem. O snapshot entra por último apenas como fallback para
+    // fontes desativadas e registros legados sem ID.
+    if (Array.isArray(DATA.roupas) && DATA.roupas.length) chunks.push(DATA.roupas);
     if (chunks.length) {
       const prevRoupasSnap = Array.isArray(DATA.roupas) ? DATA.roupas : [];
       DATA.roupas = mergeRoupasGroups(chunks, prevRoupasSnap);
+      // Reconcilia também os registros antigos sem procedência: nome exato na
+      // fonte + categoria quando possível. IDs diferentes continuam distintos.
+      let staleClothesRemoved = 0;
+      let legacyClothesMapped = 0;
+      let legacyClothesConfirmed = 0;
+      let legacyClothesDuplicateRemoved = 0;
+      let legacyClothesUnmatchedRemoved = 0;
+      const legacyClothesMoves = [];
+      for (const group of DATA.roupas) {
+        const kept = [];
+        for (const item of group.items || []) {
+          const source = norm(item.fonte);
+          const id = String(item.id_origem || '').trim();
+          if (source === 'roupas' && id) {
+            const fromFranny = id.startsWith('franny-');
+            const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
+            const exists = !sourceEnabled || (fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id));
+            if (!exists) staleClothesRemoved++;
+            else kept.push(item);
+            continue;
+          }
+          const isLegacy = source === '' || source === 'legacy gist' || (source === 'roupas' && !id);
+          if (!isLegacy || !ADD_ROUPAS || !ADD_FRANNY) {
+            kept.push(item);
+            continue;
+          }
+          const allMatches = liveRoupasProducts.filter(row => norm(row.item.nome) === norm(item.nome));
+          const categoryMatches = allMatches.filter(row => norm(row.cat) === norm(group.cat));
+          const matches = categoryMatches.length ? categoryMatches : allMatches;
+          if (matches.length > 1) {
+            throw new Error(`LEGACY_ROUPAS_AMBIGUOUS: ${item.nome} aparece em ${matches.length} registros da fonte raiz; nenhum foi apagado.`);
+          }
+          if (!matches.length) {
+            staleClothesRemoved++;
+            legacyClothesUnmatchedRemoved++;
+            continue;
+          }
+          legacyClothesConfirmed++;
+          const root = matches[0];
+          const rootId = String(root.item.id_origem || '').trim();
+          if (!rootId) throw new Error(`LEGACY_ROUPAS_WITHOUT_SOURCE_ID: ${item.nome}; nenhuma exclusão automática foi aplicada.`);
+          const alreadyPresent = DATA.roupas.some(g =>
+            (g.items || []).some(existing => existing !== item && String(existing.id_origem || '') === rootId)
+          );
+          if (alreadyPresent) {
+            staleClothesRemoved++;
+            legacyClothesDuplicateRemoved++;
+            continue;
+          }
+          const manualPrice = item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
+          item.nome = root.item.nome;
+          item.fonte = 'roupas';
+          item.id_origem = rootId;
+          item.volume = root.item.volume || '—';
+          if (!manualPrice) {
+            item.varejo = root.item.varejo;
+            item.atacado = root.item.atacado;
+          }
+          item.disponivel = root.item.disponivel;
+          if (root.item.notas) item.notas = root.item.notas;
+          if (root.item.foto) item.foto = root.item.foto;
+          if (Array.isArray(root.item.fotos) && root.item.fotos.length) item.fotos = root.item.fotos;
+          if (Array.isArray(root.item.variacoes)) item.variacoes = root.item.variacoes;
+          if (root.item.total_estoque != null) item.total_estoque = root.item.total_estoque;
+          if (norm(root.cat) === norm(group.cat)) kept.push(item);
+          else legacyClothesMoves.push({ cat: root.cat, item });
+          legacyClothesMapped++;
+        }
+        group.items = kept;
+      }
+      for (const move of legacyClothesMoves) {
+        let target = DATA.roupas.find(g => norm(g.cat) === norm(move.cat) && norm(g.brand) === 'emporio a r');
+        if (!target) {
+          target = { cat: move.cat, brand: 'Empório A.R', items: [] };
+          DATA.roupas.push(target);
+        }
+        target.items.push(move.item);
+      }
+      DATA.roupas = DATA.roupas.filter(group => (group.items || []).length > 0);
+      console.log(`Roupas fora da fonte raiz removidas após coleta completa: ${staleClothesRemoved}`);
+      console.log(`Roupas legadas confirmadas pela fonte raiz: ${legacyClothesConfirmed}`);
+      console.log(`Roupas legadas duplicadas removidas: ${legacyClothesDuplicateRemoved}`);
+      console.log(`Roupas legadas sem correspondência removidas: ${legacyClothesUnmatchedRemoved}`);
+      console.log(`Roupas legadas reclassificadas sem cópia atual: ${legacyClothesMapped}`);
       const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
       console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
     }
@@ -2158,14 +2424,11 @@ async function main() {
       const prevAcc = Array.isArray(DATA.acessorios) ? DATA.acessorios : [];
       const accGroups = await fetchDandeAcessorios(prevAcc);
       acessoriosCount = accGroups.reduce((s, g) => s + g.items.length, 0);
-      if (acessoriosCount > 0) {
-        DATA.acessorios = accGroups;
-        console.log(`Acessórios Dande: ${acessoriosCount} produtos em ${accGroups.length} categorias`);
-      } else {
-        console.log('Acessórios Dande: 0 (mantendo snapshot)');
-      }
+      if (!acessoriosCount) throw new Error('Dande retornou zero produtos; não é seguro reconciliar a fonte.');
+      DATA.acessorios = accGroups;
+      console.log(`Acessórios Dande: ${acessoriosCount} produtos em ${accGroups.length} categorias`);
     } catch (e) {
-      console.log(`❌ Erro Dande: ${e.message} (mantendo snapshot)`);
+      throw new Error(`Coleta Dande incompleta; sincronização bloqueada: ${e.message}`);
     }
   } else {
     console.log('ADD_ACESSORIOS=0 — pulando Dande');
@@ -2308,6 +2571,7 @@ async function main() {
   let conflitosVolumeImaratPorId = 0;
   let conflitosGeneroImaratPorId = 0;
   let conflitosPrecoImaratPorId = 0;
+  let conflitosPrecoImaratResolvidos = 0;
   let gruposImaratPorIdConsolidados = 0;
   const normalizarVolumeId = value => String(value || '').toLowerCase().replace(/\s+/g, '').replace(',', '.');
   const chavePrecoId = item => String(item.varejo ?? '').trim() + '|' + String(item.atacado ?? '').trim();
@@ -2353,15 +2617,23 @@ async function main() {
         isMiniatura(source.name, volumeDestino, '') ? 'Miniaturas' : 'Perfumes');
     const grupoDestino = ensureBrandGroup(DATA, linhaDestino, marcaDestino, categoriaDestino);
 
+    const precoVarejoOrigem = source.priceCents != null ? Number(source.priceCents) / 100 : 0;
+    const precoAtacadoOrigem = source.atacado && source.atacado.precoCents != null
+      ? Number(source.atacado.precoCents) / 100
+      : Math.max(precoVarejoOrigem - 30, 0);
+    const precosCanonicos = calcularPrecoMiniatura(
+      source.name || '', marcaOrigem || marcaDestino, volumeDestino, categoriaOrigem,
+      precoVarejoOrigem, precoAtacadoOrigem
+    );
     const precos = new Set(registros.map(r => chavePrecoId(r.item)));
     const registrosManuais = registros.filter(r => precoManualAtivo(r.item));
     let keeper;
 
     if (precos.size > 1) {
       const precosManuais = new Set(registrosManuais.map(r => chavePrecoId(r.item)));
-      if (!registrosManuais.length || precosManuais.size !== 1) {
+      if (registrosManuais.length && precosManuais.size !== 1) {
         conflitosPrecoImaratPorId++;
-        console.log('DUPLICIDADE IMARAT PRESERVADA POR CONFLITO DE PREÇO: ' + JSON.stringify({
+        console.log('DUPLICIDADE IMARAT PRESERVADA POR CONFLITO DE PREÇO MANUAL: ' + JSON.stringify({
           id, nome: source.name,
           itens: registros.map(r => ({
             linha: r.line, marca: r.group.brand, categoria: r.group.cat,
@@ -2371,7 +2643,18 @@ async function main() {
         }));
         continue;
       }
-      keeper = registrosManuais.find(r => chavePrecoId(r.item) === [...precosManuais][0]);
+      if (registrosManuais.length) {
+        keeper = registrosManuais.find(r => chavePrecoId(r.item) === [...precosManuais][0]);
+      } else {
+        keeper = registros.find(r => r.group === grupoDestino) ||
+          [...registros].sort((a, b) => completudeItem(b.item) - completudeItem(a.item))[0];
+        conflitosPrecoImaratResolvidos++;
+        console.log('DUPLICIDADE IMARAT RESOLVIDA PELO PREÇO CANÔNICO DA FONTE: ' + JSON.stringify({
+          id, nome: source.name, marcasEncontradas: [...new Set(registros.map(r => r.group.brand))],
+          precosAnteriores: [...precos], varejoRaiz: precosCanonicos.varejo,
+          atacadoRaiz: precosCanonicos.atacado
+        }));
+      }
     } else {
       keeper = registros.find(r => r.group === grupoDestino) ||
         registrosManuais[0] ||
@@ -2379,6 +2662,10 @@ async function main() {
     }
 
     const itemMantido = keeper.item;
+    if (!registrosManuais.length) {
+      itemMantido.varejo = precosCanonicos.varejo;
+      itemMantido.atacado = precosCanonicos.atacado;
+    }
     for (const registro of registros) {
       if (registro === keeper) continue;
       const outro = registro.item;
@@ -2439,6 +2726,14 @@ async function main() {
     DATA[line] = (DATA[line] || []).filter(group => (group.items || []).length > 0);
   }
 
+  // Executa após todas as fontes terem sido incorporadas ao DATA.
+  // Apenas IDs de origem iguais e identidade comercial exata podem ser unidos.
+  const sourceIdentityDedupe = dedupeConfirmedSourceProducts(DATA);
+  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);
+  for (const conflict of sourceIdentityDedupe.conflicts) {
+    console.log('CONFLITO DE IDENTIDADE DA FONTE PRESERVADO: ' + JSON.stringify(conflict));
+  }
+
   console.log(`Grupos Imarat consolidados: ${gruposImaratConsolidados}`);
   console.log(`Duplicatas exatas Imarat removidas: ${duplicatasImaratRemovidas}`);
   console.log(`Conflitos de preço preservados para revisão: ${conflitosPrecoImaratPreservados}`);
@@ -2446,7 +2741,8 @@ async function main() {
   console.log(`Duplicatas Imarat removidas por ID da origem: ${duplicatasImaratPorIdRemovidas}`);
   console.log(`Conflitos de volume preservados por ID: ${conflitosVolumeImaratPorId}`);
   console.log(`Conflitos de gênero preservados por ID: ${conflitosGeneroImaratPorId}`);
-  console.log(`Conflitos de preço preservados por ID: ${conflitosPrecoImaratPorId}`);
+  console.log(`Conflitos de preço resolvidos pelo preço canônico da origem: ${conflitosPrecoImaratResolvidos}`);
+  console.log(`Conflitos de preço manual preservados por ID: ${conflitosPrecoImaratPorId}`);
 
   for (const line of Object.keys(DATA)) {
     for (const g of DATA[line]) g.items.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
