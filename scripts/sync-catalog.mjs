@@ -2279,6 +2279,9 @@ async function main() {
       // fonte + categoria quando possível. IDs diferentes continuam distintos.
       let staleClothesRemoved = 0;
       let legacyClothesMapped = 0;
+      let legacyClothesConfirmed = 0;
+      let legacyClothesDuplicateRemoved = 0;
+      let legacyClothesUnmatchedRemoved = 0;
       const legacyClothesMoves = [];
       for (const group of DATA.roupas) {
         const kept = [];
@@ -2306,8 +2309,10 @@ async function main() {
           }
           if (!matches.length) {
             staleClothesRemoved++;
+            legacyClothesUnmatchedRemoved++;
             continue;
           }
+          legacyClothesConfirmed++;
           const root = matches[0];
           const rootId = String(root.item.id_origem || '').trim();
           if (!rootId) throw new Error(`LEGACY_ROUPAS_WITHOUT_SOURCE_ID: ${item.nome}; nenhuma exclusão automática foi aplicada.`);
@@ -2316,6 +2321,7 @@ async function main() {
           );
           if (alreadyPresent) {
             staleClothesRemoved++;
+            legacyClothesDuplicateRemoved++;
             continue;
           }
           const manualPrice = item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
@@ -2349,7 +2355,10 @@ async function main() {
       }
       DATA.roupas = DATA.roupas.filter(group => (group.items || []).length > 0);
       console.log(`Roupas fora da fonte raiz removidas após coleta completa: ${staleClothesRemoved}`);
-      console.log(`Roupas legadas confirmadas e reclassificadas pela origem: ${legacyClothesMapped}`);
+      console.log(`Roupas legadas confirmadas pela fonte raiz: ${legacyClothesConfirmed}`);
+      console.log(`Roupas legadas duplicadas removidas: ${legacyClothesDuplicateRemoved}`);
+      console.log(`Roupas legadas sem correspondência removidas: ${legacyClothesUnmatchedRemoved}`);
+      console.log(`Roupas legadas reclassificadas sem cópia atual: ${legacyClothesMapped}`);
       const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
       console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
     }
