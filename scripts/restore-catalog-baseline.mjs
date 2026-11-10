@@ -25,6 +25,7 @@ if (result.restoredIds.length > 200) {
 const next = serializeDataJsContent(currentRaw, result.data);
 fs.writeFileSync(currentPath, next, "utf8");
 console.log("KNOWN_GOOD_BASELINE_PUBLIC_IDS=" + result.baselineIds.size);
+console.log("KNOWN_GOOD_BASELINE_REKEYED=" + result.rekeyedIds.length);
 console.log("KNOWN_GOOD_BASELINE_RESTORED=" + result.restoredIds.length);
 console.log("KNOWN_GOOD_BASELINE_WITHOUT_PUBLIC_ID_SKIPPED=" + result.skippedWithoutPublicId);
 for (const id of result.restoredIds) console.log("KNOWN_GOOD_ITEM_RESTORED=" + id);
