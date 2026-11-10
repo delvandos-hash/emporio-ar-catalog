@@ -296,3 +296,19 @@ test("stock_ref já validado prevalece sobre ID de origem alterado", () => {
   assert.equal(item.stock_route, "a");
   assert.equal(item.id_origem, undefined);
 });
+
+
+test("não compartilha public_id entre marcas com stock_ref coincidente", () => {
+  const result = toPublicCatalog({
+    roupas: [
+      { brand: "Marca A", cat: "Roupas", items: [
+        { nome: "Camisa", id_origem: "123", fonte: "roupas", public_id: "p_aaaaaaaaaaaaaaaaaaaa" }
+      ]},
+      { brand: "Marca B", cat: "Roupas", items: [
+        { nome: "Camisa", id_origem: "123", fonte: "roupas", public_id: "p_bbbbbbbbbbbbbbbbbbbb" }
+      ]}
+    ]
+  });
+  const [a, b] = result.roupas.flatMap(group => group.items);
+  assert.notEqual(a.public_id, b.public_id);
+});
