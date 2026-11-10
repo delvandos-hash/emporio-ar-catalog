@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { toPublicCatalog } from "./public-catalog.mjs";
+import { findExactInternalPriceMatch } from "./audit-catalog-match.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
@@ -292,10 +293,10 @@ for(const [line,groups] of Object.entries(DATA)) {
     const volume=String(item.volume||volumeFrom(null,name));
     const internalKey=[norm(line),norm(group.brand),norm(group.cat),norm(name),volumeMatch(volume,name)].join("|");
     const internalCandidates=internalIndex.get(internalKey)||[];
-    const internal=internalCandidates.find(candidate =>
-      String(candidate.varejo??"")===String(item.varejo??"") &&
-      String(candidate.atacado??"")===String(item.atacado??"")
-    ) || internalCandidates[0] || null;
+    // Nunca atribua um ID de origem apenas porque o nome/volume coincide.
+    // Se os preços não identificam uma única variante interna, a origem fica
+    // sem correspondência e a auditoria não pode fabricar uma duplicidade.
+    const internal=findExactInternalPriceMatch(internalCandidates,item);
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
