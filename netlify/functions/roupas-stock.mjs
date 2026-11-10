@@ -61,8 +61,8 @@ const CATEGORY_IDS = {
   },
 };
 function normalizeCategory(value) {
-  return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
-    .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 }
 
 
@@ -191,7 +191,7 @@ export default async (req) => {
     }
 
     const bases = (source === "sophia" ? src.bases : [src.base])
-      .filter(base => typeof base === "string" && /^https?:\\/\\//i.test(base));
+      .filter(base => typeof base === "string" && /^https?:\/\//i.test(base));
     if (!bases.length) {
       return new Response(JSON.stringify({ erro: "origem não configurada", codigo: "SOURCE_NOT_CONFIGURED" }), {
         status: 503, headers,
