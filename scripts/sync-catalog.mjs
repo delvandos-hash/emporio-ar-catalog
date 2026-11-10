@@ -2474,7 +2474,7 @@ async function main() {
                   Array.isArray(item.variacoes) && item.variacoes.length) {
                 existingItem.variacoes = [...item.variacoes];
               }
-              staleClothesRemoved++;
+              if (!oldPublicId) staleClothesRemoved++;
               legacyClothesDuplicateRemoved++;
               continue;
             }
