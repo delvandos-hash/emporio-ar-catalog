@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - security/legacy-brand-151-delina-resolution-20261110
     paths:
       - "scripts/sync-catalog.mjs"
       - "scripts/dande-url.mjs"
