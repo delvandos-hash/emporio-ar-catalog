@@ -74,6 +74,14 @@ test("sincronização preserva itens sem correspondência na fonte em vez de exc
   assert.match(sync, /legacyClothesUnmatchedPreserved/);
 });
 
+test("consolidação de roupas transfere public_id antigo apenas com stock_ref e grupo exatos", () => {
+  assert.match(sync, /sameGroup && sameStockRef/);
+  assert.match(sync, /existingItem\.public_id = oldPublicId/);
+  assert.match(sync, /existingItem\._preserve_public_id = true/);
+  assert.match(sync, /item\._preserve_public_id !== true/);
+  assert.match(sync, /legacyClothesPublicIdsRekeyed/);
+});
+
 test("restauração do snapshot tem precedência sobre heurísticas de stock_ref e foto", () => {
   assert.match(apply, /if \(baselinePublicIds\.has\(key\)\) return true/);
   assert.match(audit, /!baselinePublicIds\.has\(key\)/);
