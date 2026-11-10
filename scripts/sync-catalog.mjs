@@ -894,8 +894,7 @@ async function fetchSophiaRoupas() {
         if (page === 8) throw new Error(`limite de 8 páginas atingido em ${cat.nome} sem marcador de fim`);
         await sleep(600 + Math.floor(Math.random() * 400));
       } catch (e) {
-        console.log(`    ❌ página ${page}: ${e.message}`);
-        break;
+        throw new Error(`Sophia ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
     if (!completed) throw new Error(`paginação Sophia incompleta em ${cat.nome}`);
@@ -1066,9 +1065,7 @@ async function fetchFrannyRoupas() {
         if (page === 30) throw new Error(`limite de 30 páginas atingido em ${cat.nome}`);
         await sleep(400 + Math.floor(Math.random() * 300));
       } catch (e) {
-        console.log(`    Franny erro p${page}: ${e.message}`);
-        try { cookie = await warmFacilZap(FRANNY_BASE, FRANNY_LOJA); } catch (_) {}
-        break;
+        throw new Error(`Franny ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
     if (!completed) throw new Error(`paginação Franny incompleta em ${cat.nome}`);
@@ -1230,8 +1227,12 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
       ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
       : '';
     const expectedTitle = norm(expectedCategory).replace(/s$/, '');
-    if (!actualTitle || actualTitle !== expectedTitle) {
-      throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}")`);
+    const requestedPath = String(path).replace(/\/+$/, '');
+    const finalPath = new URL(res.url || url).pathname.replace(/\/+$/, '');
+    const genericDandeTitle = actualTitle === 'dande acessorio' &&
+      finalPath === requestedPath && /data-product-id="\d+"/.test(html);
+    if (!actualTitle || (actualTitle !== expectedTitle && !genericDandeTitle)) {
+      throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}", rota final: "${finalPath}")`);
     }
   }
   return html;
@@ -1469,8 +1470,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
         if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com próxima página anunciada`);
         await sleep(400);
       } catch (e) {
-        console.log(`    Dande erro ${cat.nome} p${page}: ${e.message}`);
-        break;
+        throw new Error(`Dande ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
     if (!completed) throw new Error(`paginação Dande incompleta em ${cat.nome}`);
@@ -2160,7 +2160,7 @@ async function main() {
         if (n > 0) chunks.push(sophiaGroups);
         console.log(`Roupas Sophia: ${n} produtos`);
       } catch (e) {
-        console.log(`❌ Erro Sophia: ${e.message} (mantendo snapshot)`);
+        throw new Error(`Coleta Sophia incompleta; sincronização bloqueada: ${e.message}`);
       }
     } else {
       console.log('ADD_ROUPAS=0 — pulando Sophia');
@@ -2175,7 +2175,7 @@ async function main() {
         if (frannyCount > 0) chunks.push(frannyGroups);
         console.log(`Roupas Franny: ${frannyCount} produtos`);
       } catch (e) {
-        console.log(`❌ Erro Franny: ${e.message} (mantendo snapshot)`);
+        throw new Error(`Coleta Franny incompleta; sincronização bloqueada: ${e.message}`);
       }
     } else {
       console.log('ADD_FRANNY=0 — pulando Franny');
@@ -2219,7 +2219,7 @@ async function main() {
       DATA.acessorios = accGroups;
       console.log(`Acessórios Dande: ${acessoriosCount} produtos em ${accGroups.length} categorias`);
     } catch (e) {
-      console.log(`❌ Erro Dande: ${e.message} (mantendo snapshot)`);
+      throw new Error(`Coleta Dande incompleta; sincronização bloqueada: ${e.message}`);
     }
   } else {
     console.log('ADD_ACESSORIOS=0 — pulando Dande');
