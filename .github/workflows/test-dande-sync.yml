@@ -13,6 +13,8 @@ on:
       - "scripts/dande-stock-pagination.test.mjs"
       - "js/dande-category-membership.mjs"
       - "js/app.js"
+      - "js/cart-identity.mjs"
+      - "scripts/cart-identity.test.mjs"
       - "scripts/public-catalog.mjs"
       - "scripts/public-catalog.test.mjs"
       - "netlify/functions/dande-stock.mjs"
@@ -38,7 +40,7 @@ jobs:
           node --check scripts/sync-catalog.mjs
           node --check scripts/dande-url.mjs
           node --check js/dande-category-membership.mjs
-          node --test scripts/dande-url.test.mjs scripts/dande-category-membership.test.mjs scripts/dande-stock-pagination.test.mjs scripts/public-catalog.test.mjs
+          node --test scripts/dande-url.test.mjs scripts/dande-category-membership.test.mjs scripts/dande-stock-pagination.test.mjs scripts/cart-identity.test.mjs scripts/public-catalog.test.mjs
       - name: Executar sincronização em modo isolado
         run: node scripts/sync-catalog.mjs
         env:
