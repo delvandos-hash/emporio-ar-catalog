@@ -1151,11 +1151,11 @@ const DANDE_CATEGORIES = [
   { path: '/colares/', nome: 'Colares' },
   { path: '/conjuntos/', nome: 'Conjuntos' },
   { path: '/lancamentos/', nome: 'Lançamentos' },
-  { path: '/masculino/', nome: 'Masculinos' },
+  { path: '/masculinos/', nome: 'Masculinos' },
   { path: '/prata-925/', nome: 'Prata 925' },
   { path: '/pulseiras/', nome: 'Pulseiras' },
   { path: '/semijoia-italiana/', nome: 'Semijoia Italiana' },
-  { path: '/tornozeleiras1/', nome: 'Tornozeleiras' },
+  { path: '/tornozeleiras/', nome: 'Tornozeleiras' },
 ];
 
 function calcPrecosAcessorios(precoBase) {
@@ -1216,6 +1216,7 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
   const url = page <= 1
     ? `${DANDE_BASE}${path}`
     : `${DANDE_BASE}${path}?page=${page}`;
+  console.log(`    requisitando Dande: ${url}`);
   const res = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'pt-BR,pt;q=0.9' },
   });
@@ -1235,6 +1236,10 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
     if (!actualTitle || (actualTitle !== expectedTitle && !genericDandeTitle)) {
       throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}", rota final: "${finalPath}")`);
     }
+  }
+  if (expectedCategory) {
+    const finalUrl = new URL(res.url || url);
+    console.log(`    resposta Dande: HTTP ${res.status} ${finalUrl.pathname}${finalUrl.search}`);
   }
   return html;
 }
