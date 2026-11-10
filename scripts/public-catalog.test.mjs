@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { toPublicCatalog } from "./public-catalog.mjs";
+import { toPublicCatalog, publicLine } from "./public-catalog.mjs";
 process.env.CDN_IMAGE_BASE_URL = "https://images-primary.example/";
 process.env.CDN_IMAGE_FALLBACK_BASE_URL = "https://images-secondary.example/";
 process.env.IMARAT_ORIGIN_URL = "https://products.example/";
@@ -459,4 +459,12 @@ test("mantém rota Sophia para ID de origem sem prefixo Franny", () => {
     }] }]
   });
   assert.equal(result.roupas[0].items[0].stock_route, "a");
+});
+
+
+test("classifica linha pública por categoria quando o nome da linha é genérico", () => {
+  assert.equal(publicLine("catalogo", [{ cat: "Acessórios de Cabelo" }]), "acessorios");
+  assert.equal(publicLine("catalogo", [{ cat: "Vestidos" }]), "roupas");
+  assert.equal(publicLine("catalogo", [{ cat: "Brand Collection" }]), "brand");
+  assert.equal(publicLine("catalogo", [{ cat: "Perfumes" }]), "perfumaria");
 });
