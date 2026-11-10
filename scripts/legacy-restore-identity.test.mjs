@@ -40,3 +40,14 @@ test("sem marca esperada, falha de forma fechada", () => {
   const a=row("p_a","foto-a");
   assert.equal(resolveLegacyStockMatch([a],[a],{public_id:"p_a",foto:"foto-a"},[]),null);
 });
+
+test("uses a unique origin_ref to resolve a legacy variant before ambiguous name matches", () => {
+  const a = { ...row("p_a", "foto-a"), publicItem: { public_id: "p_a", foto: "foto-a", origin_ref: "origin-a" } };
+  const b = { ...row("p_b", "foto-b"), publicItem: { public_id: "p_b", foto: "foto-b", origin_ref: "origin-b" } };
+  assert.equal(resolveLegacyStockMatch([], [a, b], { public_id: "legacy", origin_ref: "origin-b" }, [], "Marca A", [a, b]), b);
+});
+
+test("fails closed when an explicit origin_ref has no exact internal match", () => {
+  const a = { ...row("p_a", "foto-a"), publicItem: { public_id: "p_a", foto: "foto-a", origin_ref: "origin-a" } };
+  assert.equal(resolveLegacyStockMatch([], [a], { public_id: "legacy", origin_ref: "origin-missing" }, [], "Marca A", [a]), null);
+});
