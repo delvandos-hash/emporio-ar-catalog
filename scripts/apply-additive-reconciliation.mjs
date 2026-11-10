@@ -207,22 +207,31 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
           : [];
         const photoFingerprint = publicPhotoFingerprint(item);
         const byPhoto = photoFingerprint !== "[]" ? candidates.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
-        if (norm(group?.brand) === "isis makeup" && ["body spray", "esfoliante corporal bum bum", "esfoliante corporal pitaya"].includes(norm(item?.nome))) {
-          const sameNameInternal = [...internalIndex.values()].flat().filter(row =>
-            norm(row.publicGroup?.brand) === "isis makeup" && norm(row.publicItem?.nome) === norm(item?.nome)
-          );
-          console.log("ISIS_GIST_VARIANT_DIAGNOSTIC " + JSON.stringify({
-            line, category: group?.cat, name: item?.nome, public_id: item?.public_id || "",
-            volume: item?.volume || "", retail: item?.varejo || "", wholesale: item?.atacado || "",
-            photo: item?.foto || "", photos: item?.fotos || [],
-            internalCandidates: sameNameInternal.map(row => ({
-              line: row.publicLine, category: row.publicGroup?.cat,
-              public_id: row.publicItem?.public_id || "", volume: row.publicItem?.volume || "",
-              retail: row.publicItem?.varejo || "", wholesale: row.publicItem?.atacado || "",
-              photo: row.publicItem?.foto || "", photos: row.publicItem?.fotos || [],
-              origin_id: row.item?.id_origem || ""
-            }))
+        // O Gist pode manter uma representação antiga do mesmo public_id em
+        // outra linha/categoria e com volume desatualizado. Só a reconhecemos
+        // como já representada quando marca, nome, preços e foto principal
+        // coincidem exatamente com um único registro interno.
+        const samePublicIdRepresentations = item.public_id
+          ? (internalByPublicId.get(String(item.public_id)) || []).filter(row =>
+              norm(row.publicGroup?.brand) === norm(group?.brand) &&
+              norm(row.publicItem?.nome) === norm(item?.nome) &&
+              String(row.publicItem?.varejo ?? "").trim() === String(item?.varejo ?? "").trim() &&
+              String(row.publicItem?.atacado ?? "").trim() === String(item?.atacado ?? "").trim() &&
+              photoFingerprint !== "[]" &&
+              publicPhotoFingerprint(row.publicItem) === photoFingerprint
+            )
+          : [];
+        if (byGlobalId.length === 0 && samePublicIdRepresentations.length === 1 &&
+            used.has(samePublicIdRepresentations[0])) {
+          console.log("GIST_VARIANT_ALREADY_REPRESENTED " + JSON.stringify({
+            name: item?.nome, public_id: item?.public_id || "",
+            legacyLine: line, legacyCategory: group?.cat || "",
+            legacyVolume: item?.volume || "",
+            canonicalLine: samePublicIdRepresentations[0].publicLine,
+            canonicalCategory: samePublicIdRepresentations[0].publicGroup?.cat || "",
+            canonicalVolume: samePublicIdRepresentations[0].publicItem?.volume || ""
           }));
+          continue;
         }
         const looseKey = looseIdentity(line, group, item);
         const byLooseIdentity = (internalByLooseIdentity.get(looseKey) || []).filter(row => !used.has(row));
