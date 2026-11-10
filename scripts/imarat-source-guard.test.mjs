@@ -225,7 +225,11 @@ test("auditoria global prioriza id_origem e não confunde produtos homônimos", 
 });
 
 
-test("reconciliação emite diagnóstico somente leitura para variantes legadas ISIS MAKEUP", () => {
-  assert.match(additiveSource, /ISIS_GIST_VARIANT_DIAGNOSTIC/);
-  assert.match(additiveSource, /internalCandidates: sameNameInternal\.map/);
+test("reconciliação reconhece alias legado por public_id, marca, nome, preços e foto principal", () => {
+  assert.match(additiveSource, /const samePublicIdRepresentations = item\.public_id/);
+  assert.match(additiveSource, /norm\(row\.publicGroup\?\.brand\) === norm\(group\?\.brand\)/);
+  assert.match(additiveSource, /String\(row\.publicItem\?\.varejo \?\? ""\)\.trim\(\) === String\(item\?\.varejo \?\? ""\)\.trim\(\)/);
+  assert.match(additiveSource, /publicPhotoFingerprint\(row\.publicItem\) === photoFingerprint/);
+  assert.match(additiveSource, /GIST_VARIANT_ALREADY_REPRESENTED/);
+  assert.doesNotMatch(additiveSource, /ISIS_GIST_VARIANT_DIAGNOSTIC/);
 });
