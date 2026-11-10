@@ -49,7 +49,7 @@ export function dedupeConfirmedSourceProducts(DATA) {
       for (const item of Array.isArray(group?.items) ? group.items : []) {
         const source = norm(item?.fonte);
         const id = String(item?.id_origem ?? "").trim();
-        const brand = norm(group?.brand);
+        const brand = source === "brand" ? "brand-collection" : norm(group?.brand);
         const name = norm(item?.nome);
         const volume = volumeOf(item);
         if (!source || source === "imarat" || !id || !brand || !name) {
