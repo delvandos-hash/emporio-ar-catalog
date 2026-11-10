@@ -7,6 +7,8 @@ on:
       - security/legacy-brand-151-delina-resolution-20261110
     paths:
       - "scripts/sync-catalog.mjs"
+      - "scripts/catalog-identity.mjs"
+      - "scripts/catalog-identity.test.mjs"
       - "scripts/dande-url.mjs"
       - "scripts/dande-url.test.mjs"
       - "scripts/dande-category-membership.test.mjs"
@@ -43,7 +45,7 @@ jobs:
           node --check scripts/dande-url.mjs
           node --check netlify/functions/roupas-stock.mjs
           node --check js/dande-category-membership.mjs
-          node --test scripts/dande-url.test.mjs scripts/dande-category-membership.test.mjs scripts/dande-stock-pagination.test.mjs scripts/cart-identity.test.mjs scripts/public-catalog.test.mjs scripts/variation-stock.test.mjs
+          node --test scripts/catalog-identity.test.mjs scripts/dande-url.test.mjs scripts/dande-category-membership.test.mjs scripts/dande-stock-pagination.test.mjs scripts/cart-identity.test.mjs scripts/public-catalog.test.mjs scripts/variation-stock.test.mjs
       - name: Executar sincronização em modo isolado
         run: node scripts/sync-catalog.mjs
         env:
