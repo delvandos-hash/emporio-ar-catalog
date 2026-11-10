@@ -864,6 +864,7 @@ async function fetchSophiaRoupas() {
             nome: limparTexto((vinfo && vinfo.nome) || '').trim() || String(vid),
             cor: (vinfo && vinfo.cor) || null,
             estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
+            ...normalizeVariationMedia(vinfo, toAbsImg),
           }));
           const totalEstoque =
             Number(p.total_estoque) ||
@@ -943,6 +944,17 @@ function toAbsFacilImg(u) {
   return FACILZAP_IMG + s.replace(/^\//, '');
 }
 
+function normalizeVariationMedia(variation, imageNormalizer) {
+  if (!variation || typeof variation !== "object") return {};
+  const singles = ["foto", "imagem", "image", "url_imagem", "url", "thumbnail"]
+    .map(key => variation[key]);
+  const arrays = ["fotos", "imagens", "images"]
+    .flatMap(key => Array.isArray(variation[key]) ? variation[key] : []);
+  const fotos = [...new Set([...singles, ...arrays]
+    .map(imageNormalizer).filter(Boolean))];
+  return fotos.length ? { foto: fotos[0], fotos } : {};
+}
+
 function limparDescricaoHtml(html) {
   if (!html) return '';
   return String(html)
@@ -1019,6 +1031,7 @@ function normalizeFacilZapProduct(p, idPrefix = '') {
     nome: limparTexto((vinfo && vinfo.nome) || '').trim() || String(vid),
     cor: (vinfo && vinfo.cor) || null,
     estoque: Number(estoqueMap[vid] ?? estoqueMap[String(vid)] ?? 0) || 0,
+    ...normalizeVariationMedia(vinfo, toAbsFacilImg),
   }));
   const totalEstoque =
     Number(p.total_estoque) || variacoes.reduce((s, v) => s + v.estoque, 0);
@@ -2780,7 +2793,7 @@ async function main() {
   // Executa após todas as fontes terem sido incorporadas ao DATA.
   // Apenas IDs de origem iguais e identidade comercial exata podem ser unidos.
   const sourceIdentityDedupe = dedupeConfirmedSourceProducts(DATA);
-  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);
+  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);\n  console.log(`Duplicatas visuais confirmadas Franny/Sophia removidas: ${sourceIdentityDedupe.visualRemoved || 0}`);
   for (const conflict of sourceIdentityDedupe.conflicts) {
     console.log('CONFLITO DE IDENTIDADE DA FONTE PRESERVADO: ' + JSON.stringify(conflict));
   }
