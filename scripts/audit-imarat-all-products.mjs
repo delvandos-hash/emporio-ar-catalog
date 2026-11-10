@@ -290,6 +290,24 @@ console.log(`PUBLIC_ID_COLLISION_GROUPS=${publicIdCollisions.length}`);
 for (const [public_id, rows] of publicIdCollisions) {
   console.log("PUBLIC_ID_COLLISION_DETAIL " + JSON.stringify({ public_id, rows }));
 }
+
+const internalPublicIdCollisionMap = new Map();
+for (const [line, groups] of Object.entries(internalPublicData)) {
+  for (const group of groups || []) for (const item of group.items || []) {
+    const id = String(item?.public_id || "").trim();
+    if (!id) continue;
+    if (!internalPublicIdCollisionMap.has(id)) internalPublicIdCollisionMap.set(id, []);
+    internalPublicIdCollisionMap.get(id).push({
+      line, brand: group.brand || "", category: group.cat || "", name: item.nome || "",
+      origin_ref: item.origin_ref || "", stock_ref: item.stock_ref || ""
+    });
+  }
+}
+const internalPublicIdCollisions = [...internalPublicIdCollisionMap].filter(([, rows]) => rows.length > 1);
+console.log(`INTERNAL_PUBLIC_ID_COLLISION_GROUPS=${internalPublicIdCollisions.length}`);
+for (const [public_id, rows] of internalPublicIdCollisions) {
+  console.log("INTERNAL_PUBLIC_ID_COLLISION_DETAIL " + JSON.stringify({ public_id, rows }));
+}
 const internalItemCount=internalPublicIndex.size;
 const liveKeySet=new Set(catalog.map(x=>String(x.item.public_id||"")));
 const internalOnlyKeys=[...internalPublicIndex.keys()].filter(key=>!liveKeySet.has(key));
@@ -331,6 +349,8 @@ const additiveReconciliationSafe =
   // Ambiguidades de rekey não bloqueiam a preservação: os itens permanecem no Gist
   // e a publicação aditiva só prossegue se nenhum ID público ficar sem representação.
   liveOnlyKeys.length === 0 &&
+  publicIdCollisions.length === 0 &&
+  internalPublicIdCollisions.length === 0 &&
   eligibleInternalOnlyRows.length <= 80 &&
   internalOnlyKeys.length <= 80 &&
   Math.abs(catalog.length - internalItemCount) <= 80 &&
