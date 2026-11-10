@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
-import { resolveLegacyStockMatch } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, legacyVolumeIdentity } from "./legacy-restore-identity.mjs";
 import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,11 +15,7 @@ function norm(value) {
     .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 }
 function volumeMatch(value, name) {
-  let raw = String(value || "").trim();
-  if (raw && /^\d+(?:[.,]\d+)?$/.test(raw)) raw += "ml";
-  const match = raw.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i) ||
-    String(name || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
-  return match ? String(Number(match[1].replace(",", "."))) + match[2].toLowerCase() : "";
+  return legacyVolumeIdentity(value, name);
 }
 function identity(line, group, item) {
   return [norm(line), norm(group?.brand), norm(group?.cat), norm(item?.nome), volumeMatch(item?.volume, item?.nome)].join("|");

@@ -3,6 +3,19 @@ function normalizeBrand(value) {
     .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
 }
 
+// O volume explicitamente informado é a fonte primária da identidade.
+// Só recorremos ao título quando o campo está realmente vazio; valores como
+// "—" não devem herdar um volume do nome e colidir com outra variante.
+export function legacyVolumeIdentity(value, name = "") {
+  const raw = String(value ?? "").trim();
+  if (raw) {
+    const normalized = /^\d+(?:[.,]\d+)?$/.test(raw) ? raw + "ml" : raw;
+    const explicit = normalized.match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+    return explicit ? String(Number(explicit[1].replace(",", "."))) + explicit[2].toLowerCase() : "";
+  }
+  const fromName = String(name ?? "").match(/(\d+(?:[.,]\d+)?)\s*(ml|g)\b/i);
+  return fromName ? String(Number(fromName[1].replace(",", "."))) + fromName[2].toLowerCase() : "";
+}
 export function legacyPhotoFingerprint(item) {
   const photos = Array.isArray(item?.fotos) && item.fotos.length ? item.fotos : (item?.foto ? [item.foto] : []);
   return [...new Set(photos.map(x => String(x ?? "").trim()).filter(Boolean))].sort().join("~");
