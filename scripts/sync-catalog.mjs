@@ -1863,30 +1863,6 @@ async function main() {
     }
   }
 
-  // Registros sem procedência que não foram confirmados em nenhuma fonte raiz
-  // são removidos. Exceções: Brand e Roupas são reconciliados abaixo; Scoop
-  // Premiado é um item próprio do Empório A.R, não um produto de fornecedor.
-  let unverifiedLegacyRemoved = 0;
-  const unverifiedLegacyNames = [];
-  for (const line of Object.keys(DATA)) {
-    if (line === 'roupas') continue;
-    for (const group of DATA[line] || []) {
-      if (group.cat === 'Brand' || String(group.cat || '').startsWith('Brand') ||
-          norm(group.cat) === 'scoop premiado') continue;
-      group.items = (group.items || []).filter(item => {
-        const source = norm(item.fonte);
-        if (source !== '' && source !== 'legacy gist') return true;
-        unverifiedLegacyRemoved++;
-        unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome });
-        return false;
-      });
-    }
-  }
-  console.log(`Registros legados sem correspondência em fonte raiz removidos: ${unverifiedLegacyRemoved}`);
-  for (const item of unverifiedLegacyNames) {
-    console.log('LEGADO SEM ORIGEM REMOVIDO: ' + JSON.stringify(item));
-  }
-
   // Correção nominal específica validada pelo responsável do catálogo:
   // Atheri é a grafia incorreta; Atherri é a grafia correta da miniatura Afeer.
   // Só atua na categoria Miniaturas e no grupo da marca Afeer.
@@ -2105,6 +2081,18 @@ async function main() {
       const matches = findBrandRootMatches(item, group);
       return matches.length === 1 ? matches[0] : null;
     };
+    const findAnyBrandRootMatches = item => {
+      const id = String(item.id_origem || item.id || '').trim();
+      if (id) {
+        const byId = brandList.filter(p => String(p.id ?? p.productId ?? p.slug ?? '').trim() === id);
+        if (byId.length) return byId;
+      }
+      const itemVolume = volumeMatch(item.volume, item.nome);
+      return brandList.filter(p =>
+        norm(p.nome) === norm(item.nome) &&
+        volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume
+      );
+    };
   if (!SYNC_IMARAT_ONLY) {
     if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
     let staleBrandRemoved = 0;
@@ -2134,6 +2122,56 @@ async function main() {
     }
     console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
     console.log(`Produtos Brand legados confirmados e reclassificados pela origem: ${legacyBrandMapped}`);
+    // Registros antigos em outras categorias também podem pertencer à Brand
+    // Collection. Só são movidos com ID ou nome+volume únicos na fonte raiz.
+    let legacyBrandMoved = 0;
+    let unverifiedLegacyRemoved = 0;
+    const unverifiedLegacyNames = [];
+    const brandLegacyMoves = [];
+    for (const line of Object.keys(DATA)) {
+      if (line === 'roupas') continue;
+      for (const group of DATA[line] || []) {
+        if (group.cat === 'Brand' || String(group.cat || '').startsWith('Brand') ||
+            norm(group.cat) === 'scoop premiado') continue;
+        const kept = [];
+        for (const item of group.items || []) {
+          const source = norm(item.fonte);
+          if (source !== '' && source !== 'legacy gist') {
+            kept.push(item);
+            continue;
+          }
+          const matches = findAnyBrandRootMatches(item);
+          if (matches.length > 1) {
+            throw new Error(`LEGACY_BRAND_CROSS_CATEGORY_AMBIGUOUS: ${item.nome} / ${matches.length} IDs da fonte`);
+          }
+          const hit = matches[0];
+          if (!hit) {
+            unverifiedLegacyRemoved++;
+            unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome });
+            continue;
+          }
+          const session = brandSession(hit);
+          if (!session) throw new Error(`LEGACY_BRAND_WITHOUT_SESSION: ${item.nome}`);
+          item.fonte = 'brand';
+          item.id_origem = String(hit.id ?? hit.productId ?? hit.slug ?? '');
+          item.nome = hit.nome;
+          const sourceVolume = volumeFrom(null, hit.nome);
+          if (sourceVolume) item.volume = sourceVolume;
+          brandLegacyMoves.push({ line, session, item });
+          legacyBrandMoved++;
+        }
+        group.items = kept;
+      }
+    }
+    for (const move of brandLegacyMoves) {
+      const target = ensureBrandGroup(DATA, move.line, move.session, 'Brand');
+      target.items.push(move.item);
+    }
+    console.log(`Produtos legados movidos para a sessão Brand confirmados na origem: ${legacyBrandMoved}`);
+    console.log(`Registros legados sem correspondência em nenhuma fonte raiz removidos: ${unverifiedLegacyRemoved}`);
+    for (const item of unverifiedLegacyNames) {
+      console.log('LEGADO SEM ORIGEM REMOVIDO: ' + JSON.stringify(item));
+    }
   }
 
   let addedBrand = 0;
