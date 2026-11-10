@@ -205,7 +205,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
         if (liveItem.stock_ref && item.stock_ref !== liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
         if (liveItem.stock_route && item.stock_route !== liveItem.stock_route) item.stock_route = liveItem.stock_route;
-        if (liveItem.public_id && item.public_id !== liveItem.public_id) item.public_id = liveItem.public_id;
+        if (liveItem.public_id && item.public_id !== liveItem.public_id && item._preserve_public_id !== true) item.public_id = liveItem.public_id;
       }
     }
   }
@@ -2377,6 +2377,8 @@ async function main() {
       let legacyClothesMapped = 0;
       let legacyClothesConfirmed = 0;
       let legacyClothesDuplicateRemoved = 0;
+      let legacyClothesPublicIdsRekeyed = 0;
+      let legacyClothesIdentityConflictsPreserved = 0;
       let legacyClothesUnmatchedRemoved = 0;
       let legacyClothesUnmatchedPreserved = 0;
       const legacyClothesMoves = [];
@@ -2422,12 +2424,65 @@ async function main() {
           const root = matches[0];
           const rootId = String(root.item.id_origem || '').trim();
           if (!rootId) throw new Error(`LEGACY_ROUPAS_WITHOUT_SOURCE_ID: ${item.nome}; nenhuma exclusão automática foi aplicada.`);
-          const alreadyPresent = DATA.roupas.some(g =>
-            (g.items || []).some(existing => existing !== item && String(existing.id_origem || '') === rootId)
+          const existingRows = DATA.roupas.flatMap(existingGroup =>
+            (existingGroup.items || [])
+              .filter(existing => existing !== item && String(existing.id_origem || '') === rootId)
+              .map(existing => ({ group: existingGroup, item: existing }))
           );
-          if (alreadyPresent) {
-            staleClothesRemoved++;
-            legacyClothesDuplicateRemoved++;
+          if (existingRows.length > 1) {
+            throw new Error(`LEGACY_ROUPAS_SOURCE_ID_AMBIGUOUS: ${item.nome} / ${rootId} aparece em ${existingRows.length} registros; nenhum foi removido.`);
+          }
+          if (existingRows.length === 1) {
+            const existingRow = existingRows[0];
+            const existingItem = existingRow.item;
+            const sameGroup = norm(existingRow.group.cat) === norm(group.cat) &&
+              norm(existingRow.group.brand) === norm(group.brand);
+            const oldStockRef = String(item.stock_ref || '').trim();
+            const currentStockRef = String(existingItem.stock_ref || '').trim();
+            const sameStockRef = Boolean(oldStockRef && currentStockRef && oldStockRef === currentStockRef);
+            if (sameGroup && sameStockRef) {
+              const oldPublicId = String(item.public_id || '').trim();
+              if (oldPublicId) {
+                const collision = Object.values(DATA).some(groups =>
+                  (groups || []).some(candidateGroup =>
+                    (candidateGroup.items || []).some(candidate =>
+                      candidate !== item && candidate !== existingItem &&
+                      String(candidate.public_id || '').trim() === oldPublicId
+                    )
+                  )
+                );
+                if (collision) throw new Error(`LEGACY_ROUPAS_PUBLIC_ID_COLLISION: ${oldPublicId}; nenhum ID foi sobrescrito.`);
+                existingItem.public_id = oldPublicId;
+                existingItem._preserve_public_id = true;
+                legacyClothesPublicIdsRekeyed++;
+              }
+              const manualPrice = item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
+              if (manualPrice) {
+                existingItem.varejo = item.varejo;
+                existingItem.atacado = item.atacado;
+                existingItem.precoManual = true;
+              }
+              const mergedPhotos = [...new Set([
+                ...(Array.isArray(existingItem.fotos) ? existingItem.fotos : []),
+                existingItem.foto || '',
+                ...(Array.isArray(item.fotos) ? item.fotos : []),
+                item.foto || ''
+              ].filter(Boolean))];
+              if (mergedPhotos.length) existingItem.fotos = mergedPhotos;
+              if (!existingItem.foto && item.foto) existingItem.foto = item.foto;
+              if ((!Array.isArray(existingItem.variacoes) || !existingItem.variacoes.length) &&
+                  Array.isArray(item.variacoes) && item.variacoes.length) {
+                existingItem.variacoes = [...item.variacoes];
+              }
+              staleClothesRemoved++;
+              legacyClothesDuplicateRemoved++;
+              continue;
+            }
+            // ID de origem semelhante não basta: sem stock_ref e grupo idênticos,
+            // mantém a representação legada para revisão, sem colapsar produtos.
+            staleClothesPreserved++;
+            legacyClothesIdentityConflictsPreserved++;
+            kept.push(item);
             continue;
           }
           const manualPrice = item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
@@ -2464,6 +2519,8 @@ async function main() {
       console.log(`Roupas sem correspondência preservadas: ${staleClothesPreserved}`);
       console.log(`Roupas legadas confirmadas pela fonte raiz: ${legacyClothesConfirmed}`);
       console.log(`Roupas legadas duplicadas removidas: ${legacyClothesDuplicateRemoved}`);
+      console.log(`Roupas legadas com public_id anterior reatribuído por stock_ref exato: ${legacyClothesPublicIdsRekeyed}`);
+      console.log(`Roupas com ID de origem semelhante, mas sem stock_ref/grupo exato, preservadas: ${legacyClothesIdentityConflictsPreserved}`);
       console.log(`Roupas legadas sem correspondência removidas: ${legacyClothesUnmatchedRemoved}`);
       console.log(`Roupas legadas sem correspondência preservadas: ${legacyClothesUnmatchedPreserved}`);
       console.log(`Roupas legadas reclassificadas sem cópia atual: ${legacyClothesMapped}`);
@@ -2841,6 +2898,11 @@ async function main() {
   const livePreservation = preserveLivePublicFields(DATA, LIVE_GIST_DATA);
   if (livePreservation.ambiguous) {
     throw new Error(`Preservação de dados públicos ambígua em ${livePreservation.ambiguous} variantes; publicação bloqueada.`);
+  }
+  for (const groups of Object.values(DATA)) {
+    for (const group of groups || []) {
+      for (const item of group.items || []) delete item._preserve_public_id;
+    }
   }
 
   const out = '/** Empório A.R — sync ' + new Date().toISOString() + ` | +${addedImarat} Imarat +${addedBrand} Brand +${roupasCount}+${frannyCount} Roupas +${acessoriosCount} Acc | estoqueΔ ${stockChanged} | preçoΔ ${priceChanged} */\n` + 'export const DATA = ' + JSON.stringify(DATA) + ';\n' + 'export const WHATSAPP = "5562991134488";\n' + 'export const BRAND = { name: "Empório A.R", phone: "(62) 99113-4488" };\n';
