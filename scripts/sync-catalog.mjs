@@ -2053,17 +2053,28 @@ async function main() {
   console.log(`Brand total: ${brandList.length} | nas sessões permitidas: ${brandAllowed.length}`);
   if (!SYNC_IMARAT_ONLY) {
     if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
-    const brandRootIds = new Set(brandList.map(p => String(p.id ?? p.productId ?? p.slug ?? '')).filter(Boolean));
+    const brandSession = p => {
+      let session = mapBrandSession(p.categoria_nome || p.categoria || '');
+      if (!session && norm(p.nome).includes('tubete')) session = 'TUBETES BRAND';
+      return session;
+    };
+    const findBrandRootMatch = (item, group) => {
+      const id = String(item.id_origem || '').trim();
+      const itemVolume = volumeMatch(item.volume, item.nome);
+      return brandList.find(p => {
+        if (norm(brandSession(p)) !== norm(group.brand)) return false;
+        const sourceId = String(p.id ?? p.productId ?? p.slug ?? '').trim();
+        if (id) return sourceId === id;
+        return norm(p.nome) === norm(item.nome) &&
+          volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume;
+      }) || null;
+    };
     let staleBrandRemoved = 0;
     for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
       if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
       group.items = (group.items || []).filter(item => {
         if (norm(item.fonte) !== 'brand') return true;
-        const id = String(item.id_origem || '').trim();
-        const exists = id ? brandRootIds.has(id) : brandList.some(p =>
-          norm(p.nome) === norm(item.nome) &&
-          norm(mapBrandSession(p.categoria_nome || p.categoria || '')) === norm(group.brand)
-        );
+        const exists = Boolean(findBrandRootMatch(item, group));
         if (!exists) staleBrandRemoved++;
         return exists;
       });
@@ -2076,7 +2087,7 @@ async function main() {
     for (const g of DATA[line]) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
       for (let i = 0; i < g.items.length; i++) {
-        const it = g.items[i]; const n = norm(it.nome); const hit = brandList.find((p) => norm(p.nome) === n) || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
+        const it = g.items[i]; const hit = findBrandRootMatch(it, g);
         if (!hit) continue;
         it.nome = hit.nome; 
         if (hit.descricao) it.notas = String(hit.descricao).trim().slice(0, 500);
@@ -2093,9 +2104,7 @@ async function main() {
     for (const g of DATA[line] || []) {
       if (!(g.cat === 'Brand' || String(g.cat || '').startsWith('Brand'))) continue;
       for (const it of g.items || []) {
-        const n = norm(it.nome);
-        const hit = brandList.find((p) => norm(p.nome) === n)
-          || brandList.find((p) => n.length > 6 && (n.includes(norm(p.nome)) || norm(p.nome).includes(n)));
+        const hit = findBrandRootMatch(it, g);
         if (!hit) {
           if ((it.disponivel || 'Sim') !== 'Não') {
             it.disponivel = 'Não';
