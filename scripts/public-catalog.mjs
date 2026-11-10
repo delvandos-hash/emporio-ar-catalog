@@ -99,7 +99,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
       const stock = stockRef(source, record.item?.id_origem);
       const origin = originRef(source, record.item?.id_origem, record.group?.brand);
-      const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
+      const stableKey = stock ? "stock:" + String(record.group?.brand || "").trim().toLowerCase() + "|" + stock : (origin ? "origin:" + origin : "");
       if (stableKey && publicIdByStableOrigin.has(stableKey)) {
         const existingId = publicIdByStableOrigin.get(stableKey);
         publicIdByItem.set(record.item, existingId);
@@ -117,7 +117,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
         const stock = stockRef(source, record.item?.id_origem);
         const origin = originRef(source, record.item?.id_origem, record.group?.brand);
-        const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
+        const stableKey = stock ? "stock:" + String(record.group?.brand || "").trim().toLowerCase() + "|" + stock : (origin ? "origin:" + origin : "");
         if (stableKey) publicIdByStableOrigin.set(stableKey, supplied);
       }
     }
@@ -143,7 +143,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       const source = record.item?.fonte || publicSource(record.line, record.group?.cat);
       const stock = stockRef(source, record.item?.id_origem);
       const origin = originRef(source, record.item?.id_origem, record.group?.brand);
-      const stableKey = stock ? "stock:" + stock : (origin ? "origin:" + origin : "");
+      const stableKey = stock ? "stock:" + String(record.group?.brand || "").trim().toLowerCase() + "|" + stock : (origin ? "origin:" + origin : "");
       if (stableKey) publicIdByStableOrigin.set(stableKey, nextId);
     }
   }
