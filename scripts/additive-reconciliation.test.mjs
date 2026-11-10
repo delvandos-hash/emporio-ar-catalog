@@ -170,3 +170,11 @@ test("preflight aceita tanto dry-run quanto no-op seguro da reconciliação", ()
   const workflow = readFileSync(new URL("../.github/workflows/sync-stock.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes("grep -Eq 'ADDITIVE_RECONCILIATION_(DRY_RUN|NOOP)=true'"));
 });
+
+
+test("auditoria bloqueia reconciliação quando public_id colide no Gist ou na base interna", () => {
+  assert.match(audit, /const internalPublicIdCollisionMap = new Map\(\)/);
+  assert.match(audit, /INTERNAL_PUBLIC_ID_COLLISION_GROUPS=/);
+  assert.match(audit, /publicIdCollisions\.length === 0/);
+  assert.match(audit, /internalPublicIdCollisions\.length === 0/);
+});
