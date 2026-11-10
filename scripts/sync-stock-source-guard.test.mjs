@@ -8,6 +8,8 @@ const fetchBrand = source.slice(source.indexOf("async function fetchBrand() {"),
 test("sync de estoque só aceita Brand após confirmar fim da paginação", () => {
   assert.match(fetchBrand, /pagina_especifica: ''/);
   assert.match(fetchBrand, /let completed = false/);
+  assert.match(fetchBrand, /!Object\.prototype\.hasOwnProperty\.call\(data, 'produtos'\).*products = \[\]/s);
+  assert.match(fetchBrand, /else products = data\?\.produtos/);
   assert.match(fetchBrand, /if \(!products\.length\)\s*\{\s*completed = true;/);
   assert.match(fetchBrand, /if \(!completed \|\| fetched === 0\)/);
   assert.match(fetchBrand, /atingiu o limite de 80 páginas sem fim confirmado/);
