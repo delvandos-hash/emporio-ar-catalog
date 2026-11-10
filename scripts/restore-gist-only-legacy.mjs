@@ -81,7 +81,10 @@ function legacyFromPublic(item, { rekeyPublicId = false } = {}) {
   };
 }
 function buildIndexes(DATA) {
-  const publicDATA = toPublicCatalog(DATA);
+  // O índice de restauração precisa manter uma linha por registro interno.
+  // A deduplicação visual só deve ocorrer na projeção pública final, nunca ao
+  // construir os candidatos usados para preservar preços, fotos e IDs do Gist.
+  const publicDATA = toPublicCatalog(DATA, { dedupeClothing: false });
   const identityIndex = new Map();
   const stockIndex = new Map();
   const publicIdIndex = new Map();
