@@ -946,12 +946,18 @@ function toAbsFacilImg(u) {
 
 function normalizeVariationMedia(variation, imageNormalizer) {
   if (!variation || typeof variation !== "object") return {};
-  const singles = ["foto", "imagem", "image", "url_imagem", "url", "thumbnail"]
+  const normalizeOne = value => {
+    const raw = value && typeof value === "object"
+      ? (value.url || value.src || value.path || value.foto || value.imagem || "")
+      : value;
+    return imageNormalizer(raw);
+  };
+  const singles = ["foto", "imagem", "image", "url_imagem", "foto_url", "imagem_url",
+    "image_url", "url_foto", "thumbnail", "thumbnail_url", "src"]
     .map(key => variation[key]);
-  const arrays = ["fotos", "imagens", "images"]
+  const arrays = ["fotos", "imagens", "images", "thumbnails"]
     .flatMap(key => Array.isArray(variation[key]) ? variation[key] : []);
-  const fotos = [...new Set([...singles, ...arrays]
-    .map(imageNormalizer).filter(Boolean))];
+  const fotos = [...new Set([...singles, ...arrays].map(normalizeOne).filter(Boolean))];
   return fotos.length ? { foto: fotos[0], fotos } : {};
 }
 
@@ -2791,7 +2797,8 @@ async function main() {
   }
 
   // Executa após todas as fontes terem sido incorporadas ao DATA.
-  // Apenas IDs de origem iguais e identidade comercial exata podem ser unidos.
+  // Primeiro une IDs de origem repetidos; depois remove apenas duplicatas visuais
+  // Franny/Sophia com galerias e conjuntos de variações fortemente coincidentes.
   const sourceIdentityDedupe = dedupeConfirmedSourceProducts(DATA);
   console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);
   console.log(`Duplicatas visuais confirmadas Franny/Sophia removidas: ${sourceIdentityDedupe.visualRemoved || 0}`);
