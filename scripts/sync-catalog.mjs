@@ -1485,21 +1485,11 @@ async function fetchDandeAcessorios(existingGroups = []) {
     if (!byCat.has(cat)) byCat.set(cat, []);
     byCat.get(cat).push(item);
   }
-  // Preserve existing items not found in scrape (keep snapshot)
-  for (const [id, prev] of existingById) {
-    if (byId.has(id)) continue;
-    const cat = prev.cat || 'Outros';
-    // try find cat from existing groups
-    let foundCat = 'Outros';
-    for (const g of existingGroups || []) {
-      if ((g.items || []).some((it) => String(it.id_origem) === String(id))) {
-        foundCat = g.cat || 'Outros';
-        break;
-      }
-    }
-    if (!byCat.has(foundCat)) byCat.set(foundCat, []);
-    byCat.get(foundCat).push({ ...prev, fonte: 'acessorios' });
-  }
+  // A coleta de todas as categorias foi concluída. Itens antigos ausentes
+  // da origem não podem ser reinseridos no snapshot: isso ressuscitaria
+  // produtos removidos/inativos e contrariaria a reconciliação pela fonte raiz.
+  const staleExisting = [...existingById.keys()].filter(id => !byId.has(id));
+  console.log(`Dande itens antigos ausentes da fonte raiz descartados após coleta completa: ${staleExisting.length}`);
 
   const groups = [];
   for (const [cat, items] of byCat) {
