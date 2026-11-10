@@ -226,6 +226,6 @@ test("auditoria global prioriza id_origem e não confunde produtos homônimos", 
 
 
 test("reconciliação emite diagnóstico somente leitura para variantes legadas ISIS MAKEUP", () => {
-  assert.match(additiveReconciliation, /ISIS_GIST_VARIANT_DIAGNOSTIC/);
+  assert.match(additiveSource, /ISIS_GIST_VARIANT_DIAGNOSTIC/);
   assert.match(additiveReconciliation, /internalCandidates: sameNameInternal\.map/);
 });
