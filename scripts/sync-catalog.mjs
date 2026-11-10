@@ -1352,7 +1352,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const seenPageSignatures = new Set();
     let categoryAdded = 0;
     let completed = false;
-    for (let page = 1; page <= 15; page++) {
+    for (let page = 1; page <= 80; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
@@ -1477,7 +1477,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
           completed = true;
           break;
         }
-        if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com lote de ${list.length} produtos ou próxima página anunciada`);
+        if (page === 80) throw new Error(`limite de 80 páginas atingido em ${cat.nome} com lote de ${list.length} produtos ou próxima página anunciada`);
         await sleep(400);
       } catch (e) {
         throw new Error(`Dande ${cat.nome} página ${page} falhou: ${e.message}`);
@@ -1494,6 +1494,14 @@ async function fetchDandeAcessorios(existingGroups = []) {
     if (!byCat.has(cat)) byCat.set(cat, []);
     byCat.get(cat).push(item);
   }
+  // Proteção contra coleta parcial: a Dande possui paginação por query string e
+  // pode omitir links de próxima página. Nunca descartar centenas de IDs antigos
+  // quando o novo inventário cai abruptamente; bloquear e investigar a origem.
+  const minimumExpected = Math.max(186, Math.ceil(existingById.size * 0.8));
+  if (byId.size < minimumExpected) {
+    throw new Error(`inventário Dande abaixo do mínimo de segurança: coletados=${byId.size}, mínimo=${minimumExpected}, IDs anteriores=${existingById.size}; nenhum registro antigo será descartado`);
+  }
+
   // A coleta de todas as categorias foi concluída. Itens antigos ausentes
   // da origem não podem ser reinseridos no snapshot: isso ressuscitaria
   // produtos removidos/inativos e contrariaria a reconciliação pela fonte raiz.
