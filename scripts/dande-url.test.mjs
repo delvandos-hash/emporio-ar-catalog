@@ -32,3 +32,13 @@ test("sync e consulta de estoque usam a rota real singular Masculino", () => {
   assert.doesNotMatch(sync, /path: '\/masculinos\/', nome: 'Masculinos'/);
   assert.doesNotMatch(stock, /path: "\/masculinos\/", nome: "Masculinos"/);
 });
+
+
+test("sync e estoque usam a rota raiz real Tornozeleiras1 da Dande", () => {
+  const sync = readFileSync("scripts/sync-catalog.mjs", "utf8");
+  const stock = readFileSync("netlify/functions/dande-stock.mjs", "utf8");
+  assert.match(sync, /path: '\/tornozeleiras1\/', nome: 'Tornozeleiras'/);
+  assert.match(stock, /path: "\/tornozeleiras1\/", nome: "Tornozeleiras"/);
+  assert.doesNotMatch(sync, /path: '\/tornozeleiras\/', nome: 'Tornozeleiras'/);
+  assert.doesNotMatch(stock, /path: "\/tornozeleiras\/", nome: "Tornozeleiras"/);
+});
