@@ -12,6 +12,7 @@ import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
+import { buildDandeUrl } from './dande-url.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1213,12 +1214,11 @@ function hasDandeNextPage(html, page) {
 async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-  const url = page <= 1
-    ? `${DANDE_BASE}${path}`
-    : `${DANDE_BASE}${path}?page=${page}`;
+  const url = buildDandeUrl(DANDE_BASE, path, page);
   console.log(`    requisitando Dande: ${url}`);
   const res = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'pt-BR,pt;q=0.9' },
+    redirect: 'error',
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
@@ -1284,8 +1284,7 @@ function parseDandeListProducts(html) {
       const window = html.slice(Math.max(0, namePos - 3000), namePos + 400);
       const hm = window.match(/href="((?:https:\/\/dandejoias\.com)?\/produtos\/[^"]+)"/i);
       if (hm) {
-        url = hm[1];
-        if (url.startsWith('/')) url = DANDE_BASE + url;
+        try { url = new URL(hm[1], DANDE_BASE).toString(); } catch { url = ''; }
       }
     }
     const nome = names[id] || '';
