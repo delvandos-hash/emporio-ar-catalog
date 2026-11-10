@@ -75,7 +75,7 @@ test("sincronização preserva itens sem correspondência na fonte em vez de exc
 });
 
 test("consolidação de roupas transfere public_id antigo apenas com stock_ref e grupo exatos", () => {
-  assert.match(sync, /sameGroup && sameStockRef/);
+  assert.match(sync, /sameGroup && sameStockRef && sameName && sameVolume/);
   assert.match(sync, /existingItem\.public_id = oldPublicId/);
   assert.match(sync, /existingItem\._preserve_public_id = true/);
   assert.match(sync, /item\._preserve_public_id !== true/);
