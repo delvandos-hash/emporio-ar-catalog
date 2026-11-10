@@ -83,21 +83,61 @@ jobs:
           SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
           FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
           DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
-      - name: Confirmar que todos os IDs do snapshot anterior sobreviveram ao sync
-        if: github.event_name == 'pull_request'
+      - name: Diagnosticar IDs ausentes do snapshot anterior
+        if: always() && github.event_name == 'pull_request' && hashFiles('/tmp/catalog-baseline/data.js') != ''
         run: |
+          mkdir -p /tmp/catalog-reconcile-report
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           import { collectPublicIds, parseDataJsContent } from "./scripts/catalog-baseline-restore.mjs";
           const baseline = parseDataJsContent(fs.readFileSync("/tmp/catalog-baseline/data.js", "utf8"));
           const current = parseDataJsContent(fs.readFileSync("js/data.js", "utf8"));
-          const baselineIds = collectPublicIds(baseline);
+          const flatten = data => Object.entries(data).flatMap(([line, groups]) =>
+            (groups || []).flatMap(group => (group.items || []).map(item => ({
+              line, cat: group.cat, brand: group.brand, nome: item.nome, volume: item.volume,
+              public_id: item.public_id, stock_ref: item.stock_ref, id_origem: item.id_origem,
+              fonte: item.fonte, source: item.source, varejo: item.varejo, atacado: item.atacado
+            })))
+          );
+          const baselineRows = flatten(baseline);
+          const currentRows = flatten(current);
           const currentIds = collectPublicIds(current);
-          const missing = [...baselineIds].filter(id => !currentIds.has(id));
+          const baselineIds = collectPublicIds(baseline);
+          const missing = baselineRows.filter(row => row.public_id && !currentIds.has(String(row.public_id)));
+          const report = {
+            baseline_public_ids: baselineIds.size,
+            current_public_ids: currentIds.size,
+            missing_count: missing.length,
+            missing,
+            possible_matches: missing.map(row => ({
+              missing: row,
+              candidates: currentRows.filter(candidate =>
+                candidate !== row &&
+                String(candidate.stock_ref || '') === String(row.stock_ref || '') &&
+                String(row.stock_ref || '') !== ''
+              )
+            }))
+          };
+          fs.writeFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", JSON.stringify(report, null, 2));
           console.log(`BASELINE_PUBLIC_IDS_PRESERVED=${baselineIds.size - missing.length}/${baselineIds.size}`);
           console.log(`BASELINE_PUBLIC_IDS_MISSING=${missing.length}`);
-          if (missing.length) {
-            console.error("IDs do snapshot anterior ausentes após o dry-run: " + missing.join(","));
+          for (const row of missing) console.log("MISSING_PUBLIC_ID=" + JSON.stringify(row));
+          NODE
+      - name: Confirmar que todos os IDs do snapshot anterior sobreviveram ao sync
+        if: github.event_name == 'pull_request'
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", "utf8"));
+          if (report.missing_count) {
+            console.error("IDs do snapshot anterior ausentes após o dry-run: " + report.missing.map(row => row.public_id).join(","));
             process.exit(1);
           }
           NODE
+      - name: Anexar diagnóstico da reconciliação
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-reconcile-missing-id-diagnostic
+          path: /tmp/catalog-reconcile-report/missing-public-ids.json
+          if-no-files-found: warn
