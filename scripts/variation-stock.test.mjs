@@ -12,7 +12,7 @@ test("roupas devolvem IDs públicos sequenciais sem IDs privados", () => {
     estoque: { "sku-interno-998": 3, "sku-interno-999": 0 }
   });
   assert.deepEqual(result.variacoes, [
-    { id: "v1", nome: "Tamanho M", estoque: 3 },
+    { id: "v1", nome: "Tamanho M", cor: "Azul", estoque: 3 },
     { id: "v2", nome: "Tamanho G", estoque: 0 }
   ]);
   assert.equal(result.total, 3);
