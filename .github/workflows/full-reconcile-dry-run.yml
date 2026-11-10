@@ -10,7 +10,6 @@ on:
       - "scripts/audit-imarat-all-products.mjs"
       - "scripts/restore-gist-only-legacy.mjs"
       - "scripts/legacy-restore-identity.mjs"
-      - "scripts/legacy-restore-identity.test.mjs scripts/dande-url.test.mjs"
       - "scripts/apply-additive-reconciliation.mjs"
       - "scripts/public-catalog.mjs"
       - "scripts/public-catalog.test.mjs"
