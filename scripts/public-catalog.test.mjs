@@ -354,7 +354,7 @@ test("preserva fotos públicas das variações e descarta URLs não autorizadas"
 });
 
 
-test("remove duplicatas Franny e Sophia na projeção pública sem cruzar fontes", () => {
+test("preserva roupas com IDs de origem diferentes mesmo quando nome, galeria e variantes coincidem", () => {
   const photos = [
     "https://images-primary.example/roupas/modelo-a.webp",
     "https://images-primary.example/roupas/modelo-b.webp"
@@ -376,10 +376,34 @@ test("remove duplicatas Franny e Sophia na projeção pública sem cruzar fontes
   ] }] };
   const result = toPublicCatalog(data);
   const items = result.roupas[0].items;
-  assert.equal(items.length, 2);
+  assert.equal(items.length, 4);
+  assert.equal(new Set(items.map(item => item.public_id)).size, 4);
   assert.deepEqual(new Set(items.map(item => item.stock_route)), new Set(["a", "b"]));
   assert.equal(items.some(item => item.id_origem), false);
   assert.equal(items.every(item => item.stock_ref), true);
+});
+
+test("deduplica roupas somente quando ID, preço e variantes da mesma origem coincidem", () => {
+  const make = () => ({
+    nome: "Calça Resinada", volume: "—", varejo: "149,90", atacado: "99,90",
+    fonte: "roupas", id_origem: "100", stock_ref: "s_000000000000000000000100",
+    stock_route: "a",
+    foto: "https://images-primary.example/roupas/modelo-a.webp",
+    fotos: [
+      "https://images-primary.example/roupas/modelo-a.webp",
+      "https://images-primary.example/roupas/modelo-b.webp"
+    ],
+    variacoes: [{ nome: "Preto P", estoque: 2 }, { nome: "Azul M", estoque: 1 }]
+  });
+  const data = { roupas: [{ brand: "Empório A.R", cat: "CALÇA/SHORT", items: [make(), make()] }] };
+  const publicCatalog = toPublicCatalog(data);
+  assert.equal(publicCatalog.roupas[0].items.length, 1);
+
+  // A restauração do Gist precisa indexar todos os registros internos antes da
+  // projeção final deduplicada, para não perder nem confundir candidatos.
+  const restorationIndex = toPublicCatalog(data, { dedupeClothing: false });
+  assert.equal(restorationIndex.roupas[0].items.length, 2);
+  assert.notEqual(restorationIndex.roupas[0].items[0].public_id, restorationIndex.roupas[0].items[1].public_id);
 });
 
 test("preserva roupas com mesmo nome quando as fotografias são diferentes", () => {
