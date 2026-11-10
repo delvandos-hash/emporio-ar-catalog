@@ -16,7 +16,8 @@ on:
       - "js/cart-identity.mjs"
       - "scripts/cart-identity.test.mjs"
       - "scripts/public-catalog.mjs"
-      - "scripts/public-catalog.test.mjs scripts/variation-stock.test.mjs"
+      - "scripts/public-catalog.test.mjs"
+      - "scripts/variation-stock.test.mjs"
       - "netlify/functions/dande-stock.mjs"
       - "netlify/functions/roupas-stock.mjs"
       - "scripts/variation-stock.test.mjs"
@@ -41,8 +42,9 @@ jobs:
         run: |
           node --check scripts/sync-catalog.mjs
           node --check scripts/dande-url.mjs
+          node --check netlify/functions/roupas-stock.mjs
           node --check js/dande-category-membership.mjs
-          node --test scripts/dande-url.test.mjs scripts/dande-category-membership.test.mjs scripts/dande-stock-pagination.test.mjs scripts/cart-identity.test.mjs scripts/public-catalog.test.mjs
+          node --test scripts/dande-url.test.mjs scripts/dande-category-membership.test.mjs scripts/dande-stock-pagination.test.mjs scripts/cart-identity.test.mjs scripts/public-catalog.test.mjs scripts/variation-stock.test.mjs
       - name: Executar sincronização em modo isolado
         run: node scripts/sync-catalog.mjs
         env:
