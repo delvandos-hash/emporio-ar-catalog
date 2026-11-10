@@ -32,6 +32,83 @@ function mergeDetails(keep, other) {
   return keep;
 }
 
+
+function imageSet(item) {
+  const values = [...(Array.isArray(item?.fotos) ? item.fotos : []), item?.foto];
+  return new Set(values.map(value => String(value ?? "").trim()).filter(Boolean));
+}
+function variationNameSet(item) {
+  return new Set((Array.isArray(item?.variacoes) ? item.variacoes : [])
+    .map(variation => norm(variation?.nome)).filter(Boolean));
+}
+function sourceFamily(item) {
+  const id = String(item?.id_origem ?? "").trim().toLowerCase();
+  if (id.startsWith("franny-")) return "franny";
+  return norm(item?.fonte) === "roupas" ? "sophia" : norm(item?.fonte);
+}
+function stockScore(item) {
+  return (Array.isArray(item?.variacoes) ? item.variacoes : [])
+    .reduce((sum, variation) => sum + Math.max(0, Number(variation?.estoque) || 0), 0);
+}
+function keeperScore(item) {
+  return [stockScore(item), Math.max(0, Number(item?.total_estoque) || 0), imageSet(item).size,
+    String(item?.id_origem || "")];
+}
+function compareKeeper(a, b) {
+  const left = keeperScore(a), right = keeperScore(b);
+  for (let i = 0; i < 3; i++) if (left[i] !== right[i]) return left[i] - right[i];
+  return left[3].localeCompare(right[3], "en");
+}
+function photoConfirmedDuplicate(a, b) {
+  if (sourceFamily(a.item) !== sourceFamily(b.item) ||
+      norm(a.group?.brand) !== norm(b.group?.brand) ||
+      norm(a.group?.cat) !== norm(b.group?.cat) ||
+      norm(a.item?.nome) !== norm(b.item?.nome)) return false;
+  const photosA = imageSet(a.item), photosB = imageSet(b.item);
+  const variationsA = variationNameSet(a.item), variationsB = variationNameSet(b.item);
+  if (photosA.size < 2 || photosB.size < 2 || !variationsA.size || !variationsB.size) return false;
+  const photoOverlap = [...photosA].filter(value => photosB.has(value)).length /
+    Math.min(photosA.size, photosB.size);
+  const variationOverlap = [...variationsA].filter(value => variationsB.has(value)).length /
+    Math.min(variationsA.size, variationsB.size);
+  return photoOverlap >= 0.9 && variationOverlap >= 0.75;
+}
+function removePhotoConfirmedDuplicates(DATA) {
+  const rows = [];
+  for (const [line, groups] of Object.entries(DATA ?? {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      for (const item of Array.isArray(group?.items) ? group.items : []) {
+        if (norm(item?.fonte) === "roupas" && String(item?.id_origem ?? "").trim()) {
+          rows.push({ line, group, item });
+        }
+      }
+    }
+  }
+  const removedItems = new Set();
+  let removed = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const a = rows[i];
+    if (removedItems.has(a.item)) continue;
+    for (let j = i + 1; j < rows.length; j++) {
+      const b = rows[j];
+      if (removedItems.has(b.item) || !photoConfirmedDuplicate(a, b)) continue;
+      const keeper = compareKeeper(a.item, b.item) >= 0 ? a : b;
+      const duplicate = keeper === a ? b : a;
+      mergeDetails(keeper.item, duplicate.item);
+      removedItems.add(duplicate.item);
+      removed++;
+    }
+  }
+  if (removed) {
+    for (const groups of Object.values(DATA ?? {})) {
+      for (const group of Array.isArray(groups) ? groups : []) {
+        group.items = (Array.isArray(group.items) ? group.items : []).filter(item => !removedItems.has(item));
+      }
+    }
+  }
+  return removed;
+}
+
 /**
  * Remove only cross-group repetitions whose source identity proves they are
  * the same product: same source, brand, origin ID, exact normalized title
@@ -112,5 +189,5 @@ export function dedupeConfirmedSourceProducts(DATA) {
       group.items = kept;
     }
   }
-  return { removed, conflicts };
+  const visualRemoved = removePhotoConfirmedDuplicates(DATA);\n  return { removed, conflicts, visualRemoved };
 }
