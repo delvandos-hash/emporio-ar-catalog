@@ -1531,7 +1531,8 @@ async function main() {
       const before = (group.items || []).length;
       group.items = (group.items || []).filter(item => {
         const sourceId = String(item?.id_origem ?? "").trim();
-        const confirmedImaratRecord = norm(item?.fonte) === "imarat" || sourceId === "1481";
+        const sourceName = norm(item?.fonte);
+        const confirmedImaratRecord = sourceName === "imarat" || (!sourceName && sourceId === "1481");
         return !(confirmedImaratRecord && isExcludedImaratAtherri(item, group.brand));
       });
       excludedAtherriRemoved += before - group.items.length;
