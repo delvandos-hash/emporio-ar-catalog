@@ -2302,7 +2302,8 @@ async function main() {
           }
           const root = matches[0];
           const rootId = String(root.item.id_origem || '').trim();
-          const alreadyPresent = rootId && DATA.roupas.some(g =>
+          if (!rootId) throw new Error(`LEGACY_ROUPAS_WITHOUT_SOURCE_ID: ${item.nome}; nenhuma exclusão automática foi aplicada.`);
+          const alreadyPresent = DATA.roupas.some(g =>
             (g.items || []).some(existing => existing !== item && String(existing.id_origem || '') === rootId)
           );
           if (alreadyPresent) {
