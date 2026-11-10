@@ -1902,15 +1902,6 @@ async function main() {
   }
   console.log(`Duplicatas integralmente idênticas removidas: ${exactDuplicatesRemoved}`);
 
-  // Deduplica também representações repetidas confirmadas pelo mesmo ID da
-  // fonte raiz, mesmo quando aparecem em categorias/linhas diferentes.
-  // IDs diferentes, marcas, nomes ou volumes divergentes são preservados.
-  const sourceIdentityDedupe = dedupeConfirmedSourceProducts(DATA);
-  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);
-  for (const conflict of sourceIdentityDedupe.conflicts) {
-    console.log('CONFLITO DE IDENTIDADE DA FONTE PRESERVADO: ' + JSON.stringify(conflict));
-  }
-
   const indexNormal = new Map();
   const indexNameVolume = new Map();
   const indexMiniByBase = new Map();
@@ -2447,6 +2438,14 @@ async function main() {
 
   for (const line of Object.keys(DATA)) {
     DATA[line] = (DATA[line] || []).filter(group => (group.items || []).length > 0);
+  }
+
+  // Executa após todas as fontes terem sido incorporadas ao DATA.
+  // Apenas IDs de origem iguais e identidade comercial exata podem ser unidos.
+  const sourceIdentityDedupe = dedupeConfirmedSourceProducts(DATA);
+  console.log(`Duplicatas confirmadas por fonte/ID removidas: ${sourceIdentityDedupe.removed}`);
+  for (const conflict of sourceIdentityDedupe.conflicts) {
+    console.log('CONFLITO DE IDENTIDADE DA FONTE PRESERVADO: ' + JSON.stringify(conflict));
   }
 
   console.log(`Grupos Imarat consolidados: ${gruposImaratConsolidados}`);
