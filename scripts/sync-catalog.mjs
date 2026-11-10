@@ -2097,7 +2097,16 @@ async function main() {
       for (let i = 0; i < g.items.length; i++) {
         const it = g.items[i]; const hit = findBrandRootMatch(it, g);
         if (!hit) continue;
-        it.nome = hit.nome; 
+        it.nome = hit.nome;
+        const sourceVolume = volumeFrom(null, hit.nome);
+        if (sourceVolume) it.volume = sourceVolume;
+        const manualPrice = it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1;
+        if (!manualPrice) {
+          const originalPrice = typeof hit.preco === 'number' ? hit.preco : parseOrig(hit.preco);
+          const prices = priceBrand(originalPrice, isArabicMiniBrand(hit, g.brand), g.brand);
+          it.varejo = prices.varejo;
+          it.atacado = prices.atacado;
+        }
         if (hit.descricao) it.notas = String(hit.descricao).trim().slice(0, 500);
         const disp = brandDisponivel(hit); if ((it.disponivel || 'Sim') !== disp) { it.disponivel = disp; stockChanged++; }
       }
