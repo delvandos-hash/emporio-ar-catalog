@@ -80,6 +80,74 @@ function publicVariantToken(item) {
     variacoes: item?.variacoes || []
   });
 }
+
+function dedupeText(value) {
+  return String(value ?? "").toLowerCase().normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+}
+function publicPhotoSet(item) {
+  return new Set([...(Array.isArray(item?.fotos) ? item.fotos : []), item?.foto]
+    .map(value => String(value ?? "").trim()).filter(Boolean));
+}
+function publicVariationSet(item) {
+  return new Set((Array.isArray(item?.variacoes) ? item.variacoes : [])
+    .map(variation => dedupeText(variation?.nome)).filter(Boolean));
+}
+function publicClothingSource(item) {
+  if (item?.stock_route === "b") return "franny";
+  if (item?.stock_route === "a") return "sophia";
+  return "";
+}
+function publicVariationStock(item) {
+  return (Array.isArray(item?.variacoes) ? item.variacoes : [])
+    .reduce((sum, variation) => sum + Math.max(0, Number(variation?.estoque) || 0), 0);
+}
+function dedupePublicClothing(DATA) {
+  const groups = Array.isArray(DATA?.roupas) ? DATA.roupas : [];
+  const rows = [];
+  for (const group of groups) {
+    for (const item of Array.isArray(group?.items) ? group.items : []) rows.push({ group, item });
+  }
+  const removed = new Set();
+  for (let i = 0; i < rows.length; i++) {
+    const a = rows[i];
+    if (removed.has(a.item)) continue;
+    for (let j = i + 1; j < rows.length; j++) {
+      const b = rows[j];
+      if (removed.has(b.item) ||
+          !publicClothingSource(a.item) ||
+          publicClothingSource(a.item) !== publicClothingSource(b.item) ||
+          dedupeText(a.group?.brand) !== dedupeText(b.group?.brand) ||
+          dedupeText(a.group?.cat) !== dedupeText(b.group?.cat) ||
+          dedupeText(a.item?.nome) !== dedupeText(b.item?.nome)) continue;
+      const photosA = publicPhotoSet(a.item), photosB = publicPhotoSet(b.item);
+      const varsA = publicVariationSet(a.item), varsB = publicVariationSet(b.item);
+      if (photosA.size < 2 || photosB.size < 2 || !varsA.size || !varsB.size) continue;
+      const photoOverlap = [...photosA].filter(value => photosB.has(value)).length / Math.min(photosA.size, photosB.size);
+      const variationOverlap = [...varsA].filter(value => varsB.has(value)).length / Math.min(varsA.size, varsB.size);
+      if (photoOverlap < 0.9 || variationOverlap < 0.75) continue;
+      const scoreA = [publicVariationStock(a.item), photosA.size];
+      const scoreB = [publicVariationStock(b.item), photosB.size];
+      const keeper = scoreA[0] > scoreB[0] || (scoreA[0] === scoreB[0] && scoreA[1] >= scoreB[1]) ? a : b;
+      const duplicate = keeper === a ? b : a;
+      const mergedPhotos = [...new Set([
+        ...(Array.isArray(keeper.item.fotos) ? keeper.item.fotos : []), keeper.item.foto,
+        ...(Array.isArray(duplicate.item.fotos) ? duplicate.item.fotos : []), duplicate.item.foto
+      ].filter(Boolean))];
+      if (mergedPhotos.length) {
+        keeper.item.fotos = mergedPhotos;
+        if (!keeper.item.foto) keeper.item.foto = mergedPhotos[0];
+      }
+      removed.add(duplicate.item);
+    }
+  }
+  if (removed.size) {
+    for (const group of groups) group.items = (Array.isArray(group.items) ? group.items : []).filter(item => !removed.has(item));
+    DATA.roupas = groups.filter(group => group.items.length);
+  }
+  return removed.size;
+}
+
 export function toPublicCatalog(DATA, imageOptions = {}) {
   if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("DATA inválido para publicação");
   const publicData = {};
@@ -228,5 +296,5 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       return safeGroup;
     }));
   }
-  return publicData;
+  dedupePublicClothing(publicData);\n  return publicData;
 }
