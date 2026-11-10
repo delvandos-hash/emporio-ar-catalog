@@ -1072,21 +1072,6 @@ async function fetchFrannyRoupas() {
     if (!completed) throw new Error(`paginação Franny incompleta em ${cat.nome}`);
     await sleep(500);
   }
-  // Auditoria por ID de origem: identifica produtos legitimamente listados em
-  // mais de uma categoria sem alterar a deduplicação global do catálogo.
-  const categoryMembershipsById = new Map();
-  for (const [category, ids] of DANDE_SCRAPE_IDS) {
-    for (const id of ids) {
-      if (!categoryMembershipsById.has(id)) categoryMembershipsById.set(id, []);
-      categoryMembershipsById.get(id).push(category);
-    }
-  }
-  const crossListed = [...categoryMembershipsById.entries()].filter(([, categories]) => categories.length > 1);
-  console.log(`DANDE_CATEGORY_AUDIT unique_source_ids=${categoryMembershipsById.size} cross_listed_ids=${crossListed.length}`);
-  for (const [id, categories] of crossListed) {
-    console.log(`DANDE_CATEGORY_CROSSLIST id=${id} categories=${categories.join(' | ')}`);
-  }
-
   const byCat = new Map();
   for (const item of byId.values()) {
     const cat = item.cat || 'OUTROS';
@@ -1516,6 +1501,21 @@ async function fetchDandeAcessorios(existingGroups = []) {
     DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
     DANDE_SCRAPE_NAMES.set(cat.nome, categoryNames);
     DANDE_SCRAPE_IDS.set(cat.nome, categoryIds);
+  }
+
+  // Auditoria por ID de origem: identifica produtos legitimamente listados em
+  // mais de uma categoria sem alterar a deduplicação global do catálogo.
+  const categoryMembershipsById = new Map();
+  for (const [category, ids] of DANDE_SCRAPE_IDS) {
+    for (const id of ids) {
+      if (!categoryMembershipsById.has(id)) categoryMembershipsById.set(id, []);
+      categoryMembershipsById.get(id).push(category);
+    }
+  }
+  const crossListed = [...categoryMembershipsById.entries()].filter(([, categories]) => categories.length > 1);
+  console.log(`DANDE_CATEGORY_AUDIT unique_source_ids=${categoryMembershipsById.size} cross_listed_ids=${crossListed.length}`);
+  for (const [id, categories] of crossListed) {
+    console.log(`DANDE_CATEGORY_CROSSLIST id=${id} categories=${categories.join(' | ')}`);
   }
 
   const byCat = new Map();
