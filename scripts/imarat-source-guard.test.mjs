@@ -210,3 +210,9 @@ test("auditoria de miniaturas prioriza id_origem e não associa outro SKU de mes
   assert.match(miniAudit, /exactIdMatches\.length !== 1\) return null/);
   assert.match(miniAudit, /String\(p\?\.id \?\? p\?\.productId \?\? p\?\.slug \?\? ""\)\.trim\(\) === itemSourceId/);
 });
+
+
+test("auditoria de miniaturas usa a identidade interna pareada para consultar o SKU exato", () => {
+  const miniAudit = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
+  assert.match(miniAudit, /const source = sourceMatch\(internal \|\| item, group\)/);
+});
