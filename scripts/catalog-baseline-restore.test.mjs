@@ -23,7 +23,9 @@ test("restores only missing public IDs and preserves the current version of exis
   assert.deepEqual(result.restoredIds, ["p_b"]);
   assert.equal(result.data.feminino[0].items.length, 2);
   assert.equal(result.data.feminino[0].items[0].nome, "Produto A atualizado");
+  assert.equal(result.data.feminino[0].items[0]._preserve_public_id, true);
   assert.equal(result.data.feminino[0].items[1].nome, "Produto B");
+  assert.equal(result.data.feminino[0].items[1]._preserve_public_id, true);
 });
 
 test("rekeys an exact stock_ref match to the prior public ID without overwriting current fields", () => {
