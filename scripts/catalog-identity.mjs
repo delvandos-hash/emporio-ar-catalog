@@ -110,6 +110,9 @@ export function isExcludedImaratAtherri(item, brand = "") {
 
   const id = String(item?.id_origem ?? item?.id ?? item?.productId ?? "").trim();
   if (id === "1481") return true;
+  // Um ID de origem diferente de 1481 é preservado, mesmo se o preço legado
+  // estiver desatualizado. O fallback por preço só vale para registro sem ID.
+  if (id) return false;
 
   const price = value => {
     const raw = String(value ?? "").trim().replace(/[^0-9,.-]/g, "");
@@ -117,4 +120,32 @@ export function isExcludedImaratAtherri(item, brand = "") {
     return Number(raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw);
   };
   return price(item?.varejo) === 105 && price(item?.atacado) === 75;
+}
+
+const ATHERRI_CORRECT_ORIGIN_REF = "o_9e8adfbf4a5157cb7a048f8f";
+const ATHERRI_EXCLUDED_ORIGIN_REF = "o_b8e0e31ca9e4dfafe8a7ecc7";
+
+function isAtherriAfeerIdentity(item, brand = "") {
+  const name = normalizeIdentity(item?.nome ?? item?.name ?? "");
+  const brandKey = normalizeIdentity(brand || item?.brand || "");
+  let volume = String(item?.volume ?? item?.sizeMl ?? "")
+    .toLowerCase().replace(/\s+/g, "").replace(",", ".");
+  if (volume && /^\d+(?:\.\d+)?$/.test(volume)) volume += "ml";
+  return brandKey === "afeer" && name === "miniatura atherri afeer" && volume === "30ml";
+}
+
+export function isCanonicalImaratAtherri(item, brand = "") {
+  return isAtherriAfeerIdentity(item, brand) &&
+    normalizeIdentity(item?.fonte || "") === "imarat" &&
+    String(item?.id_origem ?? item?.id ?? item?.productId ?? "").trim() === "1474";
+}
+
+export function isCanonicalAtherriGistRecord(item, brand = "") {
+  return isAtherriAfeerIdentity(item, brand) &&
+    String(item?.origin_ref || "").trim() === ATHERRI_CORRECT_ORIGIN_REF;
+}
+
+export function isExcludedAtherriGistRecord(item, brand = "") {
+  return isAtherriAfeerIdentity(item, brand) &&
+    String(item?.origin_ref || "").trim() === ATHERRI_EXCLUDED_ORIGIN_REF;
 }
