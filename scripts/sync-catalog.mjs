@@ -2056,30 +2056,52 @@ async function main() {
       if (!session && norm(p.nome).includes('tubete')) session = 'TUBETES BRAND';
       return session;
     };
-    const findBrandRootMatch = (item, group) => {
-      const id = String(item.id_origem || '').trim();
+    const findBrandRootMatches = (item, group) => {
+      const id = String(item.id_origem || item.id || '').trim();
       const itemVolume = volumeMatch(item.volume, item.nome);
-      return brandList.find(p => {
-        if (norm(brandSession(p)) !== norm(group.brand)) return false;
-        const sourceId = String(p.id ?? p.productId ?? p.slug ?? '').trim();
-        if (id) return sourceId === id;
-        return norm(p.nome) === norm(item.nome) &&
-          volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume;
-      }) || null;
+      const inSession = brandList.filter(p => norm(brandSession(p)) === norm(group.brand));
+      if (id) {
+        const byId = inSession.filter(p => String(p.id ?? p.productId ?? p.slug ?? '').trim() === id);
+        if (byId.length) return byId;
+      }
+      return inSession.filter(p =>
+        norm(p.nome) === norm(item.nome) &&
+        volumeMatch(volumeFrom(null, p.nome), p.nome) === itemVolume
+      );
+    };
+    const findBrandRootMatch = (item, group) => {
+      const matches = findBrandRootMatches(item, group);
+      return matches.length === 1 ? matches[0] : null;
     };
   if (!SYNC_IMARAT_ONLY) {
     if (!brandList.length) throw new Error('Brand retornou zero produtos; limpeza da fonte bloqueada.');
     let staleBrandRemoved = 0;
+    let legacyBrandMapped = 0;
     for (const line of Object.keys(DATA)) for (const group of DATA[line] || []) {
       if (!(group.cat === 'Brand' || String(group.cat || '').startsWith('Brand'))) continue;
       group.items = (group.items || []).filter(item => {
-        if (norm(item.fonte) !== 'brand') return true;
-        const exists = Boolean(findBrandRootMatch(item, group));
-        if (!exists) staleBrandRemoved++;
-        return exists;
+        const source = norm(item.fonte);
+        if (source !== 'brand' && source !== '' && source !== 'legacy gist') return true;
+        const matches = findBrandRootMatches(item, group);
+        if (matches.length > 1) {
+          throw new Error(`LEGACY_BRAND_AMBIGUOUS: ${group.brand} / ${item.nome} / ${matches.length} IDs da fonte`);
+        }
+        const hit = matches[0];
+        if (!hit) {
+          staleBrandRemoved++;
+          return false;
+        }
+        item.fonte = 'brand';
+        item.id_origem = String(hit.id ?? hit.productId ?? hit.slug ?? '');
+        item.nome = hit.nome;
+        const sourceVolume = volumeFrom(null, hit.nome);
+        if (sourceVolume) item.volume = sourceVolume;
+        if (source !== 'brand') legacyBrandMapped++;
+        return true;
       });
     }
     console.log(`Produtos Brand fora da fonte raiz removidos: ${staleBrandRemoved}`);
+    console.log(`Produtos Brand legados confirmados e reclassificados pela origem: ${legacyBrandMapped}`);
   }
 
   let addedBrand = 0;
