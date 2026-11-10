@@ -2196,6 +2196,7 @@ async function main() {
   let frannyCount = 0;
   const liveSophiaIds = new Set();
   const liveFrannyIds = new Set();
+  const liveRoupasProducts = [];
   if (ADD_ROUPAS || ADD_FRANNY) {
     const chunks = [];
     if (ADD_ROUPAS) {
@@ -2204,7 +2205,10 @@ async function main() {
         const sophiaGroups = await fetchSophiaRoupas();
         const n = sophiaGroups.reduce((s, g) => s + g.items.length, 0);
         if (!n) throw new Error('Sophia retornou zero produtos; não é seguro reconciliar a fonte.');
-        for (const g of sophiaGroups) for (const item of g.items || []) if (item.id_origem) liveSophiaIds.add(String(item.id_origem));
+        for (const g of sophiaGroups) for (const item of g.items || []) {
+          if (item.id_origem) liveSophiaIds.add(String(item.id_origem));
+          liveRoupasProducts.push({ cat: g.cat, item });
+        }
         roupasCount = n;
         if (n > 0) chunks.push(sophiaGroups);
         console.log(`Roupas Sophia: ${n} produtos`);
@@ -2220,7 +2224,10 @@ async function main() {
         const frannyGroups = await fetchFrannyRoupas();
         frannyCount = frannyGroups.reduce((s, g) => s + g.items.length, 0);
         if (!frannyCount) throw new Error('Franny retornou zero produtos; não é seguro reconciliar a fonte.');
-        for (const g of frannyGroups) for (const item of g.items || []) if (item.id_origem) liveFrannyIds.add(String(item.id_origem));
+        for (const g of frannyGroups) for (const item of g.items || []) {
+          if (item.id_origem) liveFrannyIds.add(String(item.id_origem));
+          liveRoupasProducts.push({ cat: g.cat, item });
+        }
         if (frannyCount > 0) chunks.push(frannyGroups);
         console.log(`Roupas Franny: ${frannyCount} produtos`);
       } catch (e) {
@@ -2236,23 +2243,80 @@ async function main() {
     if (chunks.length) {
       const prevRoupasSnap = Array.isArray(DATA.roupas) ? DATA.roupas : [];
       DATA.roupas = mergeRoupasGroups(chunks, prevRoupasSnap);
-      // Remove somente registros identificados da fonte cuja coleta completa
-      // acabou de ser validada. Legados sem ID ficam preservados para auditoria.
+      // Reconcilia também os registros antigos sem procedência: nome exato na
+      // fonte + categoria quando possível. IDs diferentes continuam distintos.
       let staleClothesRemoved = 0;
+      let legacyClothesMapped = 0;
+      const legacyClothesMoves = [];
       for (const group of DATA.roupas) {
-        group.items = (group.items || []).filter(item => {
-          if (norm(item.fonte) !== 'roupas' || !String(item.id_origem || '').trim()) return true;
-          const id = String(item.id_origem);
-          const fromFranny = id.startsWith('franny-');
-          const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
-          if (!sourceEnabled) return true;
-          const exists = fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id);
-          if (!exists) staleClothesRemoved++;
-          return exists;
-        });
+        const kept = [];
+        for (const item of group.items || []) {
+          const source = norm(item.fonte);
+          const id = String(item.id_origem || '').trim();
+          if (source === 'roupas' && id) {
+            const fromFranny = id.startsWith('franny-');
+            const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
+            const exists = !sourceEnabled || (fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id));
+            if (!exists) staleClothesRemoved++;
+            else kept.push(item);
+            continue;
+          }
+          const isLegacy = source === '' || source === 'legacy gist' || (source === 'roupas' && !id);
+          if (!isLegacy || !ADD_ROUPAS || !ADD_FRANNY) {
+            kept.push(item);
+            continue;
+          }
+          const allMatches = liveRoupasProducts.filter(row => norm(row.item.nome) === norm(item.nome));
+          const categoryMatches = allMatches.filter(row => norm(row.cat) === norm(group.cat));
+          const matches = categoryMatches.length ? categoryMatches : allMatches;
+          if (matches.length > 1) {
+            throw new Error(`LEGACY_ROUPAS_AMBIGUOUS: ${item.nome} aparece em ${matches.length} registros da fonte raiz; nenhum foi apagado.`);
+          }
+          if (!matches.length) {
+            staleClothesRemoved++;
+            continue;
+          }
+          const root = matches[0];
+          const rootId = String(root.item.id_origem || '').trim();
+          const alreadyPresent = rootId && DATA.roupas.some(g =>
+            (g.items || []).some(existing => existing !== item && String(existing.id_origem || '') === rootId)
+          );
+          if (alreadyPresent) {
+            staleClothesRemoved++;
+            continue;
+          }
+          const manualPrice = item.precoManual === true || item.precoManual === 'true' || item.precoManual === 1;
+          item.nome = root.item.nome;
+          item.fonte = 'roupas';
+          item.id_origem = rootId;
+          item.volume = root.item.volume || '—';
+          if (!manualPrice) {
+            item.varejo = root.item.varejo;
+            item.atacado = root.item.atacado;
+          }
+          item.disponivel = root.item.disponivel;
+          if (root.item.notas) item.notas = root.item.notas;
+          if (root.item.foto) item.foto = root.item.foto;
+          if (Array.isArray(root.item.fotos) && root.item.fotos.length) item.fotos = root.item.fotos;
+          if (Array.isArray(root.item.variacoes)) item.variacoes = root.item.variacoes;
+          if (root.item.total_estoque != null) item.total_estoque = root.item.total_estoque;
+          if (norm(root.cat) === norm(group.cat)) kept.push(item);
+          else legacyClothesMoves.push({ cat: root.cat, item });
+          legacyClothesMapped++;
+        }
+        group.items = kept;
+      }
+      for (const move of legacyClothesMoves) {
+        let target = DATA.roupas.find(g => norm(g.cat) === norm(move.cat) && norm(g.brand) === 'emporio a r');
+        if (!target) {
+          target = { cat: move.cat, brand: 'Empório A.R', items: [] };
+          DATA.roupas.push(target);
+        }
+        target.items.push(move.item);
       }
       DATA.roupas = DATA.roupas.filter(group => (group.items || []).length > 0);
       console.log(`Roupas fora da fonte raiz removidas após coleta completa: ${staleClothesRemoved}`);
+      console.log(`Roupas legadas confirmadas e reclassificadas pela origem: ${legacyClothesMapped}`);
       const total = DATA.roupas.reduce((s, g) => s + g.items.length, 0);
       console.log(`Roupas merge final: ${total} produtos em ${DATA.roupas.length} categorias`);
     }
