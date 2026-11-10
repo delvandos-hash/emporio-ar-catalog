@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { toPublicCatalog } from "./public-catalog.mjs";
+import { atherriGistRecordKind, isCanonicalImaratAtherri } from "./catalog-identity.mjs";
 
 const IMARAT_API = process.env.IMARAT_API_URL;
 const GIST_ID = "11918b7196b3ee6a0d8a91739167b312";
@@ -122,9 +123,30 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
       if(originRef){if(!byOriginRef.has(originRef))byOriginRef.set(originRef,[]);byOriginRef.get(originRef).push(item);}
     }
   }
-  const used=new Set(); let rekeyed=0, unmatched=0;
+  const used=new Set(); let rekeyed=0, unmatched=0, excludedAtherri=0, ambiguousAtherri=0;
   for (const [line,groups] of Object.entries(liveDATA || {})) for (const group of groups || []) {
     for (const item of group.items || []) {
+      const atherriKind=atherriGistRecordKind(item,group?.brand);
+      if(atherriKind==="excluded"){excludedAtherri++;continue;}
+      if(atherriKind==="ambiguous"){
+        unmatched++; ambiguousAtherri++;
+        console.log("ATHERRI_GIST_ORIGIN_REF_AMBIGUO "+JSON.stringify({
+          linha:line,marca:group?.brand||"",categoria:group?.cat||"",
+          nome:item?.nome||"",origin_ref:item?.origin_ref||""
+        }));
+        continue;
+      }
+      if(atherriKind==="canonical"){
+        const originRef=String(item?.origin_ref||"").trim();
+        const exactMatches=(byOriginRef.get(originRef)||[]).filter(candidate=>!used.has(candidate));
+        if(exactMatches.length===1){used.add(exactMatches[0]);continue;}
+        unmatched++; ambiguousAtherri++;
+        console.log("ATHERRI_GIST_CANONICO_SEM_ORIGEM_UNICA "+JSON.stringify({
+          linha:line,marca:group?.brand||"",categoria:group?.cat||"",
+          nome:item?.nome||"",origin_ref:originRef,candidatas:exactMatches.length
+        }));
+        continue;
+      }
       const key=[norm(line),norm(group.brand),norm(group.cat),norm(item.nome),volumeMatch(item.volume,item.nome)].join("|");
       const fp=publicFingerprint(item);
       const candidates=(byBase.get(key)||[]).filter(candidate=>!used.has(candidate));
@@ -172,7 +194,7 @@ function rekeyLiveVariants(liveDATA, internalPublic) {
       if(item.public_id!==match.public_id){item.public_id=match.public_id;rekeyed++;}
     }
   }
-  return {rekeyed,unmatched};
+  return {rekeyed,unmatched,excludedAtherri,ambiguousAtherri};
 }
 
 function syncKey(nome,volume,categoria,brand) {
@@ -271,6 +293,7 @@ const DATA=await fetchLiveCatalog();
 const internalPublicData=toPublicCatalog(INTERNAL_DATA);
 const rekeyAudit=rekeyLiveVariants(DATA,internalPublicData);
 console.log(`GIST_VARIANTS_REKEYABLE=${rekeyAudit.rekeyed} unmatchedLiveVariants=${rekeyAudit.unmatched}`);
+console.log(`GIST_ATHERRI_EXCLUDED_BY_ORIGIN_REF=${rekeyAudit.excludedAtherri} ambiguousAtherri=${rekeyAudit.ambiguousAtherri}`);
 const internalPublicIndex=new Map();
 const publicBuckets=new Map();
 for(const [line,groups] of Object.entries(internalPublicData)) for(const group of groups||[]) for(const item of group.items||[]) {
@@ -287,15 +310,29 @@ const catalog=[];
 for(const [line,groups] of Object.entries(DATA)) {
   if(!Array.isArray(groups)) continue;
   for(const group of groups) for(const item of (Array.isArray(group?.items)?group.items:[])) {
+    const atherriKind=atherriGistRecordKind(item,group?.brand);
+    if(atherriKind==="excluded") continue;
     const name=String(item.nome||"").trim();
     if(!name) continue;
     const volume=String(item.volume||volumeFrom(null,name));
     const internalKey=[norm(line),norm(group.brand),norm(group.cat),norm(name),volumeMatch(volume,name)].join("|");
     const internalCandidates=internalIndex.get(internalKey)||[];
-    const internal=internalCandidates.find(candidate =>
-      String(candidate.varejo??"")===String(item.varejo??"") &&
-      String(candidate.atacado??"")===String(item.atacado??"")
-    ) || internalCandidates[0] || null;
+    let internal=null;
+    if(atherriKind==="canonical"){
+      const canonicalCandidates=internalCandidates.filter(candidate=>
+        isCanonicalImaratAtherri(candidate,group?.brand)
+      );
+      if(canonicalCandidates.length===1) internal=canonicalCandidates[0];
+      else console.log("ATHERRI_IMARAT_CANONICO_SEM_CORRESPONDENCIA_UNICA "+JSON.stringify({
+        linha:line,marca:group?.brand||"",categoria:group?.cat||"",
+        nome:name,origin_ref:item?.origin_ref||"",candidatas:canonicalCandidates.length
+      }));
+    }else{
+      internal=internalCandidates.find(candidate =>
+        String(candidate.varejo??"")===String(item.varejo??"") &&
+        String(candidate.atacado??"")===String(item.atacado??"")
+      ) || internalCandidates[0] || null;
+    }
     catalog.push({
       line,brand:String(group.brand||"Sem marca"),category:String(group.cat||"Sem categoria"),
       name,volume,retail:item.varejo??"",wholesale:item.atacado??"",
@@ -394,6 +431,7 @@ const additiveReconciliationSafe =
   // Ambiguidades de rekey não bloqueiam a preservação: os itens permanecem no Gist
   // e a publicação aditiva só prossegue se nenhum ID público ficar sem representação.
   liveOnlyKeys.length === 0 &&
+  rekeyAudit.unmatched === 0 &&
   publicIdIdentityConflicts.length === 0 &&
   internalPublicIdIdentityConflicts.length === 0 &&
   eligibleInternalOnlyRows.length <= 80 &&
