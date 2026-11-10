@@ -222,4 +222,16 @@ test("auditoria global prioriza id_origem e não confunde produtos homônimos", 
   assert.match(auditAllSource, /originId:String\(internal\?\.id_origem\|\|""\)/);
   assert.match(auditAllSource, /const sourceId=String\(item\.originId\|\|""\)\.trim\(\)/);
   assert.match(auditAllSource, /exactIdMatches\.length!==1\) return null/);
+  assert.match(auditAllSource, /const byPublicIdContext = new Map\(\)/);
+  assert.match(auditAllSource, /GIST_VARIANT_ALREADY_REPRESENTED/);
+});
+
+
+test("reconciliação reconhece alias legado por public_id, marca, nome, preços e foto principal", () => {
+  assert.match(additiveSource, /const samePublicIdRepresentations = item\.public_id/);
+  assert.match(additiveSource, /norm\(row\.publicGroup\?\.brand\) === norm\(group\?\.brand\)/);
+  assert.match(additiveSource, /String\(row\.publicItem\?\.varejo \?\? ""\)\.trim\(\) === String\(item\?\.varejo \?\? ""\)\.trim\(\)/);
+  assert.match(additiveSource, /publicPhotoFingerprint\(row\.publicItem\) === photoFingerprint/);
+  assert.match(additiveSource, /GIST_VARIANT_ALREADY_REPRESENTED/);
+  assert.doesNotMatch(additiveSource, /ISIS_GIST_VARIANT_DIAGNOSTIC/);
 });

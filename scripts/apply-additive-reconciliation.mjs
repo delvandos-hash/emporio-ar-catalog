@@ -207,6 +207,32 @@ function rekeyLiveVariants(liveDATA, internalIndex) {
           : [];
         const photoFingerprint = publicPhotoFingerprint(item);
         const byPhoto = photoFingerprint !== "[]" ? candidates.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
+        // O Gist pode manter uma representação antiga do mesmo public_id em
+        // outra linha/categoria e com volume desatualizado. Só a reconhecemos
+        // como já representada quando marca, nome, preços e foto principal
+        // coincidem exatamente com um único registro interno.
+        const samePublicIdRepresentations = item.public_id
+          ? (internalByPublicId.get(String(item.public_id)) || []).filter(row =>
+              norm(row.publicGroup?.brand) === norm(group?.brand) &&
+              norm(row.publicItem?.nome) === norm(item?.nome) &&
+              String(row.publicItem?.varejo ?? "").trim() === String(item?.varejo ?? "").trim() &&
+              String(row.publicItem?.atacado ?? "").trim() === String(item?.atacado ?? "").trim() &&
+              photoFingerprint !== "[]" &&
+              publicPhotoFingerprint(row.publicItem) === photoFingerprint
+            )
+          : [];
+        if (byGlobalId.length === 0 && samePublicIdRepresentations.length === 1 &&
+            used.has(samePublicIdRepresentations[0])) {
+          console.log("GIST_VARIANT_ALREADY_REPRESENTED " + JSON.stringify({
+            name: item?.nome, public_id: item?.public_id || "",
+            legacyLine: line, legacyCategory: group?.cat || "",
+            legacyVolume: item?.volume || "",
+            canonicalLine: samePublicIdRepresentations[0].publicLine,
+            canonicalCategory: samePublicIdRepresentations[0].publicGroup?.cat || "",
+            canonicalVolume: samePublicIdRepresentations[0].publicItem?.volume || ""
+          }));
+          continue;
+        }
         const looseKey = looseIdentity(line, group, item);
         const byLooseIdentity = (internalByLooseIdentity.get(looseKey) || []).filter(row => !used.has(row));
         const byLoosePhoto = photoFingerprint !== "[]" ? byLooseIdentity.filter(row => publicPhotoFingerprint(row.publicItem) === photoFingerprint) : [];
