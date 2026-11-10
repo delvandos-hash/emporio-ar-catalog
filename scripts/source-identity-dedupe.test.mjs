@@ -22,10 +22,10 @@ test("remove a mesma identidade de origem repetida entre grupos", () => {
 
 test("preserva marcas diferentes, IDs diferentes e volumes diferentes", () => {
   const data = { perfumes: [
-    { cat: "Miniaturas", brand: "Only You", items: [product({ fonte: "imarat", id_origem: "77", nome: "Mini Asad 30ml", volume: "30ml" })] },
-    { cat: "Miniaturas", brand: "Lattafa", items: [product({ fonte: "imarat", id_origem: "77", nome: "Mini Asad 30ml", volume: "30ml" })] },
-    { cat: "Miniaturas", brand: "Only You", items: [product({ fonte: "imarat", id_origem: "78", nome: "Mini Asad 30ml", volume: "30ml" })] },
-    { cat: "Miniaturas", brand: "Only You", items: [product({ fonte: "imarat", id_origem: "77", nome: "Mini Asad 50ml", volume: "50ml" })] }
+    { cat: "Miniaturas", brand: "Only You", items: [product({ fonte: "roupas", id_origem: "77", nome: "Mini Asad 30ml", volume: "30ml" })] },
+    { cat: "Miniaturas", brand: "Lattafa", items: [product({ fonte: "roupas", id_origem: "77", nome: "Mini Asad 30ml", volume: "30ml" })] },
+    { cat: "Miniaturas", brand: "Only You", items: [product({ fonte: "roupas", id_origem: "78", nome: "Mini Asad 30ml", volume: "30ml" })] },
+    { cat: "Miniaturas", brand: "Only You", items: [product({ fonte: "roupas", id_origem: "77", nome: "Mini Asad 50ml", volume: "50ml" })] }
   ] };
   const result = dedupeConfirmedSourceProducts(data);
   assert.equal(result.removed, 0);
