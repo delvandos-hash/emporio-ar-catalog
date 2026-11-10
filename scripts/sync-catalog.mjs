@@ -1359,7 +1359,13 @@ async function fetchDandeAcessorios(existingGroups = []) {
         if (!list.length) { completed = true; break; }
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
-          console.log(`    p${page}: página repetida; encerrando categoria`);
+          // Algumas rotas Nuvemshop ignoram ?page=N e devolvem o primeiro lote.
+          // Só aceitamos isso como fim quando a própria página não anuncia continuação.
+          if (hasDandeNextPage(html, page)) {
+            throw new Error(`página repetida apesar de paginação anunciada (página ${page})`);
+          }
+          console.log(`    p${page}: página repetida sem continuação; encerrando categoria`);
+          completed = true;
           break;
         }
         seenPageSignatures.add(pageSignature);
@@ -1461,14 +1467,17 @@ async function fetchDandeAcessorios(existingGroups = []) {
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
 
-        // Processa a página atual antes de decidir se existe uma próxima.
-        // Sem link de paginação, encerra somente DEPOIS de salvar os itens desta página.
-        if (!hasDandeNextPage(html, page)) {
-          console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+        // O coletor histórico do projeto avançava enquanto recebia lotes de 8+ itens.
+        // A Dande/Nuvemshop pode não renderizar rel=next nem links ?page=N no HTML,
+        // embora a rota ?page=N ainda entregue o lote seguinte. Usamos ambos os sinais.
+        const hasNextLink = hasDandeNextPage(html, page);
+        const hasFullBatch = list.length >= 8;
+        if (!hasNextLink && !hasFullBatch) {
+          console.log(`    p${page}: lote final (${list.length} produtos), sem próxima página; encerrando categoria`);
           completed = true;
           break;
         }
-        if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com próxima página anunciada`);
+        if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com lote de ${list.length} produtos ou próxima página anunciada`);
         await sleep(400);
       } catch (e) {
         throw new Error(`Dande ${cat.nome} página ${page} falhou: ${e.message}`);
