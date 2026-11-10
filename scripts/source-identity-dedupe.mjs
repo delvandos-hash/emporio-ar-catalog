@@ -41,6 +41,7 @@ function mergeDetails(keep, other) {
 export function dedupeConfirmedSourceProducts(DATA) {
   const seen = new Map();
   const conflicts = [];
+  const blockedKeys = new Set();
   let removed = 0;
   for (const [line, groups] of Object.entries(DATA ?? {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
@@ -56,6 +57,7 @@ export function dedupeConfirmedSourceProducts(DATA) {
           continue;
         }
         const key = [source, brand, id].join("|");
+        if (blockedKeys.has(key)) { kept.push(item); continue; }
         const prior = seen.get(key);
         if (!prior) {
           const row = { item, group, line, name, volume };
@@ -66,6 +68,7 @@ export function dedupeConfirmedSourceProducts(DATA) {
         if (prior.name !== name || prior.volume !== volume) {
           conflicts.push({ source, id, brand, firstName: prior.item.nome, nextName: item.nome,
             firstVolume: prior.volume, nextVolume: volume });
+          blockedKeys.add(key);
           kept.push(item);
           continue;
         }
@@ -76,11 +79,13 @@ export function dedupeConfirmedSourceProducts(DATA) {
              firstPrice !== nextPrice)) {
           if (!manualPrice(prior.item) && !manualPrice(item)) {
             conflicts.push({ source, id, brand, reason: "price-conflict" });
+            blockedKeys.add(key);
             kept.push(item);
             continue;
           }
           if (manualPrice(prior.item) && manualPrice(item) && firstPrice !== nextPrice) {
             conflicts.push({ source, id, brand, reason: "manual-price-conflict" });
+            blockedKeys.add(key);
             kept.push(item);
             continue;
           }
