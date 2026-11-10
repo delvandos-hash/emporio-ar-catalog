@@ -14,7 +14,7 @@ const DANDE_CATEGORIES = [
   { path: "/colares/", nome: "Colares" },
   { path: "/conjuntos/", nome: "Conjuntos" },
   { path: "/lancamentos/", nome: "Lançamentos" },
-  { path: "/masculinos/", nome: "Masculinos" },
+  { path: "/masculino/", nome: "Masculinos" },
   { path: "/prata-925/", nome: "Prata 925" },
   { path: "/pulseiras/", nome: "Pulseiras" },
   { path: "/semijoia-italiana/", nome: "Semijoia Italiana" },
