@@ -88,6 +88,7 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
         if (!currentId || !baselineIds.has(currentId)) {
           if (currentId) currentIds.delete(currentId);
           currentItem.public_id = id;
+          currentItem._preserve_public_id = true;
           currentIds.add(id);
           matchedCurrentItems.add(currentItem);
           rekeyedIds.push({ from: currentId, to: id, nome: item.nome, stock_ref: stockRef });
@@ -106,7 +107,9 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
       target = { cat: group.cat, brand: group.brand, items: [] };
       merged[line].push(target);
     }
-    target.items.push(structuredClone(item));
+    const restoredItem = structuredClone(item);
+    restoredItem._preserve_public_id = true;
+    target.items.push(restoredItem);
     currentIds.add(id);
     restoredIds.push(id);
   }
