@@ -401,3 +401,38 @@ test("preserva roupas com mesmo nome quando as fotografias são diferentes", () 
   ] }] });
   assert.equal(result.roupas[0].items.length, 2);
 });
+
+
+test("mantém rota de estoque Franny quando stock_ref já existe", () => {
+  const result = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "VESTIDOS", items: [{
+      nome: "Vestido Floral",
+      volume: "—",
+      fonte: "roupas",
+      id_origem: "franny-12345",
+      stock_ref: "s_aaaaaaaaaaaaaaaaaaaaaaaa",
+      foto: "https://images-primary.example/vestido.webp",
+      fotos: ["https://images-primary.example/vestido.webp"],
+      variacoes: [{ nome: "Azul M", estoque: 1 }]
+    }] }]
+  });
+  assert.equal(result.roupas[0].items[0].stock_ref, "s_aaaaaaaaaaaaaaaaaaaaaaaa");
+  assert.equal(result.roupas[0].items[0].stock_route, "b");
+});
+
+test("mantém rota Sophia para ID de origem sem prefixo Franny", () => {
+  const result = toPublicCatalog({
+    roupas: [{ brand: "Empório A.R", cat: "VESTIDOS", items: [{
+      nome: "Vestido Liso",
+      volume: "—",
+      fonte: "roupas",
+      id_origem: "12345",
+      stock_ref: "s_bbbbbbbbbbbbbbbbbbbbbbbb",
+      stock_route: "b",
+      foto: "https://images-primary.example/vestido.webp",
+      fotos: ["https://images-primary.example/vestido.webp"],
+      variacoes: [{ nome: "Preto M", estoque: 1 }]
+    }] }]
+  });
+  assert.equal(result.roupas[0].items[0].stock_route, "a");
+});
