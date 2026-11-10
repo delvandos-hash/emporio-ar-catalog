@@ -1,9 +1,9 @@
 function norm(value) {
-  return String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase().replace(/\\s+/g, " ");
+  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 export function parseDataJsContent(raw) {
-  const match = String(raw).match(/export const DATA = (\\{[\\s\\S]*?\\});\\s*(?=export const WHATSAPP|$)/);
+  const match = String(raw).match(/export const DATA = (\{[\s\S]*?\});\s*(?=export const WHATSAPP|$)/);
   if (!match) throw new Error("DATA não encontrado no arquivo de catálogo.");
   const data = JSON.parse(match[1]);
   if (!data || typeof data !== "object" || Array.isArray(data)) {
@@ -75,7 +75,7 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
 }
 
 export function serializeDataJsContent(raw, data) {
-  const pattern = /export const DATA = \\{[\\s\\S]*?\\};(?=\\s*export const WHATSAPP)/;
+  const pattern = /export const DATA = \{[\s\S]*?\};(?=\s*export const WHATSAPP)/;
   if (!pattern.test(String(raw))) throw new Error("Não foi possível localizar o bloco DATA para persistir a restauração.");
   return String(raw).replace(pattern, "export const DATA = " + JSON.stringify(data) + ";");
 }
