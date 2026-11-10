@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { findExactInternalPriceMatch, findImaratSourceByOriginRef } from "./audit-catalog-match.mjs";
+import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 /**
  * Auditoria somente leitura das miniaturas do catálogo Empório A.R.
  * Lê o snapshot do Gist e a lista atual da Imarat. Nunca grava ou recalcula preços.
@@ -34,6 +35,8 @@ if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
 const snapshot = JSON.parse(raw);
 const DATA = snapshot.DATA || snapshot;
 if (!DATA || typeof DATA !== "object" || Array.isArray(DATA)) throw new Error("Estrutura DATA inválida.");
+const excludedAtherri = removeExcludedLegacyAtherri(DATA);
+console.log(`LEGACY_EXCLUDED_ATHERRI_1481_FROM_MINI_AUDIT=${excludedAtherri}`);
 
 const norm = (value) => String(value || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
