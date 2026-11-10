@@ -1227,8 +1227,9 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
       ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
       : '';
     const expectedTitle = norm(expectedCategory).replace(/s$/, '');
-    const requestedPath = String(path).replace(/\/+$/, '');
-    const finalPath = new URL(res.url || url).pathname.replace(/\/+$/, '');
+    const normalizePath = value => String(value).replace(/\/+?/g, '/').replace(/\/+$/, '');
+    const requestedPath = normalizePath(path);
+    const finalPath = normalizePath(new URL(res.url || url).pathname);
     const genericDandeTitle = actualTitle === 'dande acessorio' &&
       finalPath === requestedPath && /data-product-id="\d+"/.test(html);
     if (!actualTitle || (actualTitle !== expectedTitle && !genericDandeTitle)) {
