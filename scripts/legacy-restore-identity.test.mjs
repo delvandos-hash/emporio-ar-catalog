@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveLegacyStockMatch, legacyVolumeIdentity } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, legacyVolumeIdentity, preserveStablePublicId } from "./legacy-restore-identity.mjs";
 
 const row = (public_id, foto, brand = "Marca A") => ({
   group: { brand },
@@ -62,4 +62,50 @@ test("respeita volume explícito e não herda o volume do título quando o campo
 
 test("volume explícito numérico é normalizado sem perder a identidade", () => {
   assert.equal(legacyVolumeIdentity("25", "BRAND 151 DELINA FEM 25ML"), "25ml");
+});
+
+test("prefere a única linha confirmada na fonte raiz quando legado e origem compartilham a mesma foto", () => {
+  const legacy = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_legacy", foto: "foto-delina" },
+    item: { fonte: "legacy-gist" }
+  };
+  const root = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_root", foto: "foto-delina" },
+    item: { fonte: "brand", id_origem: "2087755" }
+  };
+  assert.equal(
+    resolveLegacyStockMatch([], [legacy, root], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
+    root
+  );
+});
+
+test("não escolhe entre duas origens confirmadas com IDs diferentes e a mesma foto", () => {
+  const a = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_a", foto: "foto-delina" },
+    item: { fonte: "brand", id_origem: "2087755" }
+  };
+  const b = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_b", foto: "foto-delina" },
+    item: { fonte: "brand", id_origem: "2087756" }
+  };
+  assert.equal(
+    resolveLegacyStockMatch([], [a, b], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
+    null
+  );
+});
+
+test("não sobrescreve public_id protegido pelo snapshot conhecido durante a recuperação do Gist", () => {
+  const target = { public_id: "p_snapshot", _preserve_public_id: true };
+  assert.equal(preserveStablePublicId(target, { public_id: "p_live" }), "p_snapshot");
+  assert.equal(target.public_id, "p_snapshot");
+});
+
+test("usa public_id do Gist quando não existe marcador de proteção do snapshot", () => {
+  const target = { public_id: "p_atual" };
+  assert.equal(preserveStablePublicId(target, { public_id: "p_live" }), "p_live");
+  assert.equal(target.public_id, "p_live");
 });
