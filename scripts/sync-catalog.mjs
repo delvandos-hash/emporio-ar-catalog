@@ -1008,23 +1008,41 @@ async function fetchFacilZapPage(base, loja, catId, page, cookie) {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
   const url = `${base}/c/atacado/carregar_produtos/${page}/${catId}/${loja}?mobile=0`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'User-Agent': UA,
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      Origin: base,
-      Referer: `${base}/c/atacado/${loja}`,
-      'X-Requested-With': 'XMLHttpRequest',
-      Accept: 'application/json, text/javascript, */*; q=0.01',
-      Cookie: cookie || '',
-    },
-    body: '',
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text = await res.text();
-  if (!text || text.trimStart().startsWith('<') || text.includes('window.location')) throw new Error('HTML/redirect da Sophia (não JSON)');
-  return JSON.parse(text);
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'User-Agent': UA,
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Origin: base,
+          Referer: `${base}/c/atacado/${loja}`,
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          Cookie: cookie || '',
+        },
+        body: '',
+      });
+      if (!res.ok) {
+        const error = new Error(`HTTP ${res.status}`);
+        if (res.status < 500 && res.status !== 429) throw error;
+        throw error;
+      }
+      const text = await res.text();
+      if (!text || text.trimStart().startsWith('<') || text.includes('window.location')) {
+        throw new Error('HTML/redirect da Sophia (não JSON)');
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      lastError = error;
+      const retryable = /HTTP 5\\d\\d|HTTP 429|fetch failed|network|timeout|ECONNRESET|ETIMEDOUT/i.test(String(error?.message || error));
+      if (!retryable || attempt === 3) throw error;
+      console.warn(`FacilZap HTTP instável; tentativa ${attempt + 1}/3 na página ${page}: ${error.message}`);
+      await sleep(900 * attempt);
+    }
+  }
+  throw lastError || new Error('Falha desconhecida na coleta FacilZap');
 }
 
 function normalizeFacilZapProduct(p, idPrefix = '') {
