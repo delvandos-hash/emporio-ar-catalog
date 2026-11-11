@@ -121,7 +121,7 @@ async function fetchBrandStock() {
 
 exports.handler = async (event) => {
   const headers = {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Cache-Control': 'no-store, no-cache, must-revalidate',
