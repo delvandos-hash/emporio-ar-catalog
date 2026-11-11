@@ -1310,14 +1310,21 @@ function hasDandeNextPage(html, page) {
   return /rel=["']next["']/i.test(html) || queryPage.test(html) || pathPage.test(html);
 }
 
-async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '') {
+async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cacheBust = '') {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-  const url = page <= 1
-    ? `${DANDE_BASE}${path}`
-    : `${DANDE_BASE}${path}?page=${page}`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'text/html', 'Accept-Language': 'pt-BR,pt;q=0.9' },
+  const requestUrl = new URL(page <= 1 ? `${DANDE_BASE}${path}` : `${DANDE_BASE}${path}?page=${page}`);
+  // Evita que CDN/proxy devolva o HTML da página 1 em requisições paginadas.
+  if (cacheBust) requestUrl.searchParams.set('_dande_refresh', String(cacheBust));
+  const res = await fetch(requestUrl.toString(), {
+    cache: 'no-store',
+    headers: {
+      'User-Agent': UA,
+      Accept: 'text/html',
+      'Accept-Language': 'pt-BR,pt;q=0.9',
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      Pragma: 'no-cache',
+    },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
@@ -1455,15 +1462,37 @@ async function fetchDandeAcessorios(existingGroups = []) {
     let completed = false;
     for (let page = 1; page <= 80; page++) {
       try {
-        const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
-        const list = parseDandeListProducts(html);
-        if (!list.length) { completed = true; break; }
-        const pageSignature = list.map((p) => p.id).sort().join('|');
-        if (!pageSignature || seenPageSignatures.has(pageSignature)) {
-          if (hasDandeNextPage(html, page)) throw new Error(`página repetida apesar de paginação anunciada (página ${page})`);
-          console.log(`    p${page}: página repetida sem continuação; encerrando categoria`);
+        let html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
+        let list = parseDandeListProducts(html);
+        if (!list.length) {
+          if (page > 1) throw new Error(`página ${page} retornou zero produtos; coleta não pode ser considerada completa`);
           completed = true;
           break;
+        }
+        let pageSignature = list.map((p) => p.id).sort().join('|');
+        if (!pageSignature || seenPageSignatures.has(pageSignature)) {
+          // Página repetida nunca é tratada como fim: pode ser resposta antiga de cache
+          // (ex.: page=2 recebendo novamente o HTML de page=1).
+          let recovered = false;
+          for (let retry = 1; retry <= 2; retry++) {
+            await sleep(350 * retry);
+            const retryHtml = await fetchDandeCategoryPage(
+              cat.path, page, cat.nome, `${Date.now()}-${retry}`
+            );
+            const retryList = parseDandeListProducts(retryHtml);
+            const retrySignature = retryList.map((p) => p.id).sort().join('|');
+            if (retryList.length && retrySignature && !seenPageSignatures.has(retrySignature)) {
+              html = retryHtml;
+              list = retryList;
+              pageSignature = retrySignature;
+              recovered = true;
+              console.log(`    p${page}: resposta repetida recuperada após tentativa sem cache (${retry}/2)`);
+              break;
+            }
+          }
+          if (!recovered) {
+            throw new Error(`página ${page} repetida/vazia após 2 tentativas sem cache; paginação Dande inconclusiva`);
+          }
         }
         seenPageSignatures.add(pageSignature);
         for (const product of list) categoryIds.add(String(product.id));
