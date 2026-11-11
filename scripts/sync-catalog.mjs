@@ -12,7 +12,7 @@ import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
-import { shouldRemoveUnmatchedSourceItem } from './source-preservation.mjs';
+import { shouldRemoveUnmatchedSourceItem, canMergeLegacyClothesClone } from './source-preservation.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -2492,16 +2492,17 @@ async function main() {
           if (existingRows.length === 1) {
             const existingRow = existingRows[0];
             const existingItem = existingRow.item;
-            const oldStockRef = String(item.stock_ref || '').trim();
-            const currentStockRef = String(existingItem.stock_ref || '').trim();
-            const sameStockRef = Boolean(oldStockRef && currentStockRef && oldStockRef === currentStockRef);
             const sameName = norm(existingItem.nome) === norm(item.nome);
             const sameVolume = norm(existingItem.volume || '—') === norm(item.volume || '—');
-            // A identidade exata do fornecedor + stock_ref + nome + volume
-            // prevalece sobre divergência histórica de grupo/categoria. A linha
-            // confirmada pela origem já está no grupo canônico; a cópia legada
-            // pode ser fundida sem criar um segundo produto.
-            if (sameStockRef && sameName && sameVolume) {
+            // ID exato da origem + nome + volume confirmam o mesmo produto.
+            // stock_ref e categoria podem ter mudado historicamente; não são
+            // motivo para manter uma segunda cópia do mesmo ID de fornecedor.
+            if (canMergeLegacyClothesClone({
+              rootId,
+              existingOriginId: existingItem.id_origem,
+              sameName,
+              sameVolume
+            })) {
               const oldPublicId = String(item.public_id || '').trim();
               if (oldPublicId) {
                 const collision = Object.values(DATA).some(groups =>
