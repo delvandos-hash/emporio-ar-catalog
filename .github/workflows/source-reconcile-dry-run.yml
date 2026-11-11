@@ -1,4 +1,4 @@
-name: Reconciliação de todas as fontes (dry-run, sem publicar)
+name: Reconciliação por origem (dry-run, sem publicar)
 
 on:
   push:
@@ -64,7 +64,7 @@ jobs:
         run: node scripts/restore-catalog-baseline.mjs
         env:
           CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
-      - name: Sincronizar todas as fontes e reaplicar IDs do snapshot sem publicar
+      - name: Sincronizar fontes completas e remover produtos ausentes sem publicar
         run: |
           node scripts/sync-catalog.mjs
           mkdir -p /tmp/catalog-reconcile-report
