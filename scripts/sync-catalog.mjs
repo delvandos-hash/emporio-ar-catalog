@@ -1326,8 +1326,8 @@ function hasDandeNextPage(html, page) {
 async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cacheBust = '', pageUrl = '', attempt = 0) {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-  const baseUrl = String(DANDE_BASE || '').replace(/\\/+$/, '') + '/';
-  const defaultUrl = new URL(String(path || '').replace(/^\\/+/, ''), baseUrl);
+  const baseUrl = String(DANDE_BASE || '').replace(/\/+$/, '') + '/';
+  const defaultUrl = new URL(String(path || '').replace(/^\/+/, ''), baseUrl);
   if (page > 1) defaultUrl.searchParams.set('page', String(page));
   const requestUrl = new URL(pageUrl || defaultUrl.toString());
   // Evita cache e normaliza a base para não gerar rotas com barra dupla.
@@ -1347,16 +1347,16 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cac
   console.log(`    Dande response p${page}: ${res.url || requestUrl.toString()}`);
   const html = await res.text();
   if (expectedCategory) {
-    const titleMatch = html.match(/<h1\\b[^>]*>([\\s\\S]*?)<\\/h1>/i);
+    const titleMatch = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
     const actualTitle = titleMatch
       ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
       : '';
     const expectedTitle = norm(expectedCategory).replace(/s$/, '');
-    const normalizePath = value => String(value).replace(/\\/+/g, '/').replace(/\\/+$/, '');
+    const normalizePath = value => String(value).replace(/\/+/g, '/').replace(/\/+$/, '');
     const requestedPath = normalizePath(path);
     const finalPath = normalizePath(new URL(res.url || requestUrl.toString()).pathname);
     const genericDandeTitle = actualTitle === 'dande acessorio' &&
-      finalPath === requestedPath && /data-product-id="\\d+"/.test(html);
+      finalPath === requestedPath && /data-product-id="\d+"/.test(html);
     console.log(`DANDE_CATEGORY_TITLE expected="${expectedCategory}" actual="${actualTitle || 'ausente'}" finalPath="${finalPath}" genericFallback=${genericDandeTitle} attempt=${attempt + 1}`);
     if (genericDandeTitle && attempt < 2) {
       await sleep(1000 * (attempt + 1));
