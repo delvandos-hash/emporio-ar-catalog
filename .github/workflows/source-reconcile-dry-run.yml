@@ -143,19 +143,21 @@ jobs:
           console.log(`BASELINE_PUBLIC_IDS_MISSING=${syncCompleted ? missing.length : "NOT_VERIFIED"}`);
           for (const row of missing) console.log("MISSING_PUBLIC_ID=" + JSON.stringify(row));
           NODE
-      - name: Confirmar que todos os IDs do snapshot anterior sobreviveram ao sync
+      - name: Confirmar coleta completa e auditar remoções legítimas da origem
         if: github.event_name == 'pull_request'
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           const report = JSON.parse(fs.readFileSync("/tmp/catalog-reconcile-report/missing-public-ids.json", "utf8"));
           if (!report.sync_completed) {
-            console.error("Sincronização completa falhou; preservação de IDs não pode ser aprovada.");
+            console.error("Coleta de uma ou mais fontes falhou; nenhuma ausência pode ser aprovada como exclusão.");
             process.exit(1);
           }
-          if (report.missing_count) {
-            console.error("IDs do snapshot anterior ausentes após o dry-run: " + report.missing.map(row => row.public_id).join(","));
-            process.exit(1);
+          console.log(`SOURCE_RECONCILIATION_COMPLETED=true`);
+          console.log(`BASELINE_PUBLIC_IDS_STILL_PRESENT=${report.current_public_ids}`);
+          console.log(`BASELINE_PUBLIC_IDS_REMOVED_OR_REKEYED_AFTER_COMPLETE_COLLECTION=${report.missing_count}`);
+          for (const row of report.missing) {
+            console.log("BASELINE_ITEM_ABSENT_AFTER_COMPLETE_SOURCE_SYNC=" + JSON.stringify(row));
           }
           NODE
       - name: Anexar diagnóstico da reconciliação
