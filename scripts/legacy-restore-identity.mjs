@@ -58,6 +58,29 @@ export function resolveLegacyStockMatch(stockMatches, identityMatches, publicIte
   if (photo && candidates.length > 1) {
     const byPhoto = candidates.filter(row => legacyPhotoFingerprint(row?.publicItem) === photo);
     if (byPhoto.length === 1) return byPhoto[0];
+
+    // Se a mesma foto aparece em uma cópia legada e em um único registro
+    // confirmado pela fonte raiz, prioriza a origem confirmada. Duas origens
+    // distintas com a mesma foto continuam ambíguas e não são fundidas.
+    if (byPhoto.length > 1) {
+      const sourceConfirmed = byPhoto.filter(row =>
+        String(row?.item?.fonte || "").trim() &&
+        normalizeBrand(row?.item?.fonte) !== "legacy gist" &&
+        String(row?.item?.id_origem || "").trim()
+      );
+      if (sourceConfirmed.length === 1) return sourceConfirmed[0];
+    }
   }
   return null;
+}
+
+/** Aplica o public_id vivo sem sobrescrever um ID protegido pelo snapshot conhecido. */
+export function preserveStablePublicId(target, publicItem) {
+  if (!target || typeof target !== "object") return "";
+  const publicId = String(publicItem?.public_id || "").trim();
+  if (!publicId) return String(target.public_id || "").trim();
+  const currentId = String(target.public_id || "").trim();
+  if (target._preserve_public_id === true && currentId) return currentId;
+  target.public_id = publicId;
+  return publicId;
 }
