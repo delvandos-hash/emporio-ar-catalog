@@ -50,7 +50,7 @@ test("snapshot público usa somente chaves neutras e mantém os dois mapas de es
     assert.equal(payload.ok, true);
     assert.equal(payload.mapA["perfume de teste|marca de teste"], "Não");
     assert.equal(payload.mapB["produto brand sem estoque|categoria teste"], "Não");
-    assert.deepEqual(payload.byNameB, {});
+    assert.equal(payload.byNameB["produto brand sem estoque"], "Não");
     for (const key of ["sources", "imarat", "brand", "brandMap", "brandByName", "total"]) {
       assert.equal(Object.hasOwn(payload, key), false, "campo interno não deve ser público: " + key);
     }
@@ -74,7 +74,7 @@ test("snapshot público usa somente chaves neutras e mantém os dois mapas de es
       if (url === process.env.BRAND_BASE_URL + "/c/atacado/darlanaugusto") throw new Error("falha simulada");
       throw new Error("URL inesperada no teste: " + url);
     };
-    const partialBrand = JSON.parse((await handler({ httpMethod: "GET" })).body);
+    const partialBrand = parseFunctionJson(await handler({ httpMethod: "GET" }));
     assert.equal(partialBrand.ok, false, "falha da segunda origem também deve invalidar o snapshot");
     assert.deepEqual(partialBrand.mapB, {});
     assert.equal(Object.hasOwn(partialBrand, "imarat"), false);
