@@ -27,3 +27,13 @@ test("sync de estoque não publica usando somente Imarat se Brand falhar", () =>
   assert.doesNotMatch(source, /Brand indisponível \(seguindo só com Imarat\)/);
   assert.ok(source.indexOf("const brand = await fetchBrand();") < source.indexOf("fs.writeFileSync(dataPath"));
 });
+
+
+test("Dande usa requisições sem cache e não confunde página repetida com fim da categoria", () => {
+  assert.match(source, /cache: 'no-store'/);
+  assert.match(source, /'Cache-Control': 'no-cache, no-store, max-age=0'/);
+  assert.match(source, /requestUrl\.searchParams\.set\('_dande_refresh'/);
+  assert.match(source, /for \(let retry = 1; retry <= 2; retry\+\+\)/);
+  assert.match(source, /página \$\{page\} repetida\/vazia após 2 tentativas sem cache/);
+  assert.doesNotMatch(source, /página repetida sem continuação; encerrando categoria/);
+});
