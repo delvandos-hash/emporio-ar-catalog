@@ -2114,10 +2114,72 @@ function renderRelatedStrip(p) {
   });
 }
 
+
+/** Completa o produto a partir do catálogo vivo (data-p dos cards é resumido). */
+function hydrateProductFromCatalog(p) {
+  if (!p || !DATA) return p;
+  const pid = String(p.public_id || '').trim();
+  const rn = relatedNorm(p.nome);
+  const rv = relatedNorm(String(p.volume || '').replace(/\s/g, ''));
+  const rb = relatedNorm(p.brand);
+  let found = null;
+  let meta = null;
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      for (const it of g.items || []) {
+        if (pid && String(it.public_id || '').trim() === pid) {
+          found = it;
+          meta = { brand: g.brand, cat: g.cat, line };
+          break;
+        }
+      }
+      if (found) break;
+    }
+    if (found) break;
+  }
+  if (!found && rn) {
+    for (const line of Object.keys(DATA)) {
+      for (const g of DATA[line] || []) {
+        for (const it of g.items || []) {
+          if (relatedNorm(it.nome) !== rn) continue;
+          const iv = relatedNorm(String(it.volume || '').replace(/\s/g, ''));
+          if (rv && iv && rv !== iv) continue;
+          if (rb && relatedNorm(g.brand) && relatedNorm(g.brand) !== rb && relatedNorm(it.brand || '') !== rb) continue;
+          found = it;
+          meta = { brand: g.brand, cat: g.cat, line };
+          break;
+        }
+        if (found) break;
+      }
+      if (found) break;
+    }
+  }
+  if (!found) return p;
+  return {
+    ...found,
+    ...p,
+    brand: p.brand || meta.brand || found.brand,
+    cat: p.cat || meta.cat || found.cat,
+    line: p.line || meta.line || found.line,
+    notas: p.notas || found.notas,
+    foto: p.foto || found.foto,
+    fotos: (Array.isArray(p.fotos) && p.fotos.length) ? p.fotos : found.fotos,
+    relacionados: (Array.isArray(found.relacionados) && found.relacionados.length)
+      ? found.relacionados
+      : (p.relacionados || undefined),
+    fonte: p.fonte || found.fonte,
+    public_id: p.public_id || found.public_id,
+    origin_ref: p.origin_ref || found.origin_ref,
+    stock_ref: p.stock_ref || found.stock_ref,
+    stock_route: p.stock_route || found.stock_route,
+  };
+}
+
 function openDetails(p, opts = {}) {
   if (!opts.fromNav) {
     detailsScrollY = window.scrollY || window.pageYOffset || 0;
   }
+  p = hydrateProductFromCatalog(p);
   const live = lookupLiveStock(p, p.brand, p.cat);
   if (live) p = { ...p, disponivel: live };
   currentProduct = p;
@@ -2359,7 +2421,8 @@ function buildFeaturedHtml() {
           stock_ref: item.stock_ref || '',
           stock_route: item.stock_route || '',
                   variacoes: item.variacoes || [],
-      total_estoque: item.total_estoque
+      total_estoque: item.total_estoque,
+      relacionados: item.relacionados || []
     }));
     const foto = resolveCatalogImageUrl(item.foto);
     const favOn = isFav(item, favoriteIds);
@@ -2793,7 +2856,8 @@ function render() {
           stock_ref: item.stock_ref || '',
           stock_route: item.stock_route || '',
                               variacoes: item.variacoes || [],
-          total_estoque: item.total_estoque
+          total_estoque: item.total_estoque,
+          relacionados: item.relacionados || []
         }));
         const fotoCard = resolveCatalogImageUrl(item.foto);
         const photoHtml = isScoop
