@@ -1346,6 +1346,13 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cac
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   console.log(`    Dande response p${page}: ${res.url || requestUrl.toString()}`);
   const html = await res.text();
+  const loadMoreAt = html.toLowerCase().indexOf('mostrar mais produtos');
+  if (loadMoreAt >= 0) {
+    console.log('DANDE_LOAD_MORE_MARKUP=' + html.slice(Math.max(0, loadMoreAt - 500), loadMoreAt + 500).replace(/\\s+/g, ' ').slice(0, 1200));
+  }
+  const paginationHints = [...html.matchAll(/.{0,100}(?:load.?more|show.?more|pagination|data-page|page=2|ajax).{0,100}/gi)]
+    .slice(0, 8).map(match => match[0].replace(/\\s+/g, ' '));
+  if (paginationHints.length) console.log('DANDE_PAGINATION_HINTS=' + JSON.stringify(paginationHints));
   if (expectedCategory) {
     const titleMatch = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
     const actualTitle = titleMatch
