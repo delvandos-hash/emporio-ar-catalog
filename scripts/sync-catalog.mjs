@@ -1528,21 +1528,10 @@ async function fetchDandeAcessorios(existingGroups = []) {
     if (!byCat.has(cat)) byCat.set(cat, []);
     byCat.get(cat).push(item);
   }
-  // Preserve existing items not found in scrape (keep snapshot)
-  for (const [id, prev] of existingById) {
-    if (byId.has(id)) continue;
-    const cat = prev.cat || 'Outros';
-    // try find cat from existing groups
-    let foundCat = 'Outros';
-    for (const g of existingGroups || []) {
-      if ((g.items || []).some((it) => String(it.id_origem) === String(id))) {
-        foundCat = g.cat || 'Outros';
-        break;
-      }
-    }
-    if (!byCat.has(foundCat)) byCat.set(foundCat, []);
-    byCat.get(foundCat).push({ ...prev, fonte: 'acessorios' });
-  }
+  // A coleta Dande chegou ao fim de todas as categorias. Produtos antigos
+  // ausentes da base raiz não são reinseridos no snapshot; somente IDs atuais
+  // em byId compõem o catálogo. Se a coleta estiver incompleta, a função lança
+  // erro antes de chegar a este ponto e nada será publicado.
 
   const groups = [];
   for (const [cat, items] of byCat) {
@@ -2183,7 +2172,7 @@ async function main() {
         }
         const hit = matches[0];
         if (!hit) {
-          if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+          if (shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) {
             staleBrandRemoved++;
             return false;
           }
@@ -2238,7 +2227,7 @@ async function main() {
           }
           const hit = matches[0];
           if (!hit) {
-            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+            if (shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) {
               unverifiedLegacyRemoved++;
               unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, action: 'removed' });
               continue;
@@ -2433,7 +2422,7 @@ async function main() {
             const fromFranny = id.startsWith('franny-');
             const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
             const exists = !sourceEnabled || (fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id));
-            if (!exists && shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) staleClothesRemoved++;
+            if (!exists && shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) staleClothesRemoved++;
             else {
               if (!exists) staleClothesPreserved++;
               kept.push(item);
@@ -2452,7 +2441,7 @@ async function main() {
             throw new Error(`LEGACY_ROUPAS_AMBIGUOUS: ${item.nome} aparece em ${matches.length} registros da fonte raiz; nenhum foi apagado.`);
           }
           if (!matches.length) {
-            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+            if (shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) {
               staleClothesRemoved++;
               legacyClothesUnmatchedRemoved++;
               continue;
