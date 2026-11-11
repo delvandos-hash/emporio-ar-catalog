@@ -14,6 +14,9 @@ on:
       - "js/cart-identity.mjs"
       - "netlify/functions/dande-stock.mjs"
       - "scripts/dande-stock-pagination.test.mjs"
+      - "scripts/catalog-baseline-restore.mjs"
+      - "scripts/catalog-baseline-restore.test.mjs"
+      - "scripts/restore-catalog-baseline.mjs"
       - ".github/workflows/test-dande-sync.yml"
 
 permissions:
@@ -39,6 +42,8 @@ jobs:
           node --check netlify/functions/dande-stock.mjs
       - name: Testar categorias cruzadas e paginação de estoque
         run: node --test scripts/dande-category-membership.test.mjs scripts/cart-identity.test.mjs scripts/dande-stock-pagination.test.mjs
+      - name: Testar restauração segura do snapshot conhecido
+        run: node --test scripts/catalog-baseline-restore.test.mjs
       - name: Executar sincronização em modo isolado
         run: node scripts/sync-catalog.mjs
         env:
