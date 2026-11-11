@@ -1,0 +1,237 @@
+name: Homologação completa isolada (sem publicar)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/sync-catalog.mjs"
+      - "scripts/legacy-restore-identity.mjs"
+      - "scripts/legacy-restore-identity.test.mjs"
+      - "scripts/restore-gist-only-legacy.mjs"
+      - "scripts/catalog-baseline-restore.mjs"
+      - "scripts/restore-catalog-baseline.mjs"
+      - "scripts/public-catalog.mjs"
+      - "js/dande-category-membership.mjs"
+      - "js/cart-identity.mjs"
+      - "netlify/functions/dande-stock.mjs"
+      - "scripts/dande-url.mjs"
+      - "scripts/dande-url.test.mjs"
+      - "scripts/dande-category-membership.test.mjs"
+      - "scripts/dande-stock-pagination.test.mjs"
+      - "scripts/cart-identity.test.mjs"
+      - "scripts/source-preservation.mjs"
+      - "scripts/source-preservation.test.mjs"
+      - ".github/workflows/temporary-source-reconcile-validation.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: temporary-source-reconcile-\${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  full-source-dry-run:
+    name: Coleta completa e auditoria de identidade sem publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Baixar o commit da PR
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha }}
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validar sintaxe e regras de identidade
+        run: |
+          node --check scripts/sync-catalog.mjs
+          node --check scripts/legacy-restore-identity.mjs
+          node --check scripts/restore-gist-only-legacy.mjs
+          node --check netlify/functions/dande-stock.mjs
+          node --test \
+            scripts/legacy-restore-identity.test.mjs \
+            scripts/catalog-baseline-restore.test.mjs \
+            scripts/catalog-identity.test.mjs \
+            scripts/source-identity-dedupe.test.mjs \
+            scripts/source-preservation.test.mjs \
+            scripts/dande-url.test.mjs \
+            scripts/dande-category-membership.test.mjs \
+            scripts/dande-stock-pagination.test.mjs \
+            scripts/cart-identity.test.mjs \
+            scripts/public-catalog.test.mjs \
+            scripts/public-image-url.test.mjs \
+            scripts/favorites-compat.test.mjs
+
+      - name: Baixar snapshot conhecido para preservar IDs estáveis
+        uses: actions/download-artifact@v4
+        with:
+          name: full-reconcile-data-js-42874130855
+          run-id: 42874130855
+          github-token: \${{ github.token }}
+          path: /tmp/catalog-baseline
+
+      - name: Restaurar IDs do snapshot conhecido
+        run: node scripts/restore-catalog-baseline.mjs
+        env:
+          CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
+
+      - name: Restaurar campos públicos do Gist sem sobrescrever IDs protegidos
+        run: node scripts/restore-gist-only-legacy.mjs
+        env:
+          GIST_TOKEN: \${{ secrets.GIST_TOKEN }}
+
+      - name: Sincronizar todas as fontes em dry-run
+        run: node scripts/sync-catalog.mjs 2>&1 | tee /tmp/source-sync.log
+        env:
+          SYNC_DRY_RUN: "1"
+          SYNC_SKIP_DETAILS: "1"
+          SYNC_IMARAT_ONLY: "0"
+          SYNC_DANDE_ONLY: "0"
+          ADD_IMARAT_NEW: "1"
+          ADD_BRAND_NEW: "1"
+          ADD_ROUPAS: "1"
+          ADD_FRANNY: "1"
+          ADD_ACESSORIOS: "1"
+          GIST_TOKEN: \${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: \${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: \${{ secrets.IMARAT_ORIGIN_URL }}
+          BRAND_BASE_URL: \${{ secrets.BRAND_BASE_URL }}
+          CDN_IMAGE_BASE_URL: \${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: \${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          SOPHIA_PRIMARY_URL: \${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: \${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: \${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: \${{ secrets.FRANNY_BASE_URL }}
+          DANDE_BASE_URL: \${{ secrets.DANDE_BASE_URL }}
+
+      - name: Auditar IDs estáveis, Dande, fotos e Scoop Premiado
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { collectPublicIds, parseDataJsContent } from "./scripts/catalog-baseline-restore.mjs";
+
+          const baseline = parseDataJsContent(fs.readFileSync("/tmp/catalog-baseline/data.js", "utf8"));
+          const current = parseDataJsContent(fs.readFileSync("js/data.js", "utf8"));
+          const log = fs.readFileSync("/tmp/source-sync.log", "utf8");
+          const flatten = data => Object.entries(data || {}).flatMap(([line, groups]) =>
+            (groups || []).flatMap(group => (group.items || []).map(item => ({
+              line, cat: group.cat, brand: group.brand, nome: item.nome, volume: item.volume,
+              public_id: item.public_id, stock_ref: item.stock_ref, id_origem: item.id_origem,
+              fonte: item.fonte, foto: item.foto, fotos: item.fotos,
+              categorias_origem: item.categorias_origem, precoManual: item.precoManual,
+              varejo: item.varejo, atacado: item.atacado
+            })))
+          );
+          const norm = value => String(value ?? "").normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "").toLowerCase()
+            .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+          const baselineRows = flatten(baseline);
+          const currentRows = flatten(current);
+          const currentIds = collectPublicIds(current);
+          const missing = baselineRows.filter(row => row.public_id && !currentIds.has(String(row.public_id)));
+          const unsafeMissing = missing.filter(row => {
+            if (row.id_origem && row.fonte) {
+              return currentRows.some(candidate =>
+                norm(candidate.brand) === norm(row.brand) &&
+                norm(candidate.fonte) === norm(row.fonte) &&
+                String(candidate.id_origem || "").trim() === String(row.id_origem).trim()
+              );
+            }
+            if (!row.id_origem && row.stock_ref) {
+              return currentRows.some(candidate =>
+                norm(candidate.line) === norm(row.line) &&
+                norm(candidate.brand) === norm(row.brand) &&
+                norm(candidate.cat) === norm(row.cat) &&
+                norm(candidate.nome) === norm(row.nome) &&
+                norm(candidate.volume || "—") === norm(row.volume || "—") &&
+                String(candidate.stock_ref || "") === String(row.stock_ref)
+              );
+            }
+            return false;
+          });
+          if (unsafeMissing.length) {
+            console.error("IDs do snapshot ausentes apesar de existir a mesma origem/identidade exata:");
+            for (const row of unsafeMissing) console.error(JSON.stringify(row));
+            throw new Error("A identidade de produtos existentes não preservou todos os public_ids conhecidos.");
+          }
+
+          const expectedScoops = ["Scoop Bronze", "Scoop Cobre", "Scoop Diamante", "Scoop Ouro", "Scoop Prata"];
+          const scoopRows = currentRows.filter(row => expectedScoops.includes(String(row.nome || "")));
+          const scoopNames = new Set(scoopRows.map(row => String(row.nome)));
+          if (scoopRows.length !== 5 || expectedScoops.some(name => !scoopNames.has(name))) {
+            throw new Error("Os cinco produtos Scoop Premiado não foram preservados integralmente.");
+          }
+          for (const row of scoopRows) {
+            if (!row.public_id || row.stock_ref || row.id_origem || row.fonte || row.foto ||
+                (Array.isArray(row.fotos) && row.fotos.length)) {
+              throw new Error("Um Scoop Premiado perdeu sua identidade própria ou recebeu metadado/foto indevido: " + row.nome);
+            }
+          }
+
+          const dandeRows = (current.acessorios || []).flatMap(group => group.items || []);
+          const dandeIds = dandeRows.map(item => String(item.id_origem || "").trim()).filter(Boolean);
+          const uniqueDandeIds = new Set(dandeIds);
+          const allowed = new Set([
+            "Acessórios de Cabelo", "Anéis", "Braceletes", "Brincos", "Colares", "Conjuntos",
+            "Lançamentos", "Masculinos", "Prata 925", "Pulseiras", "Semijoia Italiana", "Tornozeleiras"
+          ]);
+          const dandeCategories = new Set(dandeRows.flatMap(item => Array.isArray(item.categorias_origem) ? item.categorias_origem : []));
+          const unknownCategories = [...dandeCategories].filter(category => !allowed.has(category));
+          const crossListed = dandeRows.filter(item => (item.categorias_origem || []).length > 1).length;
+          const hairRows = dandeRows.filter(item => (item.categorias_origem || []).includes("Acessórios de Cabelo"));
+          const hairWithoutImage = hairRows.filter(item => !(item.foto || (Array.isArray(item.fotos) && item.fotos.length)));
+          if (!dandeRows.length || dandeIds.length !== dandeRows.length || uniqueDandeIds.size !== dandeRows.length) {
+            throw new Error("Dande contém cadastro sem ID de origem ou ID duplicado na base única.");
+          }
+          if (dandeCategories.size !== 12 || unknownCategories.length || !crossListed) {
+            throw new Error("Categorias Dande incompletas, não permitidas ou sem produtos cruzados.");
+          }
+          if (!hairRows.length || hairWithoutImage.length) {
+            throw new Error("A categoria Acessórios de Cabelo tem produto sem imagem.");
+          }
+
+          const prices = log.match(/LIVE_PUBLIC_PRICES_PROTECTED=(\d+)/);
+          const ambiguous = log.match(/LIVE_PUBLIC_AMBIGUOUS=(\d+)/);
+          if (!prices || Number(prices[1]) < 1) throw new Error("Nenhum preço público protegido foi confirmado no dry-run.");
+          if (!ambiguous || Number(ambiguous[1]) !== 0) throw new Error("A sincronização terminou com correspondências públicas ambíguas.");
+          if (!/SYNC_DRY_RUN=1[^\\n]*Gist de produção NÃO foi alterado/i.test(log)) {
+            throw new Error("Não foi encontrada a confirmação de dry-run sem publicação no Gist.");
+          }
+
+          const report = {
+            sync_dry_run: true,
+            baseline_public_ids: collectPublicIds(baseline).size,
+            current_public_ids: currentIds.size,
+            baseline_ids_missing_after_sync: missing.length,
+            baseline_ids_missing_but_exact_identity_still_exists: unsafeMissing.length,
+            baseline_ids_absent_without_safe_match: missing.length - unsafeMissing.length,
+            scoop_premiado_preserved: scoopRows.length,
+            dande_unique_source_ids: uniqueDandeIds.size,
+            dande_cross_listed_products: crossListed,
+            dande_categories: [...dandeCategories].sort(),
+            dande_hair_products: hairRows.length,
+            dande_hair_without_image: hairWithoutImage.length,
+            dande_products_with_image: dandeRows.filter(item => item.foto || (Array.isArray(item.fotos) && item.fotos.length)).length,
+            public_prices_protected: Number(prices[1]),
+            public_ambiguous_matches: Number(ambiguous[1])
+          };
+          fs.mkdirSync("/tmp/catalog-homologation", { recursive: true });
+          fs.writeFileSync("/tmp/catalog-homologation/homologation-report.json", JSON.stringify(report, null, 2));
+          fs.copyFileSync("js/data.js", "/tmp/catalog-homologation/current-data.js");
+          fs.copyFileSync("/tmp/source-sync.log", "/tmp/catalog-homologation/source-sync.log");
+          console.log(JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Anexar evidências do dry-run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-source-homologation-report
+          path: /tmp/catalog-homologation/
+          if-no-files-found: warn
+          retention-days: 14
