@@ -1680,25 +1680,16 @@ async function main() {
         console.log("IDS DO GIST AINDA SEM ID INTERNO APÓS REKEY PRE-SYNC " + JSON.stringify(missingLiveItems));
       }
       console.log(`BASELINE POR PUBLIC_ID: data.js=${internalBaseline.count} IDs/${internalBaseline.items} itens; Gist=${liveBaseline.count} IDs/${liveBaseline.items} itens; IDs sem origem interna=${liveBaseline.missingIds}; IDs só no data.js=${onlyInternal}; IDs só no Gist=${onlyLive}`);
-      const safeAdditiveBaseline = process.env.ALLOW_SAFE_ADDITIVE_BASELINE === "1";
-      const baselineRestoreEnabled = process.env.CATALOG_BASELINE_RESTORE === "1";
-      const allowedLiveOnly = safeAdditiveBaseline ? 1 : 0;
-      const allowedInternalOnly = baselineRestoreEnabled ? 200 : 80;
-      console.log(`CATALOG_BASELINE_RESTORE=${baselineRestoreEnabled} allowedInternalOnly=${allowedInternalOnly}`);
-      const baselineUnsafe =
-        liveBaseline.missingIds > 0 ||
-        onlyLive > allowedLiveOnly ||
-        onlyInternal > allowedInternalOnly ||
-        Math.abs(liveBaseline.count - internalBaseline.count) > allowedInternalOnly ||
-        (safeAdditiveBaseline && preSyncPreservation.ambiguous > 0);
+      // O Gist preserva campos públicos, mas não é autoridade para manter produtos.
+      // Itens Gist-only são avaliados novamente após a coleta completa das fontes raiz:
+      // se ainda existirem na origem, serão incluídos; se não existirem, não entram no DATA final.
+      // Antes da coleta, bloqueamos apenas IDs públicos ausentes, que impedem preservar links estáveis.
+      const baselineUnsafe = liveBaseline.missingIds > 0;
       if (!SYNC_DRY_RUN && baselineUnsafe) {
-        throw new Error("SINCRONIZAÇÃO BLOQUEADA: baseline não passou pelos limites de segurança. Excesso de IDs sem correspondência, ambiguidades ou divergência acima do limite; nenhum dado foi publicado.");
+        throw new Error("SINCRONIZAÇÃO BLOQUEADA: o Gist contém itens sem public_id estável; nenhum dado foi publicado.");
       }
-      if (!SYNC_DRY_RUN && safeAdditiveBaseline) {
-        console.log(`SAFE_ADDITIVE_BASELINE_OVERRIDE=true onlyLive=${onlyLive} onlyInternal=${onlyInternal} matched=${preSyncPreservation.matched} ambiguous=${preSyncPreservation.ambiguous}`);
-      }
-      if (SYNC_DRY_RUN && (onlyLive > 0 || onlyInternal > 80)) {
-        console.log("⚠️ Base divergente detectada; dry-run permitido apenas para diagnóstico. Nenhuma publicação será feita.");
+      if (onlyLive > 0 || onlyInternal > 0) {
+        console.log(`BASELINE_PRE_SYNC_DIVERGENTE=diagnóstico onlyLive=${onlyLive} onlyInternal=${onlyInternal}; a decisão de inclusão/remoção será tomada após a coleta completa das fontes raiz.`);
       }
     } else {
       console.log("SYNC_DRY_RUN=1 sem GIST_TOKEN; validação de divergência do Gist ignorada (sem publicação).");
