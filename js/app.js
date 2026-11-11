@@ -2005,6 +2005,115 @@ function trapDialogFocus(event) {
   }
 }
 
+
+/** Resolve produtos "combina com este" apenas para fonte Imarat presentes no catálogo. */
+function relatedNorm(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function isImaratProduct(p) {
+  const f = String(p?.fonte || '').toLowerCase();
+  return f === 'imarat' || f === 'perfumaria';
+}
+
+function resolveRelatedProducts(p) {
+  const refs = Array.isArray(p?.relacionados) ? p.relacionados : [];
+  if (!refs.length || !DATA) return [];
+  const all = [];
+  for (const line of Object.keys(DATA)) {
+    if (line === 'roupas' || line === 'acessorios') continue;
+    for (const g of DATA[line] || []) {
+      for (const it of g.items || []) {
+        all.push({ ...it, brand: it.brand || g.brand, cat: it.cat || g.cat, line });
+      }
+    }
+  }
+  const out = [];
+  const seen = new Set();
+  for (const ref of refs) {
+    const rn = relatedNorm(ref.nome);
+    const rv = relatedNorm(String(ref.volume || '').replace(/\s/g, ''));
+    const rb = relatedNorm(ref.brand);
+    let match = all.find(it =>
+      relatedNorm(it.nome) === rn &&
+      (!rv || !relatedNorm(String(it.volume || '').replace(/\s/g, '')) || relatedNorm(String(it.volume || '').replace(/\s/g, '')) === rv) &&
+      (!rb || relatedNorm(it.brand) === rb || ((rb === 'emporio a.r' || rb === 'emporio a r') && relatedNorm(it.brand).includes('imarat')))
+    );
+    if (!match) {
+      match = all.find(it => relatedNorm(it.nome) === rn && (!rv || relatedNorm(String(it.volume || '').replace(/\s/g, '')) === rv));
+    }
+    if (!match) continue;
+    const key = `${relatedNorm(match.nome)}|${relatedNorm(match.volume)}|${relatedNorm(match.brand)}`;
+    if (seen.has(key)) continue;
+    if (relatedNorm(match.nome) === relatedNorm(p.nome) && relatedNorm(match.volume) === relatedNorm(p.volume)) continue;
+    seen.add(key);
+    out.push(match);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+function renderRelatedStrip(p) {
+  let host = document.getElementById('modalRelated');
+  if (!host) {
+    const notasEl = document.getElementById('modalNotas');
+    host = document.createElement('div');
+    host.id = 'modalRelated';
+    host.className = 'modal-related';
+    host.style.display = 'none';
+    if (notasEl && notasEl.parentElement) {
+      notasEl.parentElement.insertBefore(host, notasEl.nextSibling);
+    } else {
+      document.querySelector('.modal-body')?.appendChild(host);
+    }
+  }
+  // Somente Imarat / perfumaria com lista de relacionados
+  const fonteOk = isImaratProduct(p) || (Array.isArray(p.relacionados) && p.relacionados.length);
+  if (!fonteOk || isRoupasProduct(p) || isAcessoriosProduct(p)) {
+    host.style.display = 'none';
+    host.innerHTML = '';
+    return;
+  }
+  const related = resolveRelatedProducts(p);
+  if (!related.length) {
+    host.style.display = 'none';
+    host.innerHTML = '';
+    return;
+  }
+  const cards = related.map((rp, idx) => {
+    const foto = escapeHtml((rp.fotos && rp.fotos[0]) || rp.foto || '');
+    const nome = escapeHtml(rp.nome || '');
+    const meta = escapeHtml([rp.brand, rp.volume && rp.volume !== '—' ? rp.volume : ''].filter(Boolean).join(' · '));
+    const price = rp.varejo ? `R$ ${escapeHtml(rp.varejo)}` : '';
+    return `<button type="button" class="related-card" data-related-idx="${idx}" aria-label="Ver ${nome}">
+      <div class="related-photo">${foto ? `<img src="${foto}" alt="" loading="lazy"/>` : '<span>SEM FOTO</span>'}</div>
+      <div class="related-info">
+        <div class="related-name">${nome}</div>
+        <div class="related-meta">${meta}</div>
+        <div class="related-price">${price}</div>
+      </div>
+    </button>`;
+  }).join('');
+  host.innerHTML = `
+    <div class="related-head">
+      <span class="related-kicker">Combina com este</span>
+      <strong class="related-title">Você também pode gostar</strong>
+    </div>
+    <div class="related-track">${cards}</div>`;
+  host.style.display = 'block';
+  host.querySelectorAll('.related-card').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.getAttribute('data-related-idx'));
+      const target = related[i];
+      if (target) openDetails(target, { fromNav: true });
+    });
+  });
+}
+
 function openDetails(p, opts = {}) {
   if (!opts.fromNav) {
     detailsScrollY = window.scrollY || window.pageYOffset || 0;
@@ -2077,6 +2186,8 @@ function openDetails(p, opts = {}) {
     if (!opts.preserveVariation) { p.variacoesSelecionadas = []; p.variacaoSelecionada = null; }
     bindVariacaoSelector();
   }
+
+  try { renderRelatedStrip(p); } catch (_) {}
 
   // Estoque ao vivo
     const btnAdd = document.getElementById('modalAddCart');
