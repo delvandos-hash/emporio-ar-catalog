@@ -27,3 +27,25 @@ test("sync de estoque não publica usando somente Imarat se Brand falhar", () =>
   assert.doesNotMatch(source, /Brand indisponível \(seguindo só com Imarat\)/);
   assert.ok(source.indexOf("const brand = await fetchBrand();") < source.indexOf("fs.writeFileSync(dataPath"));
 });
+
+
+test("Dande usa requisições sem cache e não confunde página repetida com fim da categoria", () => {
+  const catalogSource = fs.readFileSync(new URL("./sync-catalog.mjs", import.meta.url), "utf8");
+  assert.ok(catalogSource.includes("cache: 'no-store'"));
+  assert.ok(catalogSource.includes("'Cache-Control': 'no-cache, no-store, max-age=0'"));
+  assert.ok(catalogSource.includes("requestUrl.searchParams.set('_dande_refresh'"));
+  assert.ok(catalogSource.includes("const baseUrl = String(DANDE_BASE || '').replace("));
+  assert.ok(catalogSource.includes("if (genericDandeTitle && attempt < 2)"));
+  assert.ok(catalogSource.includes("if (!actualTitle || actualTitle !== expectedTitle)"));
+  assert.ok(catalogSource.includes("function getDandeNextPageUrl(html, page)"));
+  assert.ok(catalogSource.includes("matchAll(/<a\\b"));
+  assert.ok(catalogSource.includes("new URL(pageUrl ||"));
+  assert.ok(catalogSource.includes("cat.nome, '', nextPageUrl"));
+  assert.ok(catalogSource.includes("if (!hasNextLink && list.length < 12)"));
+  assert.ok(catalogSource.includes("Dande retornou página inicial vazia"));
+  assert.ok(catalogSource.includes("página válida sem produtos; encerrando categoria"));
+
+  assert.ok(catalogSource.includes("for (let retry = 1; retry <= 2; retry++)"));
+  assert.ok(catalogSource.includes("página ${page} repetida/vazia após 2 tentativas sem cache"));
+  assert.ok(!catalogSource.includes("página repetida sem continuação; encerrando categoria"));
+});
