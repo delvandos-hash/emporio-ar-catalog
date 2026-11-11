@@ -1613,7 +1613,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
         nextPageUrl = getDandeNextPageUrl(html, page);
         console.log(`    Dande next p${page}: ${nextPageUrl || '(none)'}`);
         const hasNextLink = Boolean(nextPageUrl);
-        if (!hasNextLink && list.length < 8) {
+        if (!hasNextLink && (page > 1 || list.length < 8)) {
           console.log(`    p${page}: lote final (${list.length} produtos); encerrando categoria`);
           completed = true;
           break;
