@@ -110,3 +110,20 @@ test("parses and serializes DATA without changing the other exports", () => {
   assert.match(output, /export const WHATSAPP = "123"/);
   assert.equal(parseDataJsContent(output).feminino.length, 1);
 });
+
+
+test("skips ambiguous stock_ref matches without failing or adding another copy", () => {
+  const current = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    { nome: "Bata Lara", volume: "—", stock_ref: "s_amb", public_id: "p_new_1" },
+    { nome: "Bata Lara", volume: "—", stock_ref: "s_amb", public_id: "p_new_2" }
+  ] }] };
+  const baseline = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    { nome: "Bata Lara", volume: "—", stock_ref: "s_amb", public_id: "p_old" }
+  ] }] };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  assert.equal(result.ambiguousStockRefs.length, 1);
+  assert.equal(result.ambiguousStockRefs[0].stock_ref, "s_amb");
+  assert.equal(result.ambiguousStockRefs[0].matches, 2);
+  assert.deepEqual(result.restoredIds, []);
+  assert.equal(result.data.roupas[0].items.length, 2);
+});
