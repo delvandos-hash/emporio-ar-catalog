@@ -58,6 +58,18 @@ export function resolveLegacyStockMatch(stockMatches, identityMatches, publicIte
   if (photo && candidates.length > 1) {
     const byPhoto = candidates.filter(row => legacyPhotoFingerprint(row?.publicItem) === photo);
     if (byPhoto.length === 1) return byPhoto[0];
+
+    // Entre uma cópia legada e o único produto confirmado na fonte raiz,
+    // a fotografia igual permite recuperar a identidade sem escolher entre
+    // variantes reais. Duas origens confirmadas continuam ambíguas.
+    if (byPhoto.length > 1) {
+      const sourceConfirmed = byPhoto.filter(row =>
+        String(row?.item?.fonte || "").trim() &&
+        normalizeBrand(row?.item?.fonte) !== "legacy gist" &&
+        String(row?.item?.id_origem || "").trim()
+      );
+      if (sourceConfirmed.length === 1) return sourceConfirmed[0];
+    }
   }
   return null;
 }
