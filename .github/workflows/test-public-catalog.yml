@@ -42,7 +42,10 @@ jobs:
           cp js/data.js /tmp/catalog-current-fixture.js
           CATALOG_BASELINE_PATH=/tmp/catalog-baseline-fixture/data.js CATALOG_CURRENT_DATA_PATH=/tmp/catalog-current-fixture.js node scripts/restore-catalog-baseline.mjs | tee /tmp/catalog-baseline-restore.log
           grep -q 'KNOWN_GOOD_BASELINE_PUBLIC_IDS=2158' /tmp/catalog-baseline-restore.log
-          grep -q 'KNOWN_GOOD_BASELINE_REKEYED=0' /tmp/catalog-baseline-restore.log
+          # Rekeys exatos são permitidos para manter o public_id estável quando a origem
+          # confirma a mesma identidade; correspondências ambíguas continuam bloqueadas.
+          grep -Eq 'KNOWN_GOOD_BASELINE_REKEYED=[0-9]+' /tmp/catalog-baseline-restore.log
+          grep -q 'KNOWN_GOOD_BASELINE_AMBIGUOUS_STOCK_REFS=0' /tmp/catalog-baseline-restore.log
           grep -Eq 'KNOWN_GOOD_BASELINE_RESTORED=[0-9]+' /tmp/catalog-baseline-restore.log
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
