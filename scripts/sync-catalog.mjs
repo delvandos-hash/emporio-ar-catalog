@@ -1538,6 +1538,14 @@ async function fetchDandeAcessorios(existingGroups = []) {
   }
   const minimumExpected = Math.max(186, Math.ceil(existingById.size * 0.8));
   if (byId.size < minimumExpected) throw new Error(`inventário Dande abaixo do mínimo de segurança: coletados=${byId.size}, mínimo=${minimumExpected}, IDs anteriores=${existingById.size}`);
+  const staleDandeRemoved = [...existingById.keys()].filter(id => !byId.has(id));
+  console.log(`Produtos Dande removidos por ausência confirmada na origem: ${staleDandeRemoved.length}`);
+  for (const id of staleDandeRemoved) {
+    const previous = existingById.get(id);
+    console.log("DANDE_SOURCE_REMOVAL_CONFIRMED=" + JSON.stringify({
+      id_origem: id, nome: previous?.nome || "", categoria_anterior: previous?.cat || ""
+    }));
+  }
 
   const byCat = new Map();
   for (const item of byId.values()) {
