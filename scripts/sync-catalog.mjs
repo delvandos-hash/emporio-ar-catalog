@@ -1307,13 +1307,13 @@ function getDandeNextPageUrl(html, page) {
   const next = page + 1;
   const queryPage = new RegExp(`[?&]page=${next}(?:[&#]|$)`, 'i');
   const pathPage = new RegExp(`/page/${next}/?(?:[?#]|$)`, 'i');
-  const anchors = [...String(html || '').matchAll(/<a\\b[^>]*>/gi)];
+  const anchors = [...String(html || '').matchAll(/<a\b[^>]*>/gi)];
   for (const match of anchors) {
     const tag = match[0];
-    const hrefMatch = tag.match(/\\bhref=["']([^"']+)["']/i);
+    const hrefMatch = tag.match(/\bhref=["']([^"']+)["']/i);
     if (!hrefMatch) continue;
     const href = decodeEntities(hrefMatch[1]);
-    if (!/\\brel=["']next["']/i.test(tag) && !queryPage.test(href) && !pathPage.test(href)) continue;
+    if (!/\brel=["']next["']/i.test(tag) && !queryPage.test(href) && !pathPage.test(href)) continue;
     try { return new URL(href, DANDE_BASE).toString(); } catch (_) {}
   }
   return '';
