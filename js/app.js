@@ -70,18 +70,46 @@ function productId(p) {
   if (!p) return '';
   return `${normId(p.brand)}-${normId(p.nome)}-${normId(p.volume)}`;
 }
+function productSlugBase(p) {
+  return [normId(p?.nome), normId(p?.brand), normId(p?.volume)].filter(Boolean).join('-') || productId(p);
+}
+function buildProductSlugIndex() {
+  const products = [];
+  for (const line of Object.keys(DATA || {})) {
+    for (const group of DATA[line] || []) {
+      for (const item of group.items || []) products.push({ ...item, brand: group.brand, cat: group.cat, line });
+    }
+  }
+  const counts = new Map();
+  for (const product of products) { const base = productSlugBase(product); counts.set(base, (counts.get(base) || 0) + 1); }
+  const bySlug = new Map(), byPublicId = new Map(), byProductId = new Map();
+  for (const product of products) {
+    const base = productSlugBase(product);
+    const publicId = String(product.public_id || '').toLowerCase();
+    const suffix = normId(publicId).slice(-6) || normId(productId(product)).slice(-6);
+    const slug = counts.get(base) > 1 ? `${base}-${suffix || 'item'}` : base;
+    bySlug.set(slug, product);
+    if (publicId) byPublicId.set(publicId, { product, slug });
+    const legacyId = productId(product).toLowerCase();
+    if (legacyId && !byProductId.has(legacyId)) byProductId.set(legacyId, product);
+  }
+  return { bySlug, byPublicId, byProductId };
+}
+const PRODUCT_SLUG_INDEX = buildProductSlugIndex();
+function productSlug(p) {
+  if (!p) return '';
+  const publicId = String(p.public_id || '').toLowerCase();
+  const indexed = publicId && PRODUCT_SLUG_INDEX.byPublicId.get(publicId);
+  if (indexed) return indexed.slug;
+  const legacy = PRODUCT_SLUG_INDEX.byProductId.get(productId(p).toLowerCase());
+  return legacy ? productSlugBase(legacy) : productSlugBase(p);
+}
 function findProductById(id) {
   if (!id || !DATA) return null;
   const want = String(id).toLowerCase();
-  for (const line of Object.keys(DATA)) {
-    for (const g of DATA[line] || []) {
-      for (const it of g.items || []) {
-        const p = { ...it, brand: g.brand, cat: g.cat, line };
-        if (productId(p) === want || String(it.public_id || '').toLowerCase() === want) return p;
-      }
-    }
-  }
-  return null;
+  const byPublicId = PRODUCT_SLUG_INDEX.byPublicId.get(want);
+  if (byPublicId) return byPublicId.product;
+  return PRODUCT_SLUG_INDEX.bySlug.get(want) || PRODUCT_SLUG_INDEX.byProductId.get(want) || null;
 }
 function setProductUrl(p) {
   try {
@@ -111,8 +139,8 @@ function openProductFromUrl() {
 
 
 function getProductShareUrl(p) {
-  const shortId = String(p?.public_id || '').trim();
-  if (shortId) return window.location.origin + '/p/' + encodeURIComponent(shortId);
+  const slug = productSlug(p);
+  if (slug) return window.location.origin + '/p/' + encodeURIComponent(slug);
   try {
     const url = new URL(window.location.href);
     url.searchParams.set('produto', productId(p));
