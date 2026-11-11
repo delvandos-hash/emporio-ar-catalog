@@ -28,7 +28,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: temporary-source-reconcile-\${{ github.event.pull_request.number }}
+  group: temporary-source-reconcile-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -40,7 +40,7 @@ jobs:
       - name: Baixar o commit da PR
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
@@ -72,7 +72,7 @@ jobs:
         with:
           name: full-reconcile-data-js-42874130855
           run-id: 42874130855
-          github-token: \${{ github.token }}
+          github-token: ${{ github.token }}
           path: /tmp/catalog-baseline
 
       - name: Restaurar IDs do snapshot conhecido
@@ -83,7 +83,7 @@ jobs:
       - name: Restaurar campos públicos do Gist sem sobrescrever IDs protegidos
         run: node scripts/restore-gist-only-legacy.mjs
         env:
-          GIST_TOKEN: \${{ secrets.GIST_TOKEN }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
 
       - name: Sincronizar todas as fontes em dry-run
         run: node scripts/sync-catalog.mjs 2>&1 | tee /tmp/source-sync.log
@@ -97,17 +97,17 @@ jobs:
           ADD_ROUPAS: "1"
           ADD_FRANNY: "1"
           ADD_ACESSORIOS: "1"
-          GIST_TOKEN: \${{ secrets.GIST_TOKEN }}
-          IMARAT_API_URL: \${{ secrets.IMARAT_API_URL }}
-          IMARAT_ORIGIN_URL: \${{ secrets.IMARAT_ORIGIN_URL }}
-          BRAND_BASE_URL: \${{ secrets.BRAND_BASE_URL }}
-          CDN_IMAGE_BASE_URL: \${{ secrets.CDN_IMAGE_BASE_URL }}
-          CDN_IMAGE_FALLBACK_BASE_URL: \${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
-          SOPHIA_PRIMARY_URL: \${{ secrets.SOPHIA_PRIMARY_URL }}
-          SOPHIA_FALLBACK_URL: \${{ secrets.SOPHIA_FALLBACK_URL }}
-          SOPHIA_FALLBACK_ORIGIN: \${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
-          FRANNY_BASE_URL: \${{ secrets.FRANNY_BASE_URL }}
-          DANDE_BASE_URL: \${{ secrets.DANDE_BASE_URL }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
+          IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+          BRAND_BASE_URL: ${{ secrets.BRAND_BASE_URL }}
+          CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
+          CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
+          SOPHIA_PRIMARY_URL: ${{ secrets.SOPHIA_PRIMARY_URL }}
+          SOPHIA_FALLBACK_URL: ${{ secrets.SOPHIA_FALLBACK_URL }}
+          SOPHIA_FALLBACK_ORIGIN: ${{ secrets.SOPHIA_FALLBACK_ORIGIN }}
+          FRANNY_BASE_URL: ${{ secrets.FRANNY_BASE_URL }}
+          DANDE_BASE_URL: ${{ secrets.DANDE_BASE_URL }}
 
       - name: Auditar IDs estáveis, Dande, fotos e Scoop Premiado
         run: |
@@ -199,7 +199,7 @@ jobs:
           const ambiguous = log.match(/LIVE_PUBLIC_AMBIGUOUS=(\d+)/);
           if (!prices || Number(prices[1]) < 1) throw new Error("Nenhum preço público protegido foi confirmado no dry-run.");
           if (!ambiguous || Number(ambiguous[1]) !== 0) throw new Error("A sincronização terminou com correspondências públicas ambíguas.");
-          if (!/SYNC_DRY_RUN=1[^\\n]*Gist de produção NÃO foi alterado/i.test(log)) {
+          if (!/SYNC_DRY_RUN=1.*Gist de produção NÃO foi alterado/i.test(log)) {
             throw new Error("Não foi encontrada a confirmação de dry-run sem publicação no Gist.");
           }
 
