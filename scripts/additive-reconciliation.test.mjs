@@ -66,16 +66,18 @@ test("auditoria compara IDs públicos e aceita fontes confirmadas ou snapshot co
 });
 
 
-test("sincronização preserva itens sem correspondência na fonte em vez de excluí-los", () => {
+test("sincronização remove itens ausentes somente após coleta completa da fonte", () => {
   assert.match(sync, /shouldRemoveUnmatchedSourceItem/);
-  assert.match(sync, /staleBrandPreserved/);
-  assert.match(sync, /unverifiedLegacyPreserved/);
-  assert.match(sync, /staleClothesPreserved/);
-  assert.match(sync, /legacyClothesUnmatchedPreserved/);
+  assert.match(sync, /sourceCollectionComplete: true/);
+  assert.match(sync, /Produtos Brand fora da fonte raiz removidos/);
+  assert.match(sync, /Roupas fora da fonte raiz removidas após coleta completa/);
+  assert.match(sync, /Produtos Dande removidos por ausência confirmada na origem/);
 });
 
-test("consolidação de roupas transfere public_id antigo apenas com stock_ref e grupo exatos", () => {
-  assert.match(sync, /sameGroup && sameStockRef && sameName && sameVolume/);
+test("consolidação de roupas transfere public_id antigo com ID de origem, nome e volume exatos", () => {
+  assert.match(sync, /canMergeLegacyClothesClone/);
+  assert.match(sync, /sameName/);
+  assert.match(sync, /sameVolume/);
   assert.match(sync, /existingItem\.public_id = oldPublicId/);
   assert.match(sync, /existingItem\._preserve_public_id = true/);
   assert.match(sync, /item\._preserve_public_id !== true/);
