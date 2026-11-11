@@ -62,6 +62,7 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
 
   const restoredIds = [];
   const rekeyedIds = [];
+  const ambiguousStockRefs = [];
   const matchedCurrentItems = new Set();
   for (const row of baselineRows) {
     const { line, group, item, id } = row;
@@ -86,7 +87,10 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
           norm(candidate.item?.volume || "—") === norm(item?.volume || "—");
       });
       if (matches.length > 1) {
-        throw new Error("stock_ref ambíguo no snapshot conhecido: " + stockRef);
+        // O item já está representado mais de uma vez com a mesma identidade.
+        // Não escolha um registro arbitrariamente nem restaure outra cópia.
+        ambiguousStockRefs.push({ stock_ref: stockRef, public_id: id, matches: matches.length, nome: item?.nome || "" });
+        continue;
       }
       if (matches.length === 1) {
         const currentItem = matches[0].item;
@@ -121,7 +125,7 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
     restoredIds.push(id);
   }
 
-  return { data: merged, baselineIds, restoredIds, rekeyedIds, skippedWithoutPublicId };
+  return { data: merged, baselineIds, restoredIds, rekeyedIds, ambiguousStockRefs, skippedWithoutPublicId };
 }
 
 export function serializeDataJsContent(raw, data) {
