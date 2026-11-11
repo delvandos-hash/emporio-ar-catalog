@@ -91,7 +91,7 @@ function buildProductSlugIndex() {
     bySlug.set(slug, product);
     if (publicId) byPublicId.set(publicId, { product, slug });
     const legacyId = productId(product).toLowerCase();
-    if (legacyId && !byProductId.has(legacyId)) byProductId.set(legacyId, product);
+    if (legacyId && !byProductId.has(legacyId)) byProductId.set(legacyId, { product, slug });
   }
   return { bySlug, byPublicId, byProductId };
 }
@@ -102,14 +102,14 @@ function productSlug(p) {
   const indexed = publicId && PRODUCT_SLUG_INDEX.byPublicId.get(publicId);
   if (indexed) return indexed.slug;
   const legacy = PRODUCT_SLUG_INDEX.byProductId.get(productId(p).toLowerCase());
-  return legacy ? productSlugBase(legacy) : productSlugBase(p);
+  return legacy ? legacy.slug : productSlugBase(p);
 }
 function findProductById(id) {
   if (!id || !DATA) return null;
   const want = String(id).toLowerCase();
   const byPublicId = PRODUCT_SLUG_INDEX.byPublicId.get(want);
   if (byPublicId) return byPublicId.product;
-  return PRODUCT_SLUG_INDEX.bySlug.get(want) || PRODUCT_SLUG_INDEX.byProductId.get(want) || null;
+  return PRODUCT_SLUG_INDEX.bySlug.get(want) || PRODUCT_SLUG_INDEX.byProductId.get(want)?.product || null;
 }
 function setProductUrl(p) {
   try {
