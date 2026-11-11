@@ -6,6 +6,18 @@ const IMARAT_API = process.env.IMARAT_API_URL;
 const BRAND_BASE = process.env.BRAND_BASE_URL;
 const BRAND_SELLER = 'darlanaugusto';
 
+// Entrega JSON como bytes UTF-8 explícitos para evitar reinterpretação de acentos
+// por camadas intermediárias antes de o navegador receber a resposta.
+function jsonResponse(statusCode, payload, headers) {
+  const json = JSON.stringify(payload);
+  return {
+    statusCode,
+    headers,
+    isBase64Encoded: true,
+    body: Buffer.from(json, 'utf8').toString('base64'),
+  };
+}
+
 function norm(s) {
   return String(s || '')
     .toLowerCase()
@@ -73,7 +85,7 @@ async function fetchBrandStock() {
       headers: {
         'User-Agent': 'EmporioAR-StockSync/1.0',
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
         Referer: `${BRAND_BASE}/c/atacado/${BRAND_SELLER}`,
         Origin: BRAND_BASE,
         'X-Requested-With': 'XMLHttpRequest',
@@ -135,16 +147,12 @@ exports.handler = async (event) => {
       mapB: brand.map || {},
       byNameB: brand.byName || {},
     };
-    return { statusCode: 200, headers, body: JSON.stringify(body) };
+    return jsonResponse(200, body, headers);
   } catch (err) {
-    return {
-      statusCode: 502,
-      headers,
-      body: JSON.stringify({
-        ok: false,
-        error: 'Falha na sincronização.',
-        updatedAt: new Date().toISOString(),
-      }),
-    };
+    return jsonResponse(502, {
+      ok: false,
+      error: 'Falha na sincronização.',
+      updatedAt: new Date().toISOString(),
+    }, headers);
   }
 };
