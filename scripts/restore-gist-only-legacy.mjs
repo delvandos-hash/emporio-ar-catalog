@@ -208,8 +208,18 @@ async function main() {
   }
 
   if (ambiguous.length) {
+    // Não bloqueia o sync: itens ambíguos (ex.: roupas Franny/Sophia/legacy duplicadas)
+    // apenas são ignorados no restore legado. O dedupe do sync-catalog remove duplicatas.
+    const roupas = ambiguous.filter((a) => String(a.line || '').toLowerCase() === 'roupas');
+    const outros = ambiguous.filter((a) => String(a.line || '').toLowerCase() !== 'roupas');
     console.log("LEGACY_GIST_IDENTITY_AMBIGUA " + JSON.stringify(ambiguous));
-    throw new Error(`Há ${ambiguous.length} identidades legadas ambíguas; nada foi salvo.`);
+    console.warn(
+      `Aviso: ${ambiguous.length} identidade(s) legada(s) ambígua(s) ignorada(s) no restore ` +
+      `(roupas=${roupas.length}, outras=${outros.length}). Sync continua.`
+    );
+    for (const a of ambiguous.slice(0, 20)) {
+      console.warn(`  - [${a.line}] ${a.nome} (${a.reason})`);
+    }
   }
 
   const check = buildIndexes(DATA);
