@@ -29,7 +29,7 @@ jobs:
           node --check scripts/catalog-baseline-restore.mjs
           node --check scripts/restore-catalog-baseline.mjs
           node --check netlify/functions/stock-sync.js
-          node --test scripts/stock-sync.test.mjs scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs scripts/product-share.test.mjs scripts/audit-catalog-match.test.mjs scripts/legacy-public-exclusions.test.mjs scripts/legacy-restore-identity.test.mjs scripts/additive-reconciliation.test.mjs scripts/source-preservation.test.mjs scripts/sync-stock-source-guard.test.mjs scripts/catalog-baseline-restore.test.mjs
+          node --test scripts/stock-sync.test.mjs scripts/public-image-url.test.mjs scripts/public-catalog.test.mjs scripts/product-image-function.test.mjs scripts/get-feed.test.mjs scripts/favorites-compat.test.mjs scripts/product-share.test.mjs scripts/audit-catalog-match.test.mjs scripts/legacy-public-exclusions.test.mjs scripts/legacy-restore-identity.test.mjs scripts/additive-reconciliation.test.mjs scripts/source-preservation.test.mjs scripts/sync-stock-source-guard.test.mjs scripts/catalog-baseline-restore.test.mjs scripts/imarat-source-guard.test.mjs
       - name: Baixar snapshot conhecido para teste de recuperação real
         uses: actions/download-artifact@v4
         with:
