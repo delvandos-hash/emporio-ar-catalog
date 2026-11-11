@@ -1303,17 +1303,30 @@ function mergeDandeImages(...groups) {
   return result;
 }
 
-function hasDandeNextPage(html, page) {
+function getDandeNextPageUrl(html, page) {
   const next = page + 1;
-  const queryPage = new RegExp(`href=["'][^"']*[?&]page=${next}(?:[&#"']|$)`, 'i');
-  const pathPage = new RegExp(`href=["'][^"']*/page/${next}/?(?:[?#"']|$)`, 'i');
-  return /rel=["']next["']/i.test(html) || queryPage.test(html) || pathPage.test(html);
+  const queryPage = new RegExp(`[?&]page=${next}(?:[&#]|$)`, 'i');
+  const pathPage = new RegExp(`/page/${next}/?(?:[?#]|$)`, 'i');
+  const anchors = [...String(html || '').matchAll(/<a\\b[^>]*>/gi)];
+  for (const match of anchors) {
+    const tag = match[0];
+    const hrefMatch = tag.match(/\\bhref=["']([^"']+)["']/i);
+    if (!hrefMatch) continue;
+    const href = decodeEntities(hrefMatch[1]);
+    if (!/\\brel=["']next["']/i.test(tag) && !queryPage.test(href) && !pathPage.test(href)) continue;
+    try { return new URL(href, DANDE_BASE).toString(); } catch (_) {}
+  }
+  return '';
 }
 
-async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cacheBust = '') {
+function hasDandeNextPage(html, page) {
+  return Boolean(getDandeNextPageUrl(html, page));
+}
+
+async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cacheBust = '', pageUrl = '') {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-  const requestUrl = new URL(page <= 1 ? `${DANDE_BASE}${path}` : `${DANDE_BASE}${path}?page=${page}`);
+  const requestUrl = new URL(pageUrl || (page <= 1 ? `${DANDE_BASE}${path}` : `${DANDE_BASE}${path}?page=${page}`));
   // Evita que CDN/proxy devolva o HTML da página 1 em requisições paginadas.
   if (cacheBust) requestUrl.searchParams.set('_dande_refresh', String(cacheBust));
   const res = await fetch(requestUrl.toString(), {
@@ -1460,9 +1473,10 @@ async function fetchDandeAcessorios(existingGroups = []) {
     let categoryAdded = 0;
     const categoryIds = new Set();
     let completed = false;
+    let nextPageUrl = '';
     for (let page = 1; page <= 80; page++) {
       try {
-        let html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
+        let html = await fetchDandeCategoryPage(cat.path, page, cat.nome, '', nextPageUrl);
         let list = parseDandeListProducts(html);
         if (!list.length) {
           if (page > 1) throw new Error(`página ${page} retornou zero produtos; coleta não pode ser considerada completa`);
@@ -1477,7 +1491,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
           for (let retry = 1; retry <= 2; retry++) {
             await sleep(350 * retry);
             const retryHtml = await fetchDandeCategoryPage(
-              cat.path, page, cat.nome, `${Date.now()}-${retry}`
+              cat.path, page, cat.nome, `${Date.now()}-${retry}`, nextPageUrl
             );
             const retryList = parseDandeListProducts(retryHtml);
             const retrySignature = retryList.map((p) => p.id).sort().join('|');
@@ -1594,7 +1608,8 @@ async function fetchDandeAcessorios(existingGroups = []) {
           added++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
-        const hasNextLink = hasDandeNextPage(html, page);
+        nextPageUrl = getDandeNextPageUrl(html, page);
+        const hasNextLink = Boolean(nextPageUrl);
         if (!hasNextLink && list.length < 8) {
           console.log(`    p${page}: lote final (${list.length} produtos); encerrando categoria`);
           completed = true;
