@@ -62,6 +62,8 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
 
   const restoredIds = [];
   const rekeyedIds = [];
+  const ambiguousStockRefs = [];
+  const deduplicatedLegacyIds = [];
   const matchedCurrentItems = new Set();
   for (const row of baselineRows) {
     const { line, group, item, id } = row;
@@ -86,7 +88,76 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
           norm(candidate.item?.volume || "—") === norm(item?.volume || "—");
       });
       if (matches.length > 1) {
-        throw new Error("stock_ref ambíguo no snapshot conhecido: " + stockRef);
+        // Caso estrito: uma única linha atual confirmada pela origem e uma
+        // única cópia legacy-gist sem id_origem, ambas com identidade exata.
+        // A origem viva fica como registro principal; a cópia legada é removida
+        // somente após transferir campos manuais/detalhes e restaurar o ID antigo.
+        const originId = String(item?.id_origem || "").trim();
+        const sourceMatches = matches.filter(candidate =>
+          norm(candidate.item?.fonte) === norm(item?.fonte) &&
+          originId &&
+          String(candidate.item?.id_origem || "").trim() === originId
+        );
+        const legacyMatches = matches.filter(candidate =>
+          norm(candidate.item?.fonte) === "legacy-gist" &&
+          !String(candidate.item?.id_origem || "").trim()
+        );
+        const source = sourceMatches.length === 1 ? sourceMatches[0] : null;
+        const legacy = legacyMatches.length === 1 ? legacyMatches[0] : null;
+        const priceKey = candidate => [String(candidate.item?.varejo ?? ""), String(candidate.item?.atacado ?? "")].join("|");
+        const manual = legacy && (
+          legacy.item?.precoManual === true ||
+          legacy.item?.precoManual === "true" ||
+          legacy.item?.precoManual === 1
+        );
+        const priceSafe = source && legacy && (
+          priceKey(source) === priceKey(legacy) ||
+          (manual && priceKey(legacy) === [String(item?.varejo ?? ""), String(item?.atacado ?? "")].join("|"))
+        );
+        if (source && legacy && source.item !== legacy.item && priceSafe) {
+          const sourceItem = source.item;
+          const legacyItem = legacy.item;
+          const sourceId = String(sourceItem?.public_id || "").trim();
+          // Preço manual é dado comercial protegido; nunca o substitua pelo
+          // preço recém-coletado da origem.
+          if (manual) {
+            sourceItem.varejo = legacyItem.varejo;
+            sourceItem.atacado = legacyItem.atacado;
+            sourceItem.precoManual = true;
+          }
+          // Completa apenas campos ausentes, sem sobrescrever estoque/variações
+          // ou dados vivos já fornecidos pela origem.
+          for (const [key, value] of Object.entries(legacyItem)) {
+            if (["public_id", "stock_ref", "fonte", "id_origem", "varejo", "atacado", "precoManual", "_preserve_public_id"].includes(key)) continue;
+            if (sourceItem[key] == null || sourceItem[key] === "" || sourceItem[key] === "—") {
+              sourceItem[key] = structuredClone(value);
+            }
+          }
+          const photos = [
+            ...(Array.isArray(sourceItem.fotos) ? sourceItem.fotos : []), sourceItem.foto,
+            ...(Array.isArray(legacyItem.fotos) ? legacyItem.fotos : []), legacyItem.foto
+          ].filter(Boolean);
+          if (photos.length) sourceItem.fotos = [...new Set(photos)];
+          if (!sourceItem.foto && legacyItem.foto) sourceItem.foto = legacyItem.foto;
+          if (sourceId) currentIds.delete(sourceId);
+          sourceItem.public_id = id;
+          sourceItem._preserve_public_id = true;
+          currentIds.add(id);
+          matchedCurrentItems.add(sourceItem);
+          const legacyList = legacy.group.items;
+          const legacyIndex = legacyList.indexOf(legacyItem);
+          if (legacyIndex >= 0) legacyList.splice(legacyIndex, 1);
+          const currentRowIndex = currentRows.indexOf(legacy);
+          if (currentRowIndex >= 0) currentRows.splice(currentRowIndex, 1);
+          if (legacyItem.public_id) currentIds.delete(String(legacyItem.public_id));
+          rekeyedIds.push({ from: sourceId, to: id, nome: item.nome, stock_ref: stockRef });
+          deduplicatedLegacyIds.push({ public_id: legacyItem.public_id || "", nome: item.nome, stock_ref: stockRef });
+          continue;
+        }
+        // Qualquer cenário diferente do par exato origem+legado permanece
+        // intocado para revisão; não se escolhe uma cópia por aproximação.
+        ambiguousStockRefs.push({ stock_ref: stockRef, public_id: id, matches: matches.length, nome: item?.nome || "" });
+        continue;
       }
       if (matches.length === 1) {
         const currentItem = matches[0].item;
@@ -121,7 +192,7 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
     restoredIds.push(id);
   }
 
-  return { data: merged, baselineIds, restoredIds, rekeyedIds, skippedWithoutPublicId };
+  return { data: merged, baselineIds, restoredIds, rekeyedIds, ambiguousStockRefs, deduplicatedLegacyIds, skippedWithoutPublicId };
 }
 
 export function serializeDataJsContent(raw, data) {

@@ -129,7 +129,9 @@ export default async (req) => {
         : DANDE_CATEGORIES;
       const categories = filteredCategories.length ? filteredCategories : DANDE_CATEGORIES;
       for (const cat of categories) {
-        for (let page = 1; page <= 15; page++) {
+        const seenPageSignatures = new Set();
+        let categoryCompleted = false;
+        for (let page = 1; page <= 80; page++) {
           const pageUrl = page === 1
             ? new URL(cat.path, DANDE_BASE).toString()
             : new URL(cat.path + "?page=" + page, DANDE_BASE).toString();
@@ -137,10 +139,22 @@ export default async (req) => {
             headers: { "User-Agent": UA, Accept: "text/html", "Accept-Language": "pt-BR,pt;q=0.9" },
             redirect: "error",
           });
-          if (!pageRes.ok) break;
+          if (!pageRes.ok) {
+            throw new Error(page === 1
+              ? `categoria Dande indisponível: ${cat.nome} (HTTP ${pageRes.status})`
+              : `paginação Dande interrompida em ${cat.nome}, página ${page} (HTTP ${pageRes.status})`);
+          }
           const pageHtml = await pageRes.text();
-          const ids = [...pageHtml.matchAll(/data-product-id="(\d+)"/g)].map((m) => m[1]);
-          if (!ids.length) break;
+          const ids = [...new Set([...pageHtml.matchAll(/data-product-id="(\d+)"/g)].map((m) => m[1]))];
+          if (!ids.length) {
+            categoryCompleted = true;
+            break;
+          }
+          const signature = [...ids].sort().join("|");
+          if (seenPageSignatures.has(signature)) {
+            throw new Error(`página Dande repetida durante consulta de estoque: ${cat.nome}, página ${page}`);
+          }
+          seenPageSignatures.add(signature);
           const matchId = ids.find((candidate) => makeStockRef(candidate) === stockRef);
           if (matchId) {
             resolvedId = matchId;
@@ -148,9 +162,14 @@ export default async (req) => {
             html = pageHtml;
             break;
           }
-          if (ids.length < 8) break;
+          if (ids.length < 8) {
+            categoryCompleted = true;
+            break;
+          }
+          if (page === 80) throw new Error(`limite de paginação Dande atingido ao consultar estoque em ${cat.nome}`);
         }
         if (resolvedId) break;
+        if (!categoryCompleted) throw new Error(`consulta de estoque Dande não concluiu a categoria ${cat.nome}`);
       }
     }
     if (productUrl) {

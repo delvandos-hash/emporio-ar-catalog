@@ -12,7 +12,7 @@ import { sanitizePublicImageUrl } from './public-image-url.mjs';
 import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
-import { shouldRemoveUnmatchedSourceItem } from './source-preservation.mjs';
+import { shouldRemoveUnmatchedSourceItem, canMergeLegacyClothesClone } from './source-preservation.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -1008,23 +1008,41 @@ async function fetchFacilZapPage(base, loja, catId, page, cookie) {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
   const url = `${base}/c/atacado/carregar_produtos/${page}/${catId}/${loja}?mobile=0`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'User-Agent': UA,
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      Origin: base,
-      Referer: `${base}/c/atacado/${loja}`,
-      'X-Requested-With': 'XMLHttpRequest',
-      Accept: 'application/json, text/javascript, */*; q=0.01',
-      Cookie: cookie || '',
-    },
-    body: '',
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text = await res.text();
-  if (!text || text.trimStart().startsWith('<') || text.includes('window.location')) throw new Error('HTML/redirect da Sophia (não JSON)');
-  return JSON.parse(text);
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'User-Agent': UA,
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Origin: base,
+          Referer: `${base}/c/atacado/${loja}`,
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          Cookie: cookie || '',
+        },
+        body: '',
+      });
+      if (!res.ok) {
+        const error = new Error(`HTTP ${res.status}`);
+        if (res.status < 500 && res.status !== 429) throw error;
+        throw error;
+      }
+      const text = await res.text();
+      if (!text || text.trimStart().startsWith('<') || text.includes('window.location')) {
+        throw new Error('HTML/redirect da Sophia (não JSON)');
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      lastError = error;
+      const retryable = /HTTP 5\d\d|HTTP 429|fetch failed|network|timeout|ECONNRESET|ETIMEDOUT/i.test(String(error?.message || error));
+      if (!retryable || attempt === 3) throw error;
+      console.warn(`FacilZap HTTP instável; tentativa ${attempt + 1}/3 na página ${page}: ${error.message}`);
+      await sleep(900 * attempt);
+    }
+  }
+  throw lastError || new Error('Falha desconhecida na coleta FacilZap');
 }
 
 function normalizeFacilZapProduct(p, idPrefix = '') {
@@ -1224,6 +1242,7 @@ function dandePathOnly(value) {
 }
 
 const DANDE_SCRAPE_COUNTS = new Map();
+const DANDE_SCRAPE_IDS = new Map();
 const DANDE_CATEGORIES = [
   { path: '/acessorios-de-cabelos/', nome: 'Acessórios de Cabelo' },
   { path: '/aneis1/', nome: 'Anéis' },
@@ -1432,22 +1451,28 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const seenCategoryIds = new Set();
     const seenPageSignatures = new Set();
     let categoryAdded = 0;
+    const categoryIds = new Set();
     let completed = false;
-    for (let page = 1; page <= 15; page++) {
+    for (let page = 1; page <= 80; page++) {
       try {
         const html = await fetchDandeCategoryPage(cat.path, page, cat.nome);
         const list = parseDandeListProducts(html);
         if (!list.length) { completed = true; break; }
         const pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
-          console.log(`    p${page}: página repetida; encerrando categoria`);
+          if (hasDandeNextPage(html, page)) throw new Error(`página repetida apesar de paginação anunciada (página ${page})`);
+          console.log(`    p${page}: página repetida sem continuação; encerrando categoria`);
+          completed = true;
           break;
         }
         seenPageSignatures.add(pageSignature);
+        for (const product of list) categoryIds.add(String(product.id));
 
         const newProducts = list.filter((p) => !seenCategoryIds.has(p.id));
         if (!newProducts.length) {
-          console.log(`    p${page}: nenhum ID novo; encerrando categoria`);
+          if (hasDandeNextPage(html, page)) throw new Error(`nenhum ID novo apesar de paginação anunciada na página ${page}`);
+          console.log(`    p${page}: nenhum ID novo e sem continuação; encerrando categoria`);
+          completed = true;
           break;
         }
         for (const p of newProducts) seenCategoryIds.add(p.id);
@@ -1538,25 +1563,48 @@ async function fetchDandeAcessorios(existingGroups = []) {
             cat: cat.nome,
           }, !prev, prev));
           added++;
-          categoryAdded++;
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
-
-        // Processa a página atual antes de decidir se existe uma próxima.
-        // Sem link de paginação, encerra somente DEPOIS de salvar os itens desta página.
-        if (!hasDandeNextPage(html, page)) {
-          console.log(`    p${page}: sem próxima página anunciada pela Dande; encerrando categoria`);
+        const hasNextLink = hasDandeNextPage(html, page);
+        if (!hasNextLink && list.length < 8) {
+          console.log(`    p${page}: lote final (${list.length} produtos); encerrando categoria`);
           completed = true;
           break;
         }
-        if (page === 15) throw new Error(`limite de 15 páginas atingido em ${cat.nome} com próxima página anunciada`);
+        if (page === 80) throw new Error(`limite de 80 páginas atingido em ${cat.nome}`);
         await sleep(400);
       } catch (e) {
         throw new Error(`Dande ${cat.nome} página ${page} falhou: ${e.message}`);
       }
     }
     if (!completed) throw new Error(`paginação Dande incompleta em ${cat.nome}`);
+    categoryAdded = categoryIds.size;
     DANDE_SCRAPE_COUNTS.set(cat.nome, categoryAdded);
+    DANDE_SCRAPE_IDS.set(cat.nome, categoryIds);
+  }
+
+  const membershipsById = new Map();
+  for (const [category, ids] of DANDE_SCRAPE_IDS) {
+    for (const id of ids) {
+      if (!membershipsById.has(id)) membershipsById.set(id, []);
+      membershipsById.get(id).push(category);
+    }
+  }
+  const crossListed = [...membershipsById.entries()].filter(([, categories]) => categories.length > 1);
+  console.log(`DANDE_CATEGORY_AUDIT unique_source_ids=${membershipsById.size} cross_listed_ids=${crossListed.length}`);
+  for (const [id, categories] of membershipsById) {
+    const product = byId.get(id);
+    if (product) product.categorias_origem = [...new Set(categories)];
+  }
+  const minimumExpected = Math.max(186, Math.ceil(existingById.size * 0.8));
+  if (byId.size < minimumExpected) throw new Error(`inventário Dande abaixo do mínimo de segurança: coletados=${byId.size}, mínimo=${minimumExpected}, IDs anteriores=${existingById.size}`);
+  const staleDandeRemoved = [...existingById.keys()].filter(id => !byId.has(id));
+  console.log(`Produtos Dande removidos por ausência confirmada na origem: ${staleDandeRemoved.length}`);
+  for (const id of staleDandeRemoved) {
+    const previous = existingById.get(id);
+    console.log("DANDE_SOURCE_REMOVAL_CONFIRMED=" + JSON.stringify({
+      id_origem: id, nome: previous?.nome || "", categoria_anterior: previous?.cat || ""
+    }));
   }
 
   const byCat = new Map();
@@ -1566,21 +1614,10 @@ async function fetchDandeAcessorios(existingGroups = []) {
     if (!byCat.has(cat)) byCat.set(cat, []);
     byCat.get(cat).push(item);
   }
-  // Preserve existing items not found in scrape (keep snapshot)
-  for (const [id, prev] of existingById) {
-    if (byId.has(id)) continue;
-    const cat = prev.cat || 'Outros';
-    // try find cat from existing groups
-    let foundCat = 'Outros';
-    for (const g of existingGroups || []) {
-      if ((g.items || []).some((it) => String(it.id_origem) === String(id))) {
-        foundCat = g.cat || 'Outros';
-        break;
-      }
-    }
-    if (!byCat.has(foundCat)) byCat.set(foundCat, []);
-    byCat.get(foundCat).push({ ...prev, fonte: 'acessorios' });
-  }
+  // A coleta Dande chegou ao fim de todas as categorias. Produtos antigos
+  // ausentes da base raiz não são reinseridos no snapshot; somente IDs atuais
+  // em byId compõem o catálogo. Se a coleta estiver incompleta, a função lança
+  // erro antes de chegar a este ponto e nada será publicado.
 
   const groups = [];
   for (const [cat, items] of byCat) {
@@ -2221,7 +2258,7 @@ async function main() {
         }
         const hit = matches[0];
         if (!hit) {
-          if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+          if (shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) {
             staleBrandRemoved++;
             return false;
           }
@@ -2276,7 +2313,7 @@ async function main() {
           }
           const hit = matches[0];
           if (!hit) {
-            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+            if (shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) {
               unverifiedLegacyRemoved++;
               unverifiedLegacyNames.push({ line, brand: group.brand, cat: group.cat, nome: item.nome, action: 'removed' });
               continue;
@@ -2471,7 +2508,7 @@ async function main() {
             const fromFranny = id.startsWith('franny-');
             const sourceEnabled = fromFranny ? ADD_FRANNY : ADD_ROUPAS;
             const exists = !sourceEnabled || (fromFranny ? liveFrannyIds.has(id) : liveSophiaIds.has(id));
-            if (!exists && shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) staleClothesRemoved++;
+            if (!exists && shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) staleClothesRemoved++;
             else {
               if (!exists) staleClothesPreserved++;
               kept.push(item);
@@ -2490,7 +2527,7 @@ async function main() {
             throw new Error(`LEGACY_ROUPAS_AMBIGUOUS: ${item.nome} aparece em ${matches.length} registros da fonte raiz; nenhum foi apagado.`);
           }
           if (!matches.length) {
-            if (shouldRemoveUnmatchedSourceItem({ explicitDeletionConfirmed: false })) {
+            if (shouldRemoveUnmatchedSourceItem({ sourceCollectionComplete: true, sourceEnabled: true })) {
               staleClothesRemoved++;
               legacyClothesUnmatchedRemoved++;
               continue;
@@ -2515,14 +2552,17 @@ async function main() {
           if (existingRows.length === 1) {
             const existingRow = existingRows[0];
             const existingItem = existingRow.item;
-            const sameGroup = norm(existingRow.group.cat) === norm(group.cat) &&
-              norm(existingRow.group.brand) === norm(group.brand);
-            const oldStockRef = String(item.stock_ref || '').trim();
-            const currentStockRef = String(existingItem.stock_ref || '').trim();
-            const sameStockRef = Boolean(oldStockRef && currentStockRef && oldStockRef === currentStockRef);
             const sameName = norm(existingItem.nome) === norm(item.nome);
             const sameVolume = norm(existingItem.volume || '—') === norm(item.volume || '—');
-            if (sameGroup && sameStockRef && sameName && sameVolume) {
+            // ID exato da origem + nome + volume confirmam o mesmo produto.
+            // stock_ref e categoria podem ter mudado historicamente; não são
+            // motivo para manter uma segunda cópia do mesmo ID de fornecedor.
+            if (canMergeLegacyClothesClone({
+              rootId,
+              existingOriginId: existingItem.id_origem,
+              sameName,
+              sameVolume
+            })) {
               const oldPublicId = String(item.public_id || '').trim();
               if (oldPublicId) {
                 const collision = Object.values(DATA).some(groups =>
@@ -2560,8 +2600,8 @@ async function main() {
               legacyClothesDuplicateRemoved++;
               continue;
             }
-            // ID de origem semelhante não basta: sem stock_ref e grupo idênticos,
-            // mantém a representação legada para revisão, sem colapsar produtos.
+            // Sem stock_ref, nome e volume exatos, a semelhança de origem não
+            // basta: mantém a representação legada para revisão.
             staleClothesPreserved++;
             legacyClothesIdentityConflictsPreserved++;
             kept.push(item);

@@ -110,3 +110,80 @@ test("parses and serializes DATA without changing the other exports", () => {
   assert.match(output, /export const WHATSAPP = "123"/);
   assert.equal(parseDataJsContent(output).feminino.length, 1);
 });
+
+
+test("skips ambiguous stock_ref matches without failing or adding another copy", () => {
+  const current = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    { nome: "Bata Lara", volume: "—", stock_ref: "s_amb", public_id: "p_new_1" },
+    { nome: "Bata Lara", volume: "—", stock_ref: "s_amb", public_id: "p_new_2" }
+  ] }] };
+  const baseline = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    { nome: "Bata Lara", volume: "—", stock_ref: "s_amb", public_id: "p_old" }
+  ] }] };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  assert.equal(result.ambiguousStockRefs.length, 1);
+  assert.equal(result.ambiguousStockRefs[0].stock_ref, "s_amb");
+  assert.equal(result.ambiguousStockRefs[0].matches, 2);
+  assert.deepEqual(result.restoredIds, []);
+  assert.equal(result.data.roupas[0].items.length, 2);
+});
+
+
+test("restores baseline ID onto the exact source row and removes its legacy-gist clone", () => {
+  const current = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    {
+      nome: "Blusa Laura Ribaninha", volume: "—", stock_ref: "s_franny_1",
+      public_id: "p_generated", fonte: "roupas", id_origem: "franny-4196903",
+      varejo: "82,00", atacado: "62,00", disponivel: "Sim",
+      variacoes: [{ nome: "Verde", estoque: 2, id: "v8" }],
+      fotos: ["foto-a"], badge: "", novoDesde: "2026-11-10"
+    },
+    {
+      nome: "Blusa Laura Ribaninha", volume: "—", stock_ref: "s_franny_1",
+      public_id: "p_legacy", fonte: "legacy-gist",
+      varejo: "82,00", atacado: "62,00", precoManual: true,
+      badge: "Novo", fotos: ["foto-b"], notas: "Tecido Ribaninha"
+    }
+  ] }] };
+  const baseline = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    {
+      nome: "Blusa Laura Ribaninha", volume: "—", stock_ref: "s_franny_1",
+      public_id: "p_baseline", fonte: "roupas", id_origem: "franny-4196903",
+      varejo: "82,00", atacado: "62,00"
+    }
+  ] }] };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  const items = result.data.roupas[0].items;
+  assert.equal(items.length, 1);
+  assert.equal(items[0].public_id, "p_baseline");
+  assert.equal(items[0]._preserve_public_id, true);
+  assert.equal(items[0].fonte, "roupas");
+  assert.equal(items[0].id_origem, "franny-4196903");
+  assert.equal(items[0].precoManual, true);
+  assert.equal(items[0].varejo, "82,00");
+  assert.equal(items[0].badge, "Novo");
+  assert.equal(items[0].notas, "Tecido Ribaninha");
+  assert.deepEqual(items[0].variacoes, [{ nome: "Verde", estoque: 2, id: "v8" }]);
+  assert.deepEqual(new Set(items[0].fotos), new Set(["foto-a", "foto-b"]));
+  assert.deepEqual(result.ambiguousStockRefs, []);
+  assert.equal(result.deduplicatedLegacyIds.length, 1);
+  assert.equal(result.rekeyedIds[0].to, "p_baseline");
+  assert.deepEqual([...collectPublicIds(result.data)], ["p_baseline"]);
+});
+
+test("keeps ambiguous source and legacy rows when their manual prices conflict", () => {
+  const current = { roupas: [{ cat: "BODY", brand: "Empório A.R", items: [
+    { nome: "Body X", volume: "—", stock_ref: "s_conflict", public_id: "p_source",
+      fonte: "roupas", id_origem: "franny-9", varejo: "90,00", atacado: "70,00" },
+    { nome: "Body X", volume: "—", stock_ref: "s_conflict", public_id: "p_legacy",
+      fonte: "legacy-gist", varejo: "95,00", atacado: "75,00", precoManual: true }
+  ] }] };
+  const baseline = { roupas: [{ cat: "BODY", brand: "Empório A.R", items: [
+    { nome: "Body X", volume: "—", stock_ref: "s_conflict", public_id: "p_old",
+      fonte: "roupas", id_origem: "franny-9", varejo: "90,00", atacado: "70,00" }
+  ] }] };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  assert.equal(result.data.roupas[0].items.length, 2);
+  assert.equal(result.ambiguousStockRefs.length, 1);
+  assert.equal(result.deduplicatedLegacyIds.length, 0);
+});

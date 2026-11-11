@@ -6,6 +6,19 @@ on:
       - main
     paths:
       - "scripts/sync-catalog.mjs"
+      - "scripts/public-catalog.mjs"
+      - "js/app.js"
+      - "js/dande-category-membership.mjs"
+      - "scripts/dande-category-membership.test.mjs"
+      - "scripts/cart-identity.test.mjs"
+      - "js/cart-identity.mjs"
+      - "netlify/functions/dande-stock.mjs"
+      - "scripts/dande-stock-pagination.test.mjs"
+      - "scripts/catalog-baseline-restore.mjs"
+      - "scripts/source-preservation.mjs"
+      - "scripts/source-preservation.test.mjs"
+      - "scripts/catalog-baseline-restore.test.mjs"
+      - "scripts/restore-catalog-baseline.mjs"
       - ".github/workflows/test-dande-sync.yml"
 
 permissions:
@@ -23,8 +36,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Validar sintaxe do sincronizador
-        run: node --check scripts/sync-catalog.mjs
+      - name: Validar sintaxe dos componentes Dande
+        run: |
+          node --check scripts/sync-catalog.mjs
+          node --check scripts/public-catalog.mjs
+          node --check js/app.js
+          node --check netlify/functions/dande-stock.mjs
+      - name: Testar categorias cruzadas, estoque e regra de remoção por origem
+        run: node --test scripts/dande-category-membership.test.mjs scripts/cart-identity.test.mjs scripts/dande-stock-pagination.test.mjs scripts/source-preservation.test.mjs
+      - name: Testar restauração segura do snapshot conhecido
+        run: node --test scripts/catalog-baseline-restore.test.mjs
       - name: Executar sincronização em modo isolado
         run: node scripts/sync-catalog.mjs
         env:
