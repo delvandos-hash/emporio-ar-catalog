@@ -15,12 +15,12 @@ on:
   workflow_dispatch:
     inputs:
       restore_previous_catalog:
-        description: "Restaurar os public_ids ausentes usando o snapshot conhecido da execução 42874130855."
+        description: "(Opcional) Restaurar public_ids a partir do snapshot conhecido da execução 42874130855."
         required: false
         default: false
         type: boolean
-      publish_catalog:
-        description: "Autorizar gravação no Gist e persistência do data.js em main."
+      dry_run:
+        description: "(Opcional) Só simular — não grava Gist nem data.js."
         required: false
         default: false
         type: boolean
@@ -33,19 +33,16 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     env:
-      # Push e schedule são sempre dry-run. Publicação só ocorre em workflow_dispatch
-      # com confirmação explícita publish_catalog=true.
-      SYNC_DRY_RUN: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_catalog != true) && '1' || '0' }}
+      # Agenda e execução manual publicam no Gist por padrão.
+      # Push na main continua em dry-run (evita gravar a cada commit).
+      # Manual: marque dry_run=true apenas para testar sem gravar.
+      SYNC_DRY_RUN: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)) && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validar parâmetros da execução manual
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_catalog == true && inputs.restore_previous_catalog != true
-        run: |
-          echo "::error::A publicação exige restore_previous_catalog=true para recuperar os itens do snapshot anterior."
-          exit 1
+
       - name: Baixar snapshot conhecido anterior à remoção
         if: github.event_name == 'workflow_dispatch' && inputs.restore_previous_catalog == true
         uses: actions/download-artifact@v4
@@ -54,11 +51,13 @@ jobs:
           run-id: 42874130855
           github-token: ${{ github.token }}
           path: /tmp/catalog-baseline
+
       - name: Restaurar public_ids ausentes do snapshot conhecido
         if: github.event_name == 'workflow_dispatch' && inputs.restore_previous_catalog == true
         run: node scripts/restore-catalog-baseline.mjs
         env:
           CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
+
       - name: Testar sanitização, identidade e recuperação legada
         run: |
           node --check scripts/restore-gist-only-legacy.mjs
@@ -67,10 +66,12 @@ jobs:
           CDN_IMAGE_BASE_URL: ${{ secrets.CDN_IMAGE_BASE_URL }}
           CDN_IMAGE_FALLBACK_BASE_URL: ${{ secrets.CDN_IMAGE_FALLBACK_BASE_URL }}
           IMARAT_ORIGIN_URL: ${{ secrets.IMARAT_ORIGIN_URL }}
+
       - name: Restaurar registros legados do Gist antes da sincronização
         run: node scripts/restore-gist-only-legacy.mjs
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+
       - name: Validar reconciliação aditiva antes da publicação
         run: |
           node scripts/audit-imarat-all-products.mjs | tee /tmp/preflight-audit.log
@@ -78,11 +79,12 @@ jobs:
           node scripts/apply-additive-reconciliation.mjs | tee /tmp/preflight-apply.log
           grep -Eq 'ADDITIVE_RECONCILIATION_(DRY_RUN|NOOP)=true' /tmp/preflight-apply.log
           echo "ALLOW_SAFE_ADDITIVE_BASELINE=1" >> "$GITHUB_ENV"
-          echo "Preflight aprovado: reconciliação aditiva simulada sem gravar no Gist." >> "$GITHUB_STEP_SUMMARY"
+          echo "Preflight aprovado: reconciliação aditiva simulada." >> "$GITHUB_STEP_SUMMARY"
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           IMARAT_API_URL: ${{ secrets.IMARAT_API_URL }}
           CATALOG_BASELINE_PATH: ${{ inputs.restore_previous_catalog == true && '/tmp/catalog-baseline/data.js' || '' }}
+
       - name: Sincronizar estoque e novos produtos
         run: node scripts/sync-catalog.mjs
         env:
@@ -105,6 +107,7 @@ jobs:
           ADD_ROUPAS: ${{ github.event_name == 'push' && '0' || '1' }}
           ADD_FRANNY: ${{ github.event_name == 'push' && '0' || '1' }}
           ADD_ACESSORIOS: ${{ github.event_name == 'push' && '0' || '1' }}
+
       - name: Persistir data.js após sincronização bem-sucedida
         if: github.event_name != 'push' && env.SYNC_DRY_RUN == '0'
         run: |
