@@ -1323,11 +1323,14 @@ function hasDandeNextPage(html, page) {
   return Boolean(getDandeNextPageUrl(html, page));
 }
 
-async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cacheBust = '', pageUrl = '') {
+async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cacheBust = '', pageUrl = '', attempt = 0) {
   const UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-  const requestUrl = new URL(pageUrl || (page <= 1 ? `${DANDE_BASE}${path}` : `${DANDE_BASE}${path}?page=${page}`));
-  // Evita que CDN/proxy devolva o HTML da página 1 em requisições paginadas.
+  const baseUrl = String(DANDE_BASE || '').replace(/\\/+$/, '') + '/';
+  const defaultUrl = new URL(String(path || '').replace(/^\\/+/, ''), baseUrl);
+  if (page > 1) defaultUrl.searchParams.set('page', String(page));
+  const requestUrl = new URL(pageUrl || defaultUrl.toString());
+  // Evita cache e normaliza a base para não gerar rotas com barra dupla.
   if (cacheBust) requestUrl.searchParams.set('_dande_refresh', String(cacheBust));
   console.log(`    Dande request p${page}: ${requestUrl.pathname}${requestUrl.search}`);
   const res = await fetch(requestUrl.toString(), {
@@ -1344,19 +1347,23 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cac
   console.log(`    Dande response p${page}: ${res.url || requestUrl.toString()}`);
   const html = await res.text();
   if (expectedCategory) {
-    const titleMatch = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+    const titleMatch = html.match(/<h1\\b[^>]*>([\\s\\S]*?)<\\/h1>/i);
     const actualTitle = titleMatch
       ? norm(decodeEntities(titleMatch[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' '))).replace(/s$/, '')
       : '';
     const expectedTitle = norm(expectedCategory).replace(/s$/, '');
-    const normalizePath = value => String(value).replace(/\/+/g, '/').replace(/\/+$/, '');
+    const normalizePath = value => String(value).replace(/\\/+/g, '/').replace(/\\/+$/, '');
     const requestedPath = normalizePath(path);
-    const finalPath = normalizePath(new URL(res.url || url).pathname);
+    const finalPath = normalizePath(new URL(res.url || requestUrl.toString()).pathname);
     const genericDandeTitle = actualTitle === 'dande acessorio' &&
-      finalPath === requestedPath && /data-product-id="\d+"/.test(html);
-    console.log(`DANDE_CATEGORY_TITLE expected="${expectedCategory}" actual="${actualTitle || 'ausente'}" finalPath="${finalPath}" genericFallback=${genericDandeTitle}`);
-    if (!actualTitle || (actualTitle !== expectedTitle && !genericDandeTitle)) {
-      throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}", rota final: "${finalPath}")`);
+      finalPath === requestedPath && /data-product-id="\\d+"/.test(html);
+    console.log(`DANDE_CATEGORY_TITLE expected="${expectedCategory}" actual="${actualTitle || 'ausente'}" finalPath="${finalPath}" genericFallback=${genericDandeTitle} attempt=${attempt + 1}`);
+    if (genericDandeTitle && attempt < 2) {
+      await sleep(1000 * (attempt + 1));
+      return fetchDandeCategoryPage(path, page, expectedCategory, String(Date.now()) + '-' + String(attempt + 1), pageUrl, attempt + 1);
+    }
+    if (!actualTitle || actualTitle !== expectedTitle) {
+      throw new Error(`resposta não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}", rota final: "${finalPath}")`);
     }
   }
   return html;
