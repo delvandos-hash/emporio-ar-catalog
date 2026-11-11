@@ -1329,6 +1329,7 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cac
   const requestUrl = new URL(pageUrl || (page <= 1 ? `${DANDE_BASE}${path}` : `${DANDE_BASE}${path}?page=${page}`));
   // Evita que CDN/proxy devolva o HTML da página 1 em requisições paginadas.
   if (cacheBust) requestUrl.searchParams.set('_dande_refresh', String(cacheBust));
+  console.log(`    Dande request p${page}: ${requestUrl.pathname}${requestUrl.search}`);
   const res = await fetch(requestUrl.toString(), {
     cache: 'no-store',
     headers: {
@@ -1340,6 +1341,7 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cac
     },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  console.log(`    Dande response p${page}: ${res.url || requestUrl.toString()}`);
   const html = await res.text();
   if (expectedCategory) {
     const titleMatch = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
@@ -1609,6 +1611,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
         }
         console.log(`    p${page}: lote ${list.length} únicos+${added}`);
         nextPageUrl = getDandeNextPageUrl(html, page);
+        console.log(`    Dande next p${page}: ${nextPageUrl || '(none)'}`);
         const hasNextLink = Boolean(nextPageUrl);
         if (!hasNextLink && list.length < 8) {
           console.log(`    p${page}: lote final (${list.length} produtos); encerrando categoria`);
