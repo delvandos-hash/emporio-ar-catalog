@@ -129,7 +129,8 @@ export default async (req) => {
         : DANDE_CATEGORIES;
       const categories = filteredCategories.length ? filteredCategories : DANDE_CATEGORIES;
       for (const cat of categories) {
-        for (let page = 1; page <= 15; page++) {
+        // O sincronizador coleta até 80 páginas; o endpoint de estoque precisa alcançar o mesmo inventário.
+        for (let page = 1; page <= 80; page++) {
           const pageUrl = page === 1
             ? new URL(cat.path, DANDE_BASE).toString()
             : new URL(cat.path + "?page=" + page, DANDE_BASE).toString();
