@@ -176,12 +176,14 @@ test("auditoria reconhece item Brand legado com mesmo nome-base e foto como já 
   assert.match(apply, /rowCategory\.includes\("brand"\)/);
 });
 
-test("baseline do sincronizador compara IDs públicos estáveis e bloqueia qualquer ID do Gist ausente", () => {
+test("baseline pré-sync não impede remoções confirmadas pelas fontes raiz", () => {
   assert.match(sync, /function countCatalogPublicIds/);
   assert.match(sync, /const internalBaseline = countCatalogPublicIds\(DATA\)/);
   assert.match(sync, /const liveBaseline = countCatalogPublicIds\(liveDATA, true\)/);
-  assert.match(sync, /onlyLive > 0/);
-  assert.match(sync, /onlyInternal > 80/);
+  assert.match(sync, /const baselineUnsafe = liveBaseline\.missingIds > 0/);
+  assert.doesNotMatch(sync, /onlyLive > allowedLiveOnly/);
+  assert.doesNotMatch(sync, /onlyInternal > allowedInternalOnly/);
+  assert.match(sync, /decisão de inclusão\/remoção será tomada após a coleta completa das fontes raiz/);
   assert.doesNotMatch(sync, /countCatalogIdentity/);
 });
 
@@ -196,9 +198,14 @@ test("auditoria e aplicação aceitam estado já reconciliado sem novas adiçõe
   assert.match(apply, /if \(!additions\.length\)/);
 });
 
-test("preflight aceita tanto dry-run quanto no-op seguro da reconciliação", () => {
+test("workflow deixa a reconciliação de produtos para depois da coleta completa das fontes", () => {
   const workflow = readFileSync(new URL("../.github/workflows/sync-stock.yml", import.meta.url), "utf8");
-  assert.ok(workflow.includes("grep -Eq 'ADDITIVE_RECONCILIATION_(DRY_RUN|NOOP)=true'"));
+  assert.doesNotMatch(workflow, /audit-imarat-all-products\.mjs \| tee \/tmp\/preflight-audit\.log/);
+  assert.doesNotMatch(workflow, /apply-additive-reconciliation\.mjs/);
+  assert.match(workflow, /node scripts\/sync-catalog\.mjs/);
+  assert.match(sync, /Coleta Sophia incompleta; sincronização bloqueada/);
+  assert.match(sync, /Coleta Franny incompleta; sincronização bloqueada/);
+  assert.match(sync, /Coleta Dande incompleta; sincronização bloqueada/);
 });
 
 
