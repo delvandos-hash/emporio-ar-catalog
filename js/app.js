@@ -1678,10 +1678,22 @@ function initSwipeToClose() {
 
   modal.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) return;
+    // Não capturar gesto de troca/fechar sobre o carrossel "Combina com este"
+    if (e.target && e.target.closest && e.target.closest('#modalRelated, .related-track, .related-card, .related-photo, .related-info')) {
+      dragging = false;
+      mode = null;
+      return;
+    }
     onStart(e.touches[0].clientY, e.touches[0].clientX);
   }, { passive: true });
   modal.addEventListener('touchmove', (e) => {
     if (!dragging || e.touches.length !== 1) return;
+    if (e.target && e.target.closest && e.target.closest('#modalRelated, .related-track, .related-card')) {
+      dragging = false;
+      mode = null;
+      resetStyle();
+      return;
+    }
     onMove(e.touches[0].clientY, e.touches[0].clientX);
   }, { passive: true });
   modal.addEventListener('touchend', onEnd, { passive: true });
