@@ -24,8 +24,9 @@ test("restauração legada distingue variantes pelo stock_ref e não mistura SKU
   assert.match(restore, /indexes\.originRefIndex\.get\(String\(publicItem\.origin_ref\)\.trim\(\)\)/);
   assert.match(restore, /resolveLegacyStockMatch\(stockMatches, identityMatches, item, publicIdMatches, group\?\.brand, originRefMatches\)/);
   assert.match(restore, /if \(!resolved\) \{/);
-  assert.match(restore, /addLegacy\(DATA, line, group, publicItem\)/);
-  assert.match(restore, /LEGACY_GIST_PRESERVATION_SCOPE=all-lines-all-brands-all-categories/);
+  assert.match(restore, /GIST_ONLY_ITEM_IGNORED/);
+  assert.match(restore, /LEGACY_GIST_PRESERVATION_SCOPE=matched-identities-only/);
+  assert.doesNotMatch(restore, /addLegacy/);
   assert.doesNotMatch(restore, /if \(!\["roupas", "acessorios"\]\.includes\(norm\(line\)\)\) continue/);
 });
 
@@ -34,8 +35,8 @@ test("restauração legada preserva preço, imagem principal, galeria e referên
   assert.match(restore, /target\.foto = publicItem\.foto/);
   assert.match(restore, /target\.fotos = mergedPhotos/);
   assert.match(restore, /target\.public_id = publicItem\.public_id/);
-  assert.match(restore, /stock_ref: item\.stock_ref/);
-  assert.match(restore, /stock_route: item\.stock_route/);
+  assert.match(restore, /target\.stock_ref = publicItem\.stock_ref/);
+  assert.match(restore, /target\.stock_route = publicItem\.stock_route/);
 });
 
 test("public_id é único para variantes e preserva IDs públicos legados", () => {
@@ -129,10 +130,12 @@ test("auditoria e reconciliação usam stock_ref global para acessórios fora da
   assert.match(apply, /internalByStockRef/);
   assert.match(apply, /byStockRef\.length === 1/);
 });
-test("restauração aditiva preserva itens legados de todas as linhas, marcas e categorias", () => {
-  assert.match(restore, /LEGACY_GIST_PRESERVATION_SCOPE=all-lines-all-brands-all-categories/);
-  assert.match(restore, /LEGACY_GIST_RESTORED/);
-  assert.doesNotMatch(restore, /isBrandLegacy|isEmporioLegacy/);
+test("restauração do Gist não ressuscita produtos sem identidade interna confirmada", () => {
+  assert.match(restore, /LEGACY_GIST_PRESERVATION_SCOPE=matched-identities-only/);
+  assert.match(restore, /GIST_ONLY_ITEMS_NOT_RESTORED=/);
+  assert.match(restore, /GIST_ONLY_ITEM_IGNORED/);
+  assert.doesNotMatch(restore, /addLegacy/);
+  assert.doesNotMatch(restore, /Restaram .* itens legados sem representação interna/);
 });
 
 test("auditoria classifica entradas internas repetidas por stock_ref como já representadas", () => {

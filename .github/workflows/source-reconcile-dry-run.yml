@@ -20,6 +20,7 @@ on:
       - "scripts/catalog-baseline-restore.mjs"
       - "scripts/catalog-baseline-restore.test.mjs"
       - "scripts/restore-catalog-baseline.mjs"
+      - "scripts/restore-gist-only-legacy.mjs"
       - ".github/workflows/source-reconcile-dry-run.yml"
 
 permissions:
@@ -64,6 +65,11 @@ jobs:
         run: node scripts/restore-catalog-baseline.mjs
         env:
           CATALOG_BASELINE_PATH: /tmp/catalog-baseline/data.js
+      - name: Restaurar somente campos de produtos ainda identificados no catálogo
+        if: github.event_name == 'pull_request'
+        run: node scripts/restore-gist-only-legacy.mjs
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
       - name: Sincronizar fontes completas e remover produtos ausentes sem publicar
         run: |
           node scripts/sync-catalog.mjs
