@@ -1476,6 +1476,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
     const categoryIds = new Set();
     let completed = false;
     let nextPageUrl = '';
+    let firstPageSize = 0;
     for (let page = 1; page <= 80; page++) {
       try {
         let html = await fetchDandeCategoryPage(cat.path, page, cat.nome, '', nextPageUrl);
@@ -1485,6 +1486,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
           completed = true;
           break;
         }
+        if (page === 1) firstPageSize = list.length;
         let pageSignature = list.map((p) => p.id).sort().join('|');
         if (!pageSignature || seenPageSignatures.has(pageSignature)) {
           // Página repetida nunca é tratada como fim: pode ser resposta antiga de cache
@@ -1505,6 +1507,11 @@ async function fetchDandeAcessorios(existingGroups = []) {
               console.log(`    p${page}: resposta repetida recuperada após tentativa sem cache (${retry}/2)`);
               break;
             }
+          }
+          if (!recovered && page === 2 && firstPageSize === 8 && !getDandeNextPageUrl(html, page)) {
+            console.log(`    p2: página repetida sem continuação após página inicial de 8 produtos; encerrando categoria`);
+            completed = true;
+            break;
           }
           if (!recovered) {
             throw new Error(`página ${page} repetida/vazia após 2 tentativas sem cache; paginação Dande inconclusiva`);
@@ -1613,7 +1620,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
         nextPageUrl = getDandeNextPageUrl(html, page);
         console.log(`    Dande next p${page}: ${nextPageUrl || '(none)'}`);
         const hasNextLink = Boolean(nextPageUrl);
-        if (!hasNextLink && (page > 1 || list.length < 8)) {
+        if (!hasNextLink && !(page === 1 && list.length === 8)) {
           console.log(`    p${page}: lote final (${list.length} produtos); encerrando categoria`);
           completed = true;
           break;
