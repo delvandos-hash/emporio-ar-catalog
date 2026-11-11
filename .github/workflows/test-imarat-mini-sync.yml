@@ -1,17 +1,12 @@
 name: Dry-run completo de sincronização Imarat sem publicar
 
 on:
-  push:
-    branches: [fix/imarat-global-duplicate-prevention, fix/imarat-final-name-cleanup]
-    paths:
-      - "scripts/sync-catalog.mjs"
-      - "scripts/catalog-identity.mjs"
-      - "scripts/catalog-identity.test.mjs"
-      - ".github/workflows/test-imarat-mini-sync.yml"
   pull_request:
     branches: [main]
     paths:
       - "scripts/sync-catalog.mjs"
+      - "scripts/catalog-identity.mjs"
+      - "scripts/catalog-identity.test.mjs"
       - ".github/workflows/test-imarat-mini-sync.yml"
   workflow_dispatch:
 

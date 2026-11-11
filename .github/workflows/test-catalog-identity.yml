@@ -1,7 +1,7 @@
 name: Testes de identidade e deduplicação do catálogo
 on:
-  push:
-    branches: [fix/dedupe-conservadora-backup-aprovado]
+  pull_request:
+    branches: [main]
     paths:
       - "scripts/catalog-identity.mjs"
       - "scripts/catalog-identity.test.mjs"
@@ -11,14 +11,6 @@ on:
       - ".github/workflows/test-catalog-identity.yml"
       - "scripts/source-identity-dedupe.mjs"
       - "scripts/source-identity-dedupe.test.mjs"
-      - ".github/workflows/test-catalog-identity.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "scripts/catalog-identity.mjs"
-      - "scripts/catalog-identity.test.mjs"
-      - "scripts/sync-catalog.mjs"
-      - ".github/workflows/test-catalog-identity.yml"
   workflow_dispatch:
 permissions:
   contents: read
