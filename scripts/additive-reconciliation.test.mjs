@@ -35,8 +35,8 @@ test("restauração legada preserva preço, imagem principal, galeria e referên
   assert.match(restore, /target\.foto = publicItem\.foto/);
   assert.match(restore, /target\.fotos = mergedPhotos/);
   assert.match(restore, /target\.public_id = publicItem\.public_id/);
-  assert.match(restore, /stock_ref: item\.stock_ref/);
-  assert.match(restore, /stock_route: item\.stock_route/);
+  assert.match(restore, /target\.stock_ref = publicItem\.stock_ref/);
+  assert.match(restore, /target\.stock_route = publicItem\.stock_route/);
 });
 
 test("public_id é único para variantes e preserva IDs públicos legados", () => {
