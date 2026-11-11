@@ -187,3 +187,31 @@ test("keeps ambiguous source and legacy rows when their manual prices conflict",
   assert.equal(result.ambiguousStockRefs.length, 1);
   assert.equal(result.deduplicatedLegacyIds.length, 0);
 });
+
+
+test("source identity and exact stock_ref allow merging a legacy clone after category changes", () => {
+  const current = { roupas: [
+    { cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+      { nome: "Blusa Laura Ribaninha", volume: "—", stock_ref: "s_same", public_id: "p_source",
+        fonte: "roupas", id_origem: "franny-4196903", varejo: "82,00", atacado: "62,00",
+        variacoes: [{ id: "v1", nome: "Verde", estoque: 2 }] }
+    ] },
+    { cat: "OUTROS", brand: "Empório A.R", items: [
+      { nome: "Blusa Laura Ribaninha", volume: "—", stock_ref: "s_same", public_id: "p_legacy",
+        fonte: "legacy-gist", varejo: "82,00", atacado: "62,00", precoManual: true,
+        fotos: ["foto-legada"], notas: "Descrição preservada" }
+    ] }
+  ] };
+  const baseline = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    { nome: "Blusa Laura Ribaninha", volume: "—", stock_ref: "s_same", public_id: "p_baseline",
+      fonte: "roupas", id_origem: "franny-4196903", varejo: "82,00", atacado: "62,00" }
+  ] }] };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  const source = result.data.roupas[0].items[0];
+  assert.equal(source.public_id, "p_baseline");
+  assert.equal(source.fonte, "roupas");
+  assert.equal(source.id_origem, "franny-4196903");
+  assert.equal(source.precoManual, true);
+  assert.equal(source.notas, "Descrição preservada");
+  assert.ok(source.fotos.includes("foto-legada"));
+});
