@@ -41,9 +41,9 @@ test("Dande usa requisições sem cache e não confunde página repetida com fim
   assert.ok(catalogSource.includes("matchAll(/<a\\b"));
   assert.ok(catalogSource.includes("new URL(pageUrl ||"));
   assert.ok(catalogSource.includes("cat.nome, '', nextPageUrl"));
-  assert.ok(catalogSource.includes("if (!hasNextLink && !(page === 1 && list.length === 8))"));
-  assert.ok(catalogSource.includes("page === 2 && firstPageSize === 8"));
-  assert.ok(catalogSource.includes("página repetida sem continuação após página inicial de 8 produtos"));
+  assert.ok(catalogSource.includes("if (!hasNextLink && list.length < 12)"));
+  assert.ok(catalogSource.includes("Dande retornou página inicial vazia"));
+  assert.ok(catalogSource.includes("página válida sem produtos; encerrando categoria"));
 
   assert.ok(catalogSource.includes("for (let retry = 1; retry <= 2; retry++)"));
   assert.ok(catalogSource.includes("página ${page} repetida/vazia após 2 tentativas sem cache"));
