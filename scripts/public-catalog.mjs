@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { sanitizePublicImageUrl } from "./public-image-url.mjs";
 
 const GROUP_FIELDS = new Set(["brand", "cat"]);
-const PRODUCT_FIELDS = new Set(["nome", "volume", "varejo", "atacado", "foto", "fotos", "notas", "disponivel", "badge", "novoDesde", "variacoes", "origin_ref", "categorias_origem"]);
+const PRODUCT_FIELDS = new Set(["nome", "volume", "varejo", "atacado", "foto", "fotos", "notas", "disponivel", "badge", "novoDesde", "variacoes", "origin_ref", "categorias_origem", "relacionados"]);
 const DANDE_CATEGORY_NAMES = new Set(["Acessórios de Cabelo", "Anéis", "Braceletes", "Brincos", "Colares", "Conjuntos", "Lançamentos", "Masculinos", "Prata 925", "Pulseiras", "Semijoia Italiana", "Tornozeleiras"]);
 const VARIATION_FIELDS = new Set(["nome", "estoque"]);
 
@@ -156,6 +156,19 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       const safeGroup = pick(group, GROUP_FIELDS);
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
+        if (Array.isArray(safeItem.relacionados)) {
+          safeItem.relacionados = safeItem.relacionados
+            .map((r) => ({
+              nome: String(r?.nome || "").trim(),
+              volume: String(r?.volume || "—").trim() || "—",
+              brand: String(r?.brand || "").trim(),
+            }))
+            .filter((r) => r.nome)
+            .slice(0, 8);
+          if (!safeItem.relacionados.length) delete safeItem.relacionados;
+        } else {
+          delete safeItem.relacionados;
+        }
         if (Array.isArray(safeItem.categorias_origem)) {
           const categories = [...new Set(safeItem.categorias_origem.map(value => String(value || "").trim()).filter(value => DANDE_CATEGORY_NAMES.has(value)))];
           if (categories.length) safeItem.categorias_origem = categories;

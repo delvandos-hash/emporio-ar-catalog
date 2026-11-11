@@ -613,6 +613,33 @@ function imaratImagesFrom(p, detail) {
   return out;
 }
 
+
+/** Extrai "combina com este" da API Imarat (detail.related) para o catálogo. */
+function relacionadosFromImaratDetail(detail) {
+  const list = Array.isArray(detail?.related) ? detail.related : [];
+  const out = [];
+  const seen = new Set();
+  for (const r of list) {
+    if (!r || typeof r !== 'object') continue;
+    const nome = limparTexto(r.name || r.nome || '');
+    if (!nome) continue;
+    const brandRaw = limparTexto(r.brand || r.brandName || '');
+    const brand = norm(brandRaw) === 'imarat' ? 'Empório A.R' : (brandRaw || '').toUpperCase() || 'OUTROS';
+    const volume = volumeFrom(r.sizeMl ?? r.volume, nome);
+    const key = `${norm(nome)}|${volumeMatch(volume, nome)}|${norm(brand)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      nome,
+      volume: volume || '—',
+      brand,
+      id_origem: r.id != null ? String(r.id) : undefined,
+    });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 async function fetchImaratDetail(slug) {
   try {
     const res = await fetch(`${IMARAT_API}/${encodeURIComponent(slug)}`, {
@@ -2020,6 +2047,9 @@ async function main() {
           if (detailImgs) {
             notas = notesToText(detailImgs.notes) || (detailImgs.shortDesc || detailImgs.description || '').slice(0, 400);
             if (notas) it.notas = sanitizarNotas(notas);
+            const rel = relacionadosFromImaratDetail(detailImgs);
+            if (rel.length) it.relacionados = rel;
+            else delete it.relacionados;
           }
         }
         const imgs = imaratImagesFrom(hit, detailImgs);
@@ -2218,6 +2248,7 @@ async function main() {
       if (p.slug && !SYNC_SKIP_DETAILS && !detail) detail = await fetchImaratDetail(p.slug);
       if (detail) notas = notesToText(detail.notes) || (detail.shortDesc || detail.description || '').slice(0, 400);
       notas = sanitizarNotas(notas);
+      const relacionados = detail ? relacionadosFromImaratDetail(detail) : [];
       imgsNew = imaratImagesFrom(p, detail);
       const fotoGaleria = imgsNew[0] || (p.image ? (p.image.startsWith('http') ? p.image : resolveImaratImageUrl(p.image, IMARAT_ORIGIN)) : '');
       
@@ -2237,6 +2268,7 @@ async function main() {
           fotos: imgsNew.length ? imgsNew : (foto ? [foto] : []),
           fonte: 'imarat',
           id_origem: String(p.id ?? p.productId ?? ''),
+          ...(relacionados.length ? { relacionados } : {}),
       }, true));
       
       const normalKey = normalProductKey(nome, volume, brand);
