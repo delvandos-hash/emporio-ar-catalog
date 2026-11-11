@@ -15,6 +15,8 @@ on:
       - "netlify/functions/dande-stock.mjs"
       - "scripts/dande-stock-pagination.test.mjs"
       - "scripts/catalog-baseline-restore.mjs"
+      - "scripts/source-preservation.mjs"
+      - "scripts/source-preservation.test.mjs"
       - "scripts/catalog-baseline-restore.test.mjs"
       - "scripts/restore-catalog-baseline.mjs"
       - ".github/workflows/test-dande-sync.yml"
@@ -40,8 +42,8 @@ jobs:
           node --check scripts/public-catalog.mjs
           node --check js/app.js
           node --check netlify/functions/dande-stock.mjs
-      - name: Testar categorias cruzadas e paginação de estoque
-        run: node --test scripts/dande-category-membership.test.mjs scripts/cart-identity.test.mjs scripts/dande-stock-pagination.test.mjs
+      - name: Testar categorias cruzadas, estoque e regra de remoção por origem
+        run: node --test scripts/dande-category-membership.test.mjs scripts/cart-identity.test.mjs scripts/dande-stock-pagination.test.mjs scripts/source-preservation.test.mjs
       - name: Testar restauração segura do snapshot conhecido
         run: node --test scripts/catalog-baseline-restore.test.mjs
       - name: Executar sincronização em modo isolado
