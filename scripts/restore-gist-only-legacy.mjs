@@ -200,9 +200,13 @@ async function main() {
           ambiguous.push({ line, brand: group.brand, cat: group.cat, nome: publicItem.nome, stock_ref: stockRef, stockMatches: stockMatches.length, identityMatches: identityMatches.length, publicIdMatches: publicIdMatches.length, reason: "sem correspondência inequívoca por public_id, identidade e fotografia" });
           continue;
         }
-        addLegacy(DATA, line, group, publicItem);
-        restored++;
-        indexes = buildIndexes(DATA);
+        // O Gist não pode reintroduzir produtos que já não existem nas bases raiz.
+        // Registros sem correspondência interna são ignorados; a sincronização completa
+        // das fontes decide quais produtos permanecem no catálogo.
+        console.log("GIST_ONLY_ITEM_IGNORED " + JSON.stringify({
+          line, brand: group.brand, cat: group.cat, nome: publicItem.nome,
+          stock_ref: stockRef, public_id: publicItem.public_id || ""
+        }));
       }
     }
   }
@@ -244,16 +248,19 @@ async function main() {
     }
   }
   if (missing.length) {
-    console.log("GIST_IDENTITY_AINDA_AUSENTE " + JSON.stringify(missing));
-    throw new Error(`Restaram ${missing.length} itens legados sem representação interna; nada foi salvo.`);
+    // Ausência no Gist não é erro: itens sem representação interna não podem
+    // ser ressuscitados. A coleta completa da origem é a autoridade do catálogo.
+    console.log("GIST_ONLY_ITEMS_NOT_RESTORED=" + missing.length);
+    for (const item of missing.slice(0, 30)) {
+      console.log("GIST_ONLY_ITEM_NOT_IN_INTERNAL=" + JSON.stringify(item));
+    }
   }
-  if (restored > 120) throw new Error(`Restauração legada excedeu limite seguro (120): ${restored}; nada foi salvo.`);
 
   const out = "/** Empório A.R — recuperação aditiva de legado Gist " + new Date().toISOString() + " */\n" +
     "export const DATA = " + JSON.stringify(DATA) + ";\n" + whatsapp + "\n" + brand + "\n";
   fs.writeFileSync(dataPath, out, "utf8");
   console.log(`LEGACY_GIST_RESTORED=${restored} LEGACY_GIST_MERGED=${merged}`);
-  console.log("LEGACY_GIST_PRESERVATION_SCOPE=all-lines-all-brands-all-categories");
-  console.log("Todos os itens públicos de todas as linhas, marcas e categorias permanecem representados no data.js.");
+  console.log("LEGACY_GIST_PRESERVATION_SCOPE=matched-identities-only");
+  console.log("Gist preserva campos apenas de produtos ainda identificados internamente; itens ausentes não são reintroduzidos.");
 }
 main().catch(error => { console.error(error); process.exit(1); });
