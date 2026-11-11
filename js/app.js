@@ -2085,31 +2085,36 @@ function renderRelatedStrip(p) {
     return;
   }
   const cards = related.map((rp, idx) => {
-    const foto = escapeHtml((rp.fotos && rp.fotos[0]) || rp.foto || '');
+    const rawFoto = (rp.fotos && rp.fotos[0]) || rp.foto || '';
+    const foto = escapeHtml(resolveCatalogImageUrl(rawFoto) || rawFoto || '');
     const nome = escapeHtml(rp.nome || '');
     const meta = escapeHtml([rp.brand, rp.volume && rp.volume !== '—' ? rp.volume : ''].filter(Boolean).join(' · '));
     const price = rp.varejo ? `R$ ${escapeHtml(rp.varejo)}` : '';
-    return `<button type="button" class="related-card" data-related-idx="${idx}" aria-label="Ver ${nome}">
-      <div class="related-photo">${foto ? `<img src="${foto}" alt="" loading="lazy"/>` : '<span>SEM FOTO</span>'}</div>
+    return `<div class="related-card" role="button" tabindex="0" data-related-idx="${idx}" aria-label="Ver ${nome}">
+      <div class="related-photo">${foto ? `<img src="${foto}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"/>` : '<span>SEM FOTO</span>'}</div>
       <div class="related-info">
         <div class="related-name">${nome}</div>
         <div class="related-meta">${meta}</div>
         <div class="related-price">${price}</div>
       </div>
-    </button>`;
+    </div>`;
   }).join('');
   host.innerHTML = `
     <div class="related-head">
       <span class="related-kicker">Combina com este</span>
       <strong class="related-title">Você também pode gostar</strong>
     </div>
-    <div class="related-track">${cards}</div>`;
+    <div class="related-track" role="list">${cards}</div>`;
   host.style.display = 'block';
-  host.querySelectorAll('.related-card').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const i = Number(btn.getAttribute('data-related-idx'));
+  host.querySelectorAll('.related-card').forEach((card) => {
+    const open = () => {
+      const i = Number(card.getAttribute('data-related-idx'));
       const target = related[i];
       if (target) openDetails(target, { fromNav: true });
+    };
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
   });
 }
