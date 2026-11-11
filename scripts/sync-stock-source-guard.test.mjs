@@ -34,6 +34,9 @@ test("Dande usa requisições sem cache e não confunde página repetida com fim
   assert.ok(catalogSource.includes("cache: 'no-store'"));
   assert.ok(catalogSource.includes("'Cache-Control': 'no-cache, no-store, max-age=0'"));
   assert.ok(catalogSource.includes("requestUrl.searchParams.set('_dande_refresh'"));
+  assert.ok(catalogSource.includes("const baseUrl = String(DANDE_BASE || '').replace("));
+  assert.ok(catalogSource.includes("if (genericDandeTitle && attempt < 2)"));
+  assert.ok(catalogSource.includes("if (!actualTitle || actualTitle !== expectedTitle)"));
   assert.ok(catalogSource.includes("function getDandeNextPageUrl(html, page)"));
   assert.ok(catalogSource.includes("matchAll(/<a\\b"));
   assert.ok(catalogSource.includes("new URL(pageUrl ||"));
