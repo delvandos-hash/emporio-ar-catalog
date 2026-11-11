@@ -1,86 +1,48 @@
-# Sincronização automática de estoque — Empório A.R
+# Sincronização do catálogo — Empório A.R
 
-## O que foi implementado (opção C)
+## Fluxo atual
 
-### 1) Ao abrir o catálogo (tempo real)
-- O site chama `/.netlify/functions/stock-sync`
-- A função consulta a **Imarat** (`inStock`) e a **Brand Collection** (`total_estoque` / `status`)
-- O catálogo aplica **Disponível / Esgotado** na tela
-- Resultado fica em cache no celular por **30 minutos**
+O workflow `.github/workflows/sync-stock.yml` é o fluxo principal de sincronização do catálogo. Ele roda automaticamente todos os dias às **08h e 20h (horário de Brasília)** e também pode ser iniciado manualmente pelo GitHub Actions.
 
-### 2) Robô 2x por dia (permanente no data.js)
-- Script: `scripts/sync-stock.mjs`
-- Workflow GitHub: `.github/workflows/sync-stock.yml` (08h e 20h Brasília)
-- Atualiza `js/data.js` e faz push → Netlify republica
+A execução completa consulta as fontes configuradas:
+- Imarat
+- Brand Collection
+- Sophia
+- Franny
+- Dande
 
----
+O sincronizador principal é `scripts/sync-catalog.mjs`. A atualização complementar de disponibilidade usa `scripts/sync-stock.mjs`.
 
-## Como ativar no Netlify
+## Proteção dos dados
 
-1. Publique **toda a pasta** do catálogo (incluindo `netlify/`, `netlify.toml`, `scripts/`)
-2. No painel Netlify → **Site configuration → Functions**  
-   Confirme que a função `stock-sync` aparece
-3. (Opcional) **Scheduled functions** já estão no `netlify.toml`
+- Um produto só é removido quando a coleta da respectiva fonte é concluída e sua ausência é confirmada.
+- Falha, resposta inválida, paginação incompleta ou coleta suspeita deve interromper a reconciliação destrutiva.
+- Preços manuais, identidade de variantes, imagens e referências públicas devem ser preservados conforme as regras do sincronizador.
+- Os cinco itens próprios de Scoop Premiado não pertencem às fontes externas e devem ser preservados.
+- O catálogo público é sanitizado antes da publicação no Gist.
 
-## Como ativar o robô no GitHub (recomendado)
+## Gist e site
 
-1. Crie um repositório e envie os arquivos do catálogo
-2. Conecte o repositório ao Netlify (deploy automático no push)
-3. Em **Actions**, o workflow **Sync estoque Imarat** roda sozinho  
-   Ou clique em **Run workflow** para testar
+O catálogo online consulta `/api/catalogo`, servido pela Netlify Function `get-catalog.mjs`, que lê o Gist `catalogo.json`. Por isso, uma publicação válida do Gist pode atualizar os dados visíveis sem deploy do site.
 
-## Rodar na mão (computador)
+Mudanças no código das Netlify Functions, na interface, nos redirects ou em `netlify.toml` exigem novo deploy para entrarem em produção.
 
-```bash
-cd emporio_ar_unificado
-node scripts/sync-stock.mjs
-```
+## Execução manual
 
-Depois publique de novo o `js/data.js` no Netlify.
+No GitHub:
+1. Abra **Actions**.
+2. Selecione **Sync catálogo (estoque + novos produtos)**.
+3. Clique em **Run workflow**.
+4. Deixe `dry_run` desmarcado para sincronização real. Marque-o somente para simular sem publicar.
+5. Não habilite a restauração de snapshot sem uma necessidade de recuperação previamente confirmada.
 
----
+## Arquivos centrais
 
-## Observações
+- `scripts/sync-catalog.mjs` — sincronização completa das fontes.
+- `scripts/sync-stock.mjs` — atualização de disponibilidade.
+- `scripts/public-catalog.mjs` — sanitização do catálogo público.
+- `scripts/restore-gist-only-legacy.mjs` — preservação segura de registros legados com identidade confirmada.
+- `netlify/functions/stock-sync.js` — estoque consultado pelo site em tempo real.
+- `.github/workflows/sync-stock.yml` — agendamento e execução principal.
 
-| Fonte | Sincroniza? |
-|--------|-------------|
-| **Imarat** (Perfumes, Miniaturas, Óleos…) | Sim — automático |
-| **Brand Collection** (sessão Brand) | Sim — via FácilZap (`carregar_produtos`, total_estoque) |
-| **Scoop Premiado** | Não vem dos raízes — mantém o que você definiu |
-
-Se a Imarat mudar a API, avise para ajustarmos a função.
-
-
-## Novos produtos (automático)
-
-O script `scripts/sync-catalog.mjs` também:
-
-1. Compara Imarat + Brand com o `data.js`
-2. **Adiciona só o que ainda não existe**
-3. Aplica precificação:
-   - **Imarat:** varejo e atacado do site + R$ 30
-   - **Brand:** ≤100 → +30 atacado / +60 varejo; >100 → +60 / +90; Arabic mini → 85 / 125
-4. Busca foto, volume, gênero e notas (Imarat via detalhe do produto)
-5. Atualiza estoque dos itens já existentes
-
-```bash
-node scripts/sync-catalog.mjs
-```
-
-Não remove itens nem sobrescreve preços/fotos que você já editou manualmente nos produtos existentes.
-
-
-## Brand — apenas sessões selecionadas
-
-O robô **não** importa todo o catálogo Brand. Só estas sessões:
-
-- ARABIC COLLECTION
-- BEAUTY BRAND
-- BODY SPLAHS
-- COLEÇÃO BRAND
-- COLEÇÂO DREAM
-- DREAM BRAND 80/100ML
-- FLACONETE BRAND
-- SAPATINHO GOOD GIRL
-
-Novos itens **fora** dessas sessões são ignorados. Estoque é atualizado para os Brand já existentes.
+Os relatórios em `docs/` documentam homologações anteriores e não substituem o fluxo operacional acima.
