@@ -2492,14 +2492,16 @@ async function main() {
           if (existingRows.length === 1) {
             const existingRow = existingRows[0];
             const existingItem = existingRow.item;
-            const sameGroup = norm(existingRow.group.cat) === norm(group.cat) &&
-              norm(existingRow.group.brand) === norm(group.brand);
             const oldStockRef = String(item.stock_ref || '').trim();
             const currentStockRef = String(existingItem.stock_ref || '').trim();
             const sameStockRef = Boolean(oldStockRef && currentStockRef && oldStockRef === currentStockRef);
             const sameName = norm(existingItem.nome) === norm(item.nome);
             const sameVolume = norm(existingItem.volume || '—') === norm(item.volume || '—');
-            if (sameGroup && sameStockRef && sameName && sameVolume) {
+            // A identidade exata do fornecedor + stock_ref + nome + volume
+            // prevalece sobre divergência histórica de grupo/categoria. A linha
+            // confirmada pela origem já está no grupo canônico; a cópia legada
+            // pode ser fundida sem criar um segundo produto.
+            if (sameStockRef && sameName && sameVolume) {
               const oldPublicId = String(item.public_id || '').trim();
               if (oldPublicId) {
                 const collision = Object.values(DATA).some(groups =>
@@ -2537,8 +2539,8 @@ async function main() {
               legacyClothesDuplicateRemoved++;
               continue;
             }
-            // ID de origem semelhante não basta: sem stock_ref e grupo idênticos,
-            // mantém a representação legada para revisão, sem colapsar produtos.
+            // Sem stock_ref, nome e volume exatos, a semelhança de origem não
+            // basta: mantém a representação legada para revisão.
             staleClothesPreserved++;
             legacyClothesIdentityConflictsPreserved++;
             kept.push(item);
