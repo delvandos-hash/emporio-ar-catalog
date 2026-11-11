@@ -1354,6 +1354,7 @@ async function fetchDandeCategoryPage(path, page = 1, expectedCategory = '', cac
     const finalPath = normalizePath(new URL(res.url || url).pathname);
     const genericDandeTitle = actualTitle === 'dande acessorio' &&
       finalPath === requestedPath && /data-product-id="\d+"/.test(html);
+    console.log(`DANDE_CATEGORY_TITLE expected="${expectedCategory}" actual="${actualTitle || 'ausente'}" finalPath="${finalPath}" genericFallback=${genericDandeTitle}`);
     if (!actualTitle || (actualTitle !== expectedTitle && !genericDandeTitle)) {
       throw new Error(`página não corresponde à categoria esperada "${expectedCategory}" (título: "${actualTitle || 'ausente'}", rota final: "${finalPath}")`);
     }
@@ -1481,6 +1482,7 @@ async function fetchDandeAcessorios(existingGroups = []) {
       try {
         let html = await fetchDandeCategoryPage(cat.path, page, cat.nome, '', nextPageUrl);
         let list = parseDandeListProducts(html);
+        console.log(`DANDE_CATEGORY_SAMPLE category="${cat.nome}" page=${page} count=${list.length} sample=${list.slice(0, 8).map(p => `${p.id}:${p.nome}`).join(' || ')}`);
         if (!list.length) {
           if (page > 1) throw new Error(`página ${page} retornou zero produtos; coleta não pode ser considerada completa`);
           completed = true;
