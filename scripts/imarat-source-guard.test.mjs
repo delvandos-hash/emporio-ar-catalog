@@ -112,7 +112,7 @@ test("baseline pré-sync preserva IDs públicos e deixa remoções para a coleta
   assert.match(source, /const baselineUnsafe = liveBaseline\.missingIds > 0/);
   assert.doesNotMatch(source, /ALLOW_SAFE_ADDITIVE_BASELINE/);
   assert.doesNotMatch(source, /onlyLive > allowedLiveOnly/);
-  assert.match(source, /preservação de dados públicos ambígua em/);
+  assert.match(source, /Preservação de dados públicos ambígua em/);
 });
 
 test("restauração Only You é append-only, respeita preço manual e valida antes de gravar", () => {
