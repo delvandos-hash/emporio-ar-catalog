@@ -720,75 +720,124 @@ body {
 }
 
 
-/* —— Combina com este (Imarat) —— */
+
+/* —— Combina com este (Imarat) — carrossel horizontal compacto —— */
+#modal .modal-related,
 .modal-related {
-  margin: 1rem 0 0.25rem;
-  padding-top: 0.75rem;
+  margin: 0.85rem 0 0.35rem;
+  padding: 0.75rem 0 0.15rem;
   border-top: 1px solid #e8e4dc;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
+#modal .related-head,
 .related-head {
-  margin-bottom: 0.65rem;
+  margin: 0 0 0.55rem;
+  padding: 0 0.1rem;
 }
+#modal .related-kicker,
 .related-kicker {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #8a7a4a;
   font-weight: 600;
+  line-height: 1.2;
 }
+#modal .related-title,
 .related-title {
   display: block;
-  font-size: 1.05rem;
+  font-size: 1rem;
   color: #1f2937;
-  font-weight: 600;
-  margin-top: 0.15rem;
+  font-weight: 650;
+  margin-top: 0.12rem;
+  line-height: 1.25;
 }
+#modal .related-track,
 .related-track {
-  display: flex;
-  gap: 0.7rem;
-  overflow-x: auto;
-  padding: 0.15rem 0 0.5rem;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch;
+  gap: 0.65rem;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  width: 100%;
+  max-width: 100%;
+  padding: 0.1rem 0 0.55rem;
+  margin: 0;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
+#modal .related-track::-webkit-scrollbar,
 .related-track::-webkit-scrollbar { display: none; }
+
+#modal .related-card,
 .related-card {
-  flex: 0 0 min(148px, 42vw);
+  flex: 0 0 132px !important;
+  width: 132px !important;
+  min-width: 132px !important;
+  max-width: 132px !important;
   scroll-snap-align: start;
   border: 1px solid #e8e4dc;
   border-radius: 14px;
   background: #fff;
-  padding: 0;
+  padding: 0 !important;
+  margin: 0 !important;
   text-align: left;
   cursor: pointer;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  box-shadow: 0 2px 10px rgba(0,0,0,.05);
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box;
 }
+#modal .related-card:active,
 .related-card:active { transform: scale(0.98); }
+
+#modal .related-photo,
 .related-photo {
-  aspect-ratio: 1;
+  width: 132px !important;
+  height: 132px !important;
+  min-height: 132px !important;
+  max-height: 132px !important;
+  aspect-ratio: 1 / 1;
   background: #f6f3ec;
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex: 0 0 132px;
 }
+#modal .related-photo img,
 .related-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: 132px !important;
+  height: 132px !important;
+  max-width: 132px !important;
+  max-height: 132px !important;
+  object-fit: cover !important;
+  display: block !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
 }
+#modal .related-photo span,
 .related-photo span {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: #9ca3af;
 }
+#modal .related-info,
 .related-info {
-  padding: 0.5rem 0.55rem 0.65rem;
+  padding: 0.45rem 0.5rem 0.55rem;
+  flex: 1 1 auto;
 }
+#modal .related-name,
 .related-name {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   color: #1f2937;
   line-height: 1.25;
@@ -796,16 +845,41 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 2em;
+  min-height: 1.9em;
 }
+#modal .related-meta,
 .related-meta {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: #6b7280;
-  margin-top: 0.2rem;
+  margin-top: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+#modal .related-price,
 .related-price {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #3d3420;
-  margin-top: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 380px) {
+  #modal .related-card,
+  .related-card {
+    flex-basis: 120px !important;
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+  }
+  #modal .related-photo,
+  .related-photo,
+  #modal .related-photo img,
+  .related-photo img {
+    width: 120px !important;
+    height: 120px !important;
+    max-width: 120px !important;
+    max-height: 120px !important;
+    flex-basis: 120px;
+  }
 }
