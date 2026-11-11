@@ -1036,7 +1036,7 @@ async function fetchFacilZapPage(base, loja, catId, page, cookie) {
       return JSON.parse(text);
     } catch (error) {
       lastError = error;
-      const retryable = /HTTP 5\\d\\d|HTTP 429|fetch failed|network|timeout|ECONNRESET|ETIMEDOUT/i.test(String(error?.message || error));
+      const retryable = /HTTP 5\d\d|HTTP 429|fetch failed|network|timeout|ECONNRESET|ETIMEDOUT/i.test(String(error?.message || error));
       if (!retryable || attempt === 3) throw error;
       console.warn(`FacilZap HTTP instável; tentativa ${attempt + 1}/3 na página ${page}: ${error.message}`);
       await sleep(900 * attempt);
