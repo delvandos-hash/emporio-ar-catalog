@@ -187,7 +187,8 @@ test("baseline reidentifica variante legada por marca, nome e foto antes de bloq
   assert.match(source, /function publicLooseIdentity\(group, item\)/);
   assert.match(source, /liveByLooseIdentity/);
   assert.match(source, /const preSyncPreservation = preserveLivePublicFields\(DATA, liveDATA\)/);
-  assert.match(source, /!\/\^p_\[a-f0-9\]\{20\}\$\/\.test\(String\(item\.public_id \|\| ""\)\.trim\(\)\)/);\n  assert.match(source, /item\.public_id = liveItem\.public_id/);
+  assert.match(source, /!\/\^p_\[a-f0-9\]\{20\}\$\/\.test\(String\(item\.public_id \|\| ""\)\.trim\(\)\)/);
+  assert.match(source, /item\.public_id = liveItem\.public_id/);
 });
 
 test("IDs de origem diferentes nunca são colapsados só por nome e volume iguais", () => {
