@@ -165,6 +165,16 @@ export function mergeKnownGoodSnapshot(currentData, baselineData) {
         // Não reaproveita um ID atual que também pertence a outro registro do snapshot anterior.
         if (!currentId || !baselineIds.has(currentId)) {
           if (currentId) currentIds.delete(currentId);
+          // Se o snapshot histórico guardava preço manual, essa proteção comercial
+          // deve acompanhar o produto ao restaurar seu public_id, mesmo quando a
+          // linha atual já veio da origem com outro identificador.
+          const hasManualPrice = item?.precoManual === true ||
+            item?.precoManual === "true" || item?.precoManual === 1;
+          if (hasManualPrice) {
+            currentItem.varejo = item.varejo;
+            currentItem.atacado = item.atacado;
+            currentItem.precoManual = true;
+          }
           currentItem.public_id = id;
           currentItem._preserve_public_id = true;
           currentIds.add(id);
