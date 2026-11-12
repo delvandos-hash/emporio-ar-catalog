@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveLegacyStockMatch, legacyVolumeIdentity } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, legacyVolumeIdentity, normalizeBrand } from "./legacy-restore-identity.mjs";
 
 const row = (public_id, foto, brand = "Marca A") => ({
   group: { brand },
@@ -97,4 +97,11 @@ test("continua bloqueando quando duas correspondências com IDs de origem distin
     resolveLegacyStockMatch([], [a, b], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
     null
   );
+});
+
+
+test("normaliza marcas com acentos, espaços e letras u sem alterar o nome", () => {
+  assert.equal(normalizeBrand("  Águas de Aqua   Parfums  "), "aguas de aqua parfums");
+  assert.equal(normalizeBrand("AQUA"), "aqua");
+  assert.notEqual(normalizeBrand("AQUA"), normalizeBrand("AQA"));
 });
