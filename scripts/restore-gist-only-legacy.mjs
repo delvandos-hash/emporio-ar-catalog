@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
 import { resolveLegacyStockMatch, legacyVolumeIdentity, preserveStablePublicId } from "./legacy-restore-identity.mjs";
 import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
+import { sanitizePublicImageUrl } from "./public-image-url.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
@@ -44,9 +45,14 @@ function mergePublicFields(target, publicItem) {
     ...(Array.isArray(publicItem.fotos) ? publicItem.fotos : []),
     publicItem.foto || ""
   ];
-  const mergedPhotos = [...new Set([...existingPhotos, ...publicPhotos].map(x => String(x || "").trim()).filter(Boolean))];
+  const mergedPhotos = [...new Set([...existingPhotos, ...publicPhotos]
+    .map(sanitizePublicImageUrl).filter(Boolean))];
   if (mergedPhotos.length) target.fotos = mergedPhotos;
-  if (publicItem.foto) target.foto = publicItem.foto;
+  else delete target.fotos;
+  const preferredPhoto = sanitizePublicImageUrl(publicItem.foto) ||
+    sanitizePublicImageUrl(target.foto) || mergedPhotos[0] || "";
+  if (preferredPhoto) target.foto = preferredPhoto;
+  else delete target.foto;
   if (publicItem.notas) target.notas = publicItem.notas;
   if (publicItem.badge) target.badge = publicItem.badge;
   if (publicItem.novoDesde) target.novoDesde = publicItem.novoDesde;
