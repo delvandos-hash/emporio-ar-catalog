@@ -1,5 +1,21 @@
 const PROXY_ORIGIN = "https://catalogo-interno.invalid";
 const IMAGE_SOURCES = new Set(["a", "b", "p", "d"]);
+const BLOCKED_IMAGE_FILENAMES = new Set(["1793210957_d0b7bcf06500577a2bfd.webp"]);
+
+export function isBlockedPublicImageReference(value) {
+  let candidate = String(value ?? "");
+  for (let i = 0; i < 3; i++) {
+    for (const filename of BLOCKED_IMAGE_FILENAMES) {
+      if (candidate.toLowerCase().includes(filename.toLowerCase())) return true;
+    }
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) break;
+      candidate = decoded;
+    } catch { break; }
+  }
+  return false;
+}
 
 function safeBase(value) {
   if (!value) return null;
@@ -25,6 +41,7 @@ export function normalizeProductImagePath(value) {
 }
 
 export function sanitizePublicImageUrl(value, options = {}) {
+  if (isBlockedPublicImageReference(value)) return "";
   if (typeof value !== "string" || !value.trim()) return "";
   const primary = safeBase(options.cdnBase ?? process.env.CDN_IMAGE_BASE_URL ?? "");
   const secondary = safeBase(options.cdnFallbackBase ?? process.env.CDN_IMAGE_FALLBACK_BASE_URL ?? "");
