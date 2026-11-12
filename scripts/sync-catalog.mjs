@@ -444,7 +444,7 @@ function isMiniaturaBolsa(nome) { return norm(nome).includes('bolsa'); }
 function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig) {
   // Kits de perfume com quatro peças usam a regra de acréscimo do Kit Vulcan,
   // sempre sobre a base original da fonte e sem copiar preços de outro SKU.
-  if (isFourPiecePerfumeKit(nome)) {
+  if (isFourPiecePerfumeKit(nome, categoria)) {
     return calculateFourPiecePerfumeKitPrices(precoVarejoOrig, precoAtacadoOrig);
   }
 
@@ -2962,7 +2962,7 @@ async function main() {
       ? Number(source.atacado.precoCents) / 100
       : Math.max(precoVarejoOrigem - 30, 0);
     const precosCanonicos = calcularPrecoMiniatura(
-      source.name || '', marcaOrigem || marcaDestino, volumeDestino, categoriaOrigem,
+      source.name || '', marcaOrigem || marcaDestino, volumeDestino, categoriaDestino,
       precoVarejoOrigem, precoAtacadoOrigem
     );
     const precos = new Set(registros.map(r => chavePrecoId(r.item)));
