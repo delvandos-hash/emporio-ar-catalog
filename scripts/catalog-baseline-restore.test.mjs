@@ -187,3 +187,30 @@ test("keeps ambiguous source and legacy rows when their manual prices conflict",
   assert.equal(result.ambiguousStockRefs.length, 1);
   assert.equal(result.deduplicatedLegacyIds.length, 0);
 });
+
+
+test("restaura public_id histórico por stock_ref exata e preserva preço manual legado", () => {
+  const current = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    { nome: "Blusa Basic Listrada", volume: "—", stock_ref: "s_blusa_1",
+      public_id: "p_atual", fonte: "roupas", id_origem: "franny-3206576",
+      varejo: "89,90", atacado: "69,90" }
+  ] }] };
+  const baseline = { roupas: [{ cat: "BLUSA/CAMISA/CROPPED", brand: "Empório A.R", items: [
+    { nome: "Blusa Basic Listrada", volume: "—", stock_ref: "s_blusa_1",
+      public_id: "p_historico", fonte: "legacy-gist",
+      varejo: "82,00", atacado: "62,00", precoManual: true }
+  ] }] };
+  const result = mergeKnownGoodSnapshot(current, baseline);
+  const item = result.data.roupas[0].items[0];
+  assert.equal(result.rekeyedIds.length, 1);
+  assert.deepEqual(result.rekeyedIds[0], {
+    from: "p_atual", to: "p_historico", nome: "Blusa Basic Listrada", stock_ref: "s_blusa_1"
+  });
+  assert.equal(item.public_id, "p_historico");
+  assert.equal(item.precoManual, true);
+  assert.equal(item.varejo, "82,00");
+  assert.equal(item.atacado, "62,00");
+  assert.equal(item.fonte, "roupas");
+  assert.equal(item.id_origem, "franny-3206576");
+  assert.deepEqual([...collectPublicIds(result.data)], ["p_historico"]);
+});
