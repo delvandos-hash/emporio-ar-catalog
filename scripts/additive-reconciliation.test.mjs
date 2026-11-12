@@ -34,7 +34,7 @@ test("restauração legada preserva preço, imagem principal, galeria e referên
   assert.match(restore, /target\.precoManual = true/);
   assert.match(restore, /target\.foto = publicItem\.foto/);
   assert.match(restore, /target\.fotos = mergedPhotos/);
-  assert.match(restore, /target\.public_id = publicItem\.public_id/);
+  assert.match(restore, /preserveStablePublicId\(target, publicItem\)/);
   assert.match(restore, /target\.stock_ref = publicItem\.stock_ref/);
   assert.match(restore, /target\.stock_route = publicItem\.stock_route/);
 });
@@ -150,7 +150,7 @@ test("publicação aditiva não duplica item com stock_ref já presente no Gist"
 });
 
 test("preserva o public_id canônico do Gist e confirma grupos Brand permitidos", () => {
-  assert.match(restore, /if \(publicItem\.public_id\) target\.public_id = publicItem\.public_id/);
+  assert.match(restore, /preserveStablePublicId\(target, publicItem\)/);
   assert.match(audit, /KNOWN_BRAND_GROUPS/);
   assert.match(audit, /effectiveAdditiveSource\(row\)/);
   assert.match(apply, /effectiveAdditiveSource\(rows\[0\]\)/);

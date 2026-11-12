@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveLegacyStockMatch, legacyVolumeIdentity } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, legacyVolumeIdentity, normalizeBrand, preserveStablePublicId } from "./legacy-restore-identity.mjs";
 
 const row = (public_id, foto, brand = "Marca A") => ({
   group: { brand },
@@ -62,4 +62,65 @@ test("respeita volume explícito e não herda o volume do título quando o campo
 
 test("volume explícito numérico é normalizado sem perder a identidade", () => {
   assert.equal(legacyVolumeIdentity("25", "BRAND 151 DELINA FEM 25ML"), "25ml");
+});
+
+
+test("prefere o único produto confirmado na fonte raiz entre cópia legada e produto atual com a mesma foto", () => {
+  const legacy = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_legacy", foto: "foto-delina" },
+    item: { fonte: "legacy-gist" }
+  };
+  const root = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_root", foto: "foto-delina" },
+    item: { fonte: "brand", id_origem: "2087755" }
+  };
+  assert.equal(
+    resolveLegacyStockMatch([], [legacy, root], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
+    root
+  );
+});
+
+test("continua bloqueando quando duas correspondências com IDs de origem distintos compartilham a mesma foto", () => {
+  const a = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_a", foto: "foto-delina" },
+    item: { fonte: "brand", id_origem: "2087755" }
+  };
+  const b = {
+    group: { brand: "COLEÇÃO BRAND" },
+    publicItem: { public_id: "p_b", foto: "foto-delina" },
+    item: { fonte: "brand", id_origem: "2087756" }
+  };
+  assert.equal(
+    resolveLegacyStockMatch([], [a, b], { public_id: "legacy-public", foto: "foto-delina" }, [], "COLEÇÃO BRAND"),
+    null
+  );
+});
+
+
+test("normaliza marcas com acentos, espaços e letras u sem alterar o nome", () => {
+  assert.equal(normalizeBrand("  Águas de Aqua   Parfums  "), "aguas de aqua parfums");
+  assert.equal(normalizeBrand("AQUA"), "aqua");
+  assert.notEqual(normalizeBrand("AQUA"), normalizeBrand("AQA"));
+});
+
+
+test("preserva public_id interno válido diante de um ID antigo do Gist", () => {
+  const target = { public_id: "p_0123456789abcdefabcd" };
+  preserveStablePublicId(target, { public_id: "p_fedcba9876543210fedc" });
+  assert.equal(target.public_id, "p_0123456789abcdefabcd");
+});
+
+test("usa public_id do Gist apenas como fallback quando o ID interno não é válido", () => {
+  const target = { public_id: "legacy-id" };
+  preserveStablePublicId(target, { public_id: "p_fedcba9876543210fedc" });
+  assert.equal(target.public_id, "p_fedcba9876543210fedc");
+});
+
+test("não inventa nem substitui public_id quando o Gist não fornece um ID", () => {
+  const target = { public_id: "p_0123456789abcdefabcd" };
+  preserveStablePublicId(target, {});
+  assert.equal(target.public_id, "p_0123456789abcdefabcd");
 });

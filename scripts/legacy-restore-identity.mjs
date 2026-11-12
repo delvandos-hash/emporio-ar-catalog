@@ -1,6 +1,6 @@
-function normalizeBrand(value) {
+export function normalizeBrand(value) {
   return String(value ?? "").trim().toLowerCase().normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 }
 
 // O volume explicitamente informado é a fonte primária da identidade.
@@ -58,6 +58,32 @@ export function resolveLegacyStockMatch(stockMatches, identityMatches, publicIte
   if (photo && candidates.length > 1) {
     const byPhoto = candidates.filter(row => legacyPhotoFingerprint(row?.publicItem) === photo);
     if (byPhoto.length === 1) return byPhoto[0];
+
+    // Entre uma cópia legada e o único produto confirmado na fonte raiz,
+    // a fotografia igual permite recuperar a identidade sem escolher entre
+    // variantes reais. Duas origens confirmadas continuam ambíguas.
+    if (byPhoto.length > 1) {
+      const sourceConfirmed = byPhoto.filter(row =>
+        String(row?.item?.fonte || "").trim() &&
+        normalizeBrand(row?.item?.fonte) !== "legacy gist" &&
+        String(row?.item?.id_origem || "").trim()
+      );
+      if (sourceConfirmed.length === 1) return sourceConfirmed[0];
+    }
   }
   return null;
+}
+
+
+/**
+ * Mantém o public_id interno estável. O Gist só fornece fallback quando
+ * o registro interno ainda não possui um ID no formato público canônico.
+ */
+export function preserveStablePublicId(target, publicItem) {
+  const currentId = String(target?.public_id || "").trim();
+  const incomingId = String(publicItem?.public_id || "").trim();
+  if (incomingId && !/^p_[a-f0-9]{20}$/.test(currentId)) {
+    target.public_id = incomingId;
+  }
+  return String(target?.public_id || "").trim();
 }
