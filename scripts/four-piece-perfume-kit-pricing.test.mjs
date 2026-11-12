@@ -4,6 +4,7 @@ import {
   isFourPiecePerfumeKit,
   calculateFourPiecePerfumeKitPrices,
 } from "./four-piece-perfume-kit-pricing.mjs";
+import { preservePublicPrice } from "./manual-price-protection.mjs";
 
 test("identifica kits de perfume com quatro peças em formatos comuns", () => {
   for (const name of [
@@ -34,4 +35,30 @@ test("aplica os acréscimos da regra Vulcan sobre a base de cada fonte, sem pre�
     varejo: "190,00",
     atacado: "155,00",
   });
+});
+
+
+test("divergência com o Gist preserva o preço público sem criar precoManual", () => {
+  const target = { varejo: "220,00", atacado: "165,00" };
+  const changed = preservePublicPrice(target, { varejo: "190,00", atacado: "155,00" });
+  assert.equal(changed, true);
+  assert.deepEqual(target, { varejo: "190,00", atacado: "155,00" });
+  assert.equal(Object.hasOwn(target, "precoManual"), false);
+});
+
+test("precoManual explicitamente definido continua protegendo os dois preços", () => {
+  for (const marker of [true, "true", 1]) {
+    const target = { varejo: "777,00", atacado: "555,00", precoManual: marker };
+    const changed = preservePublicPrice(target, { varejo: "190,00", atacado: "155,00" });
+    assert.equal(changed, false);
+    assert.equal(target.varejo, "777,00");
+    assert.equal(target.atacado, "555,00");
+    assert.equal(target.precoManual, marker);
+  }
+});
+
+test("preço público inválido não altera o registro", () => {
+  const target = { varejo: "220,00", atacado: "165,00" };
+  assert.equal(preservePublicPrice(target, { varejo: "", atacado: "155,00" }), false);
+  assert.deepEqual(target, { varejo: "220,00", atacado: "165,00" });
 });
