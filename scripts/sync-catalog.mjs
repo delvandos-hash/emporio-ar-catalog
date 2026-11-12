@@ -198,7 +198,11 @@ function preserveLivePublicFields(DATA, liveDATA) {
           .map(sanitizePublicImageUrl).filter(Boolean))];
         if (mergedPhotos.length > existingPhotos.filter(Boolean).length) photos++;
         if (mergedPhotos.length) item.fotos = mergedPhotos;
-        if (liveItem.foto) item.foto = sanitizePublicImageUrl(liveItem.foto) || item.foto;
+        else delete item.fotos;
+        const preferredPhoto = sanitizePublicImageUrl(liveItem.foto) ||
+          sanitizePublicImageUrl(item.foto) || mergedPhotos[0] || "";
+        if (preferredPhoto) item.foto = preferredPhoto;
+        else delete item.foto;
         if (liveItem.notas) item.notas = liveItem.notas;
         if (liveItem.badge) item.badge = liveItem.badge;
         if (liveItem.novoDesde) item.novoDesde = liveItem.novoDesde;

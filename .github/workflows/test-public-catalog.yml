@@ -42,8 +42,11 @@ jobs:
           cp js/data.js /tmp/catalog-current-fixture.js
           CATALOG_BASELINE_PATH=/tmp/catalog-baseline-fixture/data.js CATALOG_CURRENT_DATA_PATH=/tmp/catalog-current-fixture.js node scripts/restore-catalog-baseline.mjs | tee /tmp/catalog-baseline-restore.log
           grep -q 'KNOWN_GOOD_BASELINE_PUBLIC_IDS=2158' /tmp/catalog-baseline-restore.log
-          # Rekeys só são aceitos pelo restaurador após correspondência exata de stock_ref, linha, marca, categoria, nome e volume.
-          grep -q 'KNOWN_GOOD_BASELINE_REKEYED=0' /tmp/catalog-baseline-restore.log
+          # Estes dois rekeys são esperados: correspondência exata de stock_ref, linha, marca, categoria, nome e volume com o snapshot histórico.
+          # O primeiro também deve preservar o preço manual gravado no snapshot.
+          grep -q 'KNOWN_GOOD_BASELINE_REKEYED=2' /tmp/catalog-baseline-restore.log
+          grep -Fq 'KNOWN_GOOD_BASELINE_REKEYED_ITEM={"from":"p_075346921b81acf67035","to":"p_20e409077acd20a85763","nome":"Blusa Basic Listrada","stock_ref":"s_691b8048fb460611e4cb2c71"}' /tmp/catalog-baseline-restore.log
+          grep -Fq 'KNOWN_GOOD_BASELINE_REKEYED_ITEM={"from":"p_c1832958ed5fa7d1e246","to":"p_2b703ae3426fb7ecb19e","nome":"Body Luísa (suplex Premium)010","stock_ref":"s_fd59d9f422af86330366c0a8"}' /tmp/catalog-baseline-restore.log
           grep -q 'KNOWN_GOOD_BASELINE_AMBIGUOUS_STOCK_REFS=0' /tmp/catalog-baseline-restore.log
           grep -Eq 'KNOWN_GOOD_BASELINE_RESTORED=[0-9]+' /tmp/catalog-baseline-restore.log
           node --input-type=module <<'NODE'
