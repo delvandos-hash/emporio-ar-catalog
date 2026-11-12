@@ -13,6 +13,7 @@ import { resolveImaratImageUrl } from './imarat-image-url.mjs';
 import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, miniIdentityNameVolumeKey, isDuplicateMiniSource, exactCatalogFingerprint, isExcludedImaratAtherri } from './catalog-identity.mjs';
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 import { shouldRemoveUnmatchedSourceItem, canMergeLegacyClothesClone } from './source-preservation.mjs';
+import { isFourPiecePerfumeKit, calculateFourPiecePerfumeKitPrices } from './four-piece-perfume-kit-pricing.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -441,6 +442,12 @@ function isKit2em1(nome) { return norm(nome).includes('kit 2 em 1'); }
 function isMiniaturaBolsa(nome) { return norm(nome).includes('bolsa'); }
 
 function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig, precoAtacadoOrig) {
+  // Kits de perfume com quatro peças usam a regra de acréscimo do Kit Vulcan,
+  // sempre sobre a base original da fonte e sem copiar preços de outro SKU.
+  if (isFourPiecePerfumeKit(nome, categoria)) {
+    return calculateFourPiecePerfumeKitPrices(precoVarejoOrig, precoAtacadoOrig);
+  }
+
   if (!isMiniatura(nome, volume, categoria)) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
   
   const n = norm(nome); const b = norm(brand);
@@ -2955,7 +2962,7 @@ async function main() {
       ? Number(source.atacado.precoCents) / 100
       : Math.max(precoVarejoOrigem - 30, 0);
     const precosCanonicos = calcularPrecoMiniatura(
-      source.name || '', marcaOrigem || marcaDestino, volumeDestino, categoriaOrigem,
+      source.name || '', marcaOrigem || marcaDestino, volumeDestino, categoriaDestino,
       precoVarejoOrigem, precoAtacadoOrigem
     );
     const precos = new Set(registros.map(r => chavePrecoId(r.item)));
