@@ -54,3 +54,17 @@ test("converte imagens da Dande para alias privado autorizado", () => {
     "/api/product-image?source=d&path=%2Fproducts%2Fanel.webp"
   );
 });
+
+
+test("bloqueia permanentemente a fotografia promocional com preço incorreto", () => {
+  const blocked = "https://arquivos.facilzap.app.br/produtos/1793210957_d0b7bcf06500577a2bfd.webp";
+  assert.equal(sanitizePublicImageUrl(blocked, options), "");
+  assert.equal(
+    sanitizePublicImageUrl("/api/product-image?source=d&path=%2Fprodutos%2F1793210957_d0b7bcf06500577a2bfd.webp", options),
+    ""
+  );
+  assert.equal(
+    sanitizePublicImageUrl("https://images-primary.example/products/outra-foto.webp", options),
+    "/api/product-image?source=a&path=%2Fproducts%2Foutra-foto.webp"
+  );
+});
