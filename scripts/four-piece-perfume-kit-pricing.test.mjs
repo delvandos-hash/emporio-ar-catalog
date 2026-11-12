@@ -4,7 +4,7 @@ import {
   isFourPiecePerfumeKit,
   calculateFourPiecePerfumeKitPrices,
 } from "./four-piece-perfume-kit-pricing.mjs";
-import { preservePublicPrice } from "./manual-price-protection.mjs";
+import { preservePublicPrice, shouldProtectManualPrice } from "./manual-price-protection.mjs";
 
 test("identifica kits de perfume com quatro peças em formatos comuns", () => {
   for (const name of [
@@ -61,4 +61,22 @@ test("preço público inválido não altera o registro", () => {
   const target = { varejo: "220,00", atacado: "165,00" };
   assert.equal(preservePublicPrice(target, { varejo: "", atacado: "155,00" }), false);
   assert.deepEqual(target, { varejo: "220,00", atacado: "165,00" });
+});
+
+
+test("Kit Liquid e Kit Hawas de quatro peças ignoram marcação manual histórica indevida", () => {
+  for (const name of [
+    "Kit Liquid 4 peças 30ml cada",
+    "Kit Hawas 4 peças 30ml cada",
+  ]) {
+    for (const marker of [true, "true", 1]) {
+      assert.equal(shouldProtectManualPrice({ nome: name, precoManual: marker }, "Perfumes"), false, name);
+    }
+  }
+});
+
+test("outros preços manuais explícitos continuam protegidos", () => {
+  assert.equal(shouldProtectManualPrice({ nome: "Kit Vulcan 4 peças", precoManual: true }, "Perfumes"), true);
+  assert.equal(shouldProtectManualPrice({ nome: "Perfume comum", precoManual: true }, "Perfumes"), true);
+  assert.equal(shouldProtectManualPrice({ nome: "Kit Liquid 3 peças", precoManual: true }, "Perfumes"), true);
 });

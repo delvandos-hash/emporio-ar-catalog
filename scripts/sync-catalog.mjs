@@ -14,7 +14,7 @@ import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, mini
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 import { shouldRemoveUnmatchedSourceItem, canMergeLegacyClothesClone } from './source-preservation.mjs';
 import { isFourPiecePerfumeKit, calculateFourPiecePerfumeKitPrices } from './four-piece-perfume-kit-pricing.mjs';
-import { preservePublicPrice } from './manual-price-protection.mjs';
+import { preservePublicPrice, shouldProtectManualPrice } from './manual-price-protection.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -2077,7 +2077,7 @@ async function main() {
         const categoria = hit.categoria_nome || hit.categoria || '';
 
         // precoManual: true no item → robô NÃO altera varejo/atacado
-        if (it.precoManual === true || it.precoManual === 'true' || it.precoManual === 1) {
+        if (shouldProtectManualPrice(it, categoria)) {
           // mantém preços definidos manualmente
         } else {
           const prices = calcularPrecoMiniatura(it.nome, hit.brand || g.brand, it.volume, categoria, precoVarejoOrig, precoAtacadoOrig);
