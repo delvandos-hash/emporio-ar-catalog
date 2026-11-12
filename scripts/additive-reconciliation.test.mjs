@@ -31,7 +31,8 @@ test("restauração legada distingue variantes pelo stock_ref e não mistura SKU
 });
 
 test("restauração legada preserva preço, imagem principal, galeria e referência pública", () => {
-  assert.match(restore, /target\.precoManual = true/);
+  assert.match(restore, /preservePublicPrice\(target, publicItem\)/);
+  assert.doesNotMatch(restore, /target\.precoManual = true/);
   assert.match(restore, /sanitizePublicImageUrl/);
   assert.match(restore, /const preferredPhoto = sanitizePublicImageUrl\(publicItem\.foto\)/);
   assert.match(restore, /if \(preferredPhoto\) target\.foto = preferredPhoto/);
