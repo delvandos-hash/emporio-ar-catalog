@@ -1,6 +1,6 @@
-function normalizeBrand(value) {
+export function normalizeBrand(value) {
   return String(value ?? "").trim().toLowerCase().normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\\s+/g, " ");
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 }
 
 // O volume explicitamente informado é a fonte primária da identidade.
