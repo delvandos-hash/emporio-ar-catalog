@@ -122,7 +122,7 @@ test("recuperação legada do Gist só enriquece produtos com correspondência i
   assert.match(restoreLegacySource, /GIST_ONLY_ITEM_IGNORED/);
   assert.match(restoreLegacySource, /LEGACY_GIST_PRESERVATION_SCOPE=matched-identities-only/);
   assert.match(restoreLegacySource, /GIST_ONLY_ITEMS_NOT_RESTORED=/);
-  assert.match(restoreLegacySource, /preserveStablePublicId\\(target, publicItem\\)/);
+  assert.match(restoreLegacySource, /preserveStablePublicId\(target, publicItem\)/);
 });
 
 test("recuperação legada preserva preços do snapshot, fotos e variações", () => {
