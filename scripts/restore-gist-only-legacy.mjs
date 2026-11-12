@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toPublicCatalog } from "./public-catalog.mjs";
-import { resolveLegacyStockMatch, legacyVolumeIdentity } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, legacyVolumeIdentity, preserveStablePublicId } from "./legacy-restore-identity.mjs";
 import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -55,7 +55,7 @@ function mergePublicFields(target, publicItem) {
   }
   if (publicItem.stock_ref && target.stock_ref !== publicItem.stock_ref) target.stock_ref = publicItem.stock_ref;
   if (publicItem.stock_route && target.stock_route !== publicItem.stock_route) target.stock_route = publicItem.stock_route;
-  if (publicItem.public_id) target.public_id = publicItem.public_id;
+  preserveStablePublicId(target, publicItem);
 }
 function buildIndexes(DATA) {
   const publicDATA = toPublicCatalog(DATA);
