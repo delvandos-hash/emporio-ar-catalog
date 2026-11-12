@@ -14,6 +14,7 @@ import { normalProductKey, normalProductNameVolumeKey, miniIdentityBaseKey, mini
 import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 import { shouldRemoveUnmatchedSourceItem, canMergeLegacyClothesClone } from './source-preservation.mjs';
 import { isFourPiecePerfumeKit, calculateFourPiecePerfumeKitPrices } from './four-piece-perfume-kit-pricing.mjs';
+import { preservePublicPrice } from './manual-price-protection.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -175,19 +176,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
         used.add(liveItem);
         matched++;
 
-        if (!(item.precoManual === true || item.precoManual === "true" || item.precoManual === 1)) {
-          const liveRetail = publicPriceNumber(liveItem.varejo);
-          const liveWholesale = publicPriceNumber(liveItem.atacado);
-          const currentRetail = publicPriceNumber(item.varejo);
-          const currentWholesale = publicPriceNumber(item.atacado);
-          if (Number.isFinite(liveRetail) && Number.isFinite(liveWholesale) &&
-              (liveRetail !== currentRetail || liveWholesale !== currentWholesale)) {
-            item.varejo = liveItem.varejo;
-            item.atacado = liveItem.atacado;
-            item.precoManual = true;
-            prices++;
-          }
-        }
+        if (preservePublicPrice(item, liveItem)) prices++;
 
         const existingPhotos = [
           ...(Array.isArray(item.fotos) ? item.fotos : []), item.foto || ""
