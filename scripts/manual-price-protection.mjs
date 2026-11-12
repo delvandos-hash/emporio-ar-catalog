@@ -49,11 +49,11 @@ export function shouldProtectManualPrice(item, category) {
   const name = String(item?.nome ?? "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
-    .replace(/\\s+/g, " ");
-  const isAffectedKit = /^kit (?:liquid|hawas)(?:\\s|$)/.test(name) &&
+    .replace(/\s+/g, " ");
+  const isAffectedKit = /^kit (?:liquid|hawas)(?:\s|$)/.test(name) &&
     isFourPiecePerfumeKit(item?.nome, category);
   return !isAffectedKit;
 }
