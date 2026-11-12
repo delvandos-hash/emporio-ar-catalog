@@ -73,3 +73,17 @@ export function resolveLegacyStockMatch(stockMatches, identityMatches, publicIte
   }
   return null;
 }
+
+
+/**
+ * Mantém o public_id interno estável. O Gist só fornece fallback quando
+ * o registro interno ainda não possui um ID no formato público canônico.
+ */
+export function preserveStablePublicId(target, publicItem) {
+  const currentId = String(target?.public_id || "").trim();
+  const incomingId = String(publicItem?.public_id || "").trim();
+  if (incomingId && !/^p_[a-f0-9]{20}$/.test(currentId)) {
+    target.public_id = incomingId;
+  }
+  return String(target?.public_id || "").trim();
+}
