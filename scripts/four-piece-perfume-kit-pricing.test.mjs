@@ -12,12 +12,17 @@ test("identifica kits de perfume com quatro peças em formatos comuns", () => {
     "Kit Perfume 4 pcs",
     "Kit Perfume 4x30ml",
     "Kit Perfume 30ml x 4 pcs",
-  ]) assert.equal(isFourPiecePerfumeKit(name), true, name);
+  ]) {
+    assert.equal(isFourPiecePerfumeKit(name, "Perfumes"), true, name);
+    assert.equal(isFourPiecePerfumeKit(name, "Miniaturas"), true, name);
+  }
 });
 
-test("não classifica kits sem quatro peças nem produtos que não sejam kits", () => {
-  assert.equal(isFourPiecePerfumeKit("Kit perfume 3 peças"), false);
-  assert.equal(isFourPiecePerfumeKit("Perfume 4 peças"), false);
+test("não classifica kits sem quatro peças, sem kit ou fora das categorias de perfume", () => {
+  assert.equal(isFourPiecePerfumeKit("Kit perfume 3 peças", "Perfumes"), false);
+  assert.equal(isFourPiecePerfumeKit("Perfume 4 peças", "Perfumes"), false);
+  assert.equal(isFourPiecePerfumeKit("Kit organizador 4 peças", "Acessórios"), false);
+  assert.equal(isFourPiecePerfumeKit("Kit maquiagem 4 peças", "Maquiagem"), false);
 });
 
 test("aplica os acréscimos da regra Vulcan sobre a base de cada fonte, sem preço fixo", () => {
