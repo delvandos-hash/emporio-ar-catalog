@@ -5,6 +5,7 @@ import { toPublicCatalog } from "./public-catalog.mjs";
 import { resolveLegacyStockMatch, legacyVolumeIdentity, preserveStablePublicId } from "./legacy-restore-identity.mjs";
 import { removeExcludedLegacyAtherri } from "./legacy-public-exclusions.mjs";
 import { sanitizePublicImageUrl } from "./public-image-url.mjs";
+import { preservePublicPrice } from "./manual-price-protection.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, "..", "js", "data.js");
@@ -21,22 +22,10 @@ function volumeMatch(value, name) {
 function identity(line, group, item) {
   return [norm(line), norm(group?.brand), norm(group?.cat), norm(item?.nome), volumeMatch(item?.volume, item?.nome)].join("|");
 }
-function priceNumber(value) {
-  const raw = String(value ?? "").trim().replace(/[^0-9,.-]/g, "");
-  if (!raw) return NaN;
-  return Number(raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw);
-}
 function mergePublicFields(target, publicItem) {
-  const publicRetail = priceNumber(publicItem.varejo);
-  const publicWholesale = priceNumber(publicItem.atacado);
-  const currentRetail = priceNumber(target.varejo);
-  const currentWholesale = priceNumber(target.atacado);
-  if (Number.isFinite(publicRetail) && Number.isFinite(publicWholesale) &&
-      (publicRetail !== currentRetail || publicWholesale !== currentWholesale)) {
-    target.varejo = publicItem.varejo;
-    target.atacado = publicItem.atacado;
-    target.precoManual = true;
-  }
+  // Só a marcação manual explícita protege o preço; divergência com o Gist
+  // não deve criar precoManual e bloquear as regras de preço da origem.
+  preservePublicPrice(target, publicItem);
   const existingPhotos = [
     ...(Array.isArray(target.fotos) ? target.fotos : []),
     target.foto || ""
