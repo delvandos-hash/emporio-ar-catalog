@@ -126,7 +126,8 @@ test("recuperação legada do Gist só enriquece produtos com correspondência i
 });
 
 test("recuperação legada preserva preços do snapshot, fotos e variações", () => {
-  assert.match(restoreLegacySource, /target\.precoManual = true/);
+  assert.match(restoreLegacySource, /preservePublicPrice\(target, publicItem\)/);
+  assert.doesNotMatch(restoreLegacySource, /target\.precoManual = true/);
   assert.match(restoreLegacySource, /target\.fotos = mergedPhotos/);
   assert.match(restoreLegacySource, /target\.variacoes = \[\.\.\.publicItem\.variacoes\]/);
 });
