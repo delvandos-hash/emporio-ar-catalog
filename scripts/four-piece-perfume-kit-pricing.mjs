@@ -10,8 +10,12 @@ const norm = (value) => String(value || "")
   .trim()
   .replace(/\s+/g, " ");
 
-export function isFourPiecePerfumeKit(name) {
+export function isFourPiecePerfumeKit(name, category) {
   const value = norm(name);
+  const categoryValue = norm(category);
+  // Kits de miniaturas continuam sendo kits de perfume; outras categorias
+  // (acessórios, maquiagem, vestuário etc.) ficam fora desta regra.
+  if (!/\b(?:perfumes?|perfumaria|miniaturas?)\b/.test(categoryValue)) return false;
   if (!/\bkit\b/.test(value)) return false;
 
   return /\b4\s*(?:pecas?|pcs?|unidades?|frascos?)\b/.test(value)
