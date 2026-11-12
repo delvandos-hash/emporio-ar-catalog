@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveLegacyStockMatch, legacyVolumeIdentity, normalizeBrand } from "./legacy-restore-identity.mjs";
+import { resolveLegacyStockMatch, legacyVolumeIdentity, normalizeBrand, preserveStablePublicId } from "./legacy-restore-identity.mjs";
 
 const row = (public_id, foto, brand = "Marca A") => ({
   group: { brand },
@@ -104,4 +104,23 @@ test("normaliza marcas com acentos, espaços e letras u sem alterar o nome", () 
   assert.equal(normalizeBrand("  Águas de Aqua   Parfums  "), "aguas de aqua parfums");
   assert.equal(normalizeBrand("AQUA"), "aqua");
   assert.notEqual(normalizeBrand("AQUA"), normalizeBrand("AQA"));
+});
+
+
+test("preserva public_id interno válido diante de um ID antigo do Gist", () => {
+  const target = { public_id: "p_0123456789abcdefabcd" };
+  preserveStablePublicId(target, { public_id: "p_fedcba9876543210fedc" });
+  assert.equal(target.public_id, "p_0123456789abcdefabcd");
+});
+
+test("usa public_id do Gist apenas como fallback quando o ID interno não é válido", () => {
+  const target = { public_id: "legacy-id" };
+  preserveStablePublicId(target, { public_id: "p_fedcba9876543210fedc" });
+  assert.equal(target.public_id, "p_fedcba9876543210fedc");
+});
+
+test("não inventa nem substitui public_id quando o Gist não fornece um ID", () => {
+  const target = { public_id: "p_0123456789abcdefabcd" };
+  preserveStablePublicId(target, {});
+  assert.equal(target.public_id, "p_0123456789abcdefabcd");
 });
