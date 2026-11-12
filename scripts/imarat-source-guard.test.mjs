@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("./sync-catalog.mjs", import.meta.url), "utf8");
-const restoreOnlyYouSource = fs.readFileSync(new URL("./restore-onlyyou-minis.mjs", import.meta.url), "utf8");
+const restoreLegacySource = fs.readFileSync(new URL("./restore-gist-only-legacy.mjs", import.meta.url), "utf8");
 const auditMiniSource = fs.readFileSync(new URL("./audit-miniaturas-imarat.mjs", import.meta.url), "utf8");
 const auditAllSource = fs.readFileSync(new URL("./audit-imarat-all-products.mjs", import.meta.url), "utf8");
 const auditSource = fs.readFileSync(new URL("./audit-imarat-titles.mjs", import.meta.url), "utf8");
@@ -115,15 +115,19 @@ test("baseline pré-sync preserva IDs públicos e deixa remoções para a coleta
   assert.match(source, /Preservação de dados públicos ambígua em/);
 });
 
-test("restauração Only You é append-only, respeita preço manual e valida antes de gravar", () => {
-  assert.match(restoreOnlyYouSource, /source\.filter\(p => norm\(p\.brand\) === "only you"\)/);
-  assert.match(restoreOnlyYouSource, /function findLiveMatches\(DATA, product, volume\)/);
-  assert.match(restoreOnlyYouSource, /if \(matches\.length\)/);
-  assert.match(restoreOnlyYouSource, /manualPrice\(internalItem\) \? internalItem\.varejo/);
-  assert.match(restoreOnlyYouSource, /group\.items\.push\(entry\.item\)/);
-  assert.match(restoreOnlyYouSource, /if \(DRY_RUN\)/);
-  assert.match(restoreOnlyYouSource, /stillMissing/);
-  assert.doesNotMatch(restoreOnlyYouSource, /group\.items\s*=\s*group\.items\.filter/);
+test("recuperação legada do Gist só enriquece produtos com correspondência inequívoca", () => {
+  assert.match(restoreLegacySource, /const resolved = resolveLegacyStockMatch/);
+  assert.match(restoreLegacySource, /if \(resolved\) \{\s*mergePublicFields\(resolved\.item, publicItem\)/);
+  assert.match(restoreLegacySource, /O Gist não pode reintroduzir produtos que já não existem nas bases raiz/);
+  assert.match(restoreLegacySource, /GIST_ONLY_ITEM_IGNORED/);
+  assert.match(restoreLegacySource, /LEGACY_GIST_PRESERVATION_SCOPE=matched-identities-only/);
+  assert.match(restoreLegacySource, /GIST_ONLY_ITEMS_NOT_RESTORED=/);
+});
+
+test("recuperação legada preserva preços do snapshot, fotos e variações", () => {
+  assert.match(restoreLegacySource, /target\.precoManual = true/);
+  assert.match(restoreLegacySource, /target\.fotos = mergedPhotos/);
+  assert.match(restoreLegacySource, /target\.variacoes = \[\.\.\.publicItem\.variacoes\]/);
 });
 
 test("miniaturas usam ID de origem e fallback conservador por marca, nome e volume", () => {
@@ -183,9 +187,7 @@ test("baseline reidentifica variante legada por marca, nome e foto antes de bloq
   assert.match(source, /function publicLooseIdentity\(group, item\)/);
   assert.match(source, /liveByLooseIdentity/);
   assert.match(source, /const preSyncPreservation = preserveLivePublicFields\(DATA, liveDATA\)/);
-  // A valid internal public_id must not be overwritten by a reissued Gist ID.
-  assert.match(source, /!\/\^p_\[a-f0-9\]\{20\}\$\/\.test\(String\(item\.public_id \|\| ""\)\.trim\(\)\)/);
-  assert.match(source, /item\.public_id = liveItem\.public_id/);
+  assert.match(source, /!\/\^p_\[a-f0-9\]\{20\}\$\/\.test\(String\(item\.public_id \|\| ""\)\.trim\(\)\)/);\n  assert.match(source, /item\.public_id = liveItem\.public_id/);
 });
 
 test("IDs de origem diferentes nunca são colapsados só por nome e volume iguais", () => {
