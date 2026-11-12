@@ -602,8 +602,7 @@ const CART_KEY = 'emporio_ar_cart';
 const ADMIN_KEY = 'emporio_ar_admin';
 const OVERRIDES_KEY = 'emporio_ar_overrides';
 const SECTIONS_KEY = 'emporio_ar_sections';
-const ADMIN_PASS = '172812ds';
-let isAdmin = false; // versão final sem Admin
+let isAdmin = false;
 
 function loadOverrides() {
   try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}'); }
@@ -3393,27 +3392,42 @@ document.getElementById('logoHome').addEventListener('click', e => {
 });
 
 
-function toggleAdmin() {
+async function toggleAdmin() {
   const btnSec = document.getElementById('btnSections');
+  const button = document.getElementById('btnAdmin');
   if (isAdmin) {
+    try {
+      await fetch('/api/admin-auth', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) });
+    } catch (e) {}
     isAdmin = false;
     sessionStorage.removeItem(ADMIN_KEY);
-    const b = document.getElementById('btnAdmin');
-    if (b) b.textContent = 'Admin';
+    if (button) button.textContent = 'Admin';
     if (btnSec) btnSec.style.display = 'none';
     render();
     return;
   }
-  const pass = prompt('Senha do Admin:');
-  if (pass === ADMIN_PASS) {
+  const pass = prompt('Autorização do Admin: informe sua senha administrativa.');
+  if (pass === null) return;
+  try {
+    const response = await fetch('/api/admin-auth', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.authenticated) {
+      alert(response.status === 503 ? 'Admin ainda não configurado no servidor. Configure ADMIN_PASSWORD e ADMIN_SESSION_SECRET no Netlify.' : 'Autorização inválida.');
+      return;
+    }
     isAdmin = true;
     sessionStorage.setItem(ADMIN_KEY, '1');
-    const b = document.getElementById('btnAdmin');
-    if (b) b.textContent = 'Sair Admin';
+    if (button) button.textContent = 'Sair Admin';
     if (btnSec) btnSec.style.display = 'inline-flex';
-    alert('Modo Admin ativo.\n• Sessões: ativar/desativar e renomear\n• Produto: Detalhes → editar nome, preço, foto e estoque');
-  } else if (pass !== null) {
-    alert('Senha incorreta.');
+    render();
+    alert('Modo Admin ativo por tempo limitado.\n• Sessões: ativar/desativar e renomear\n• Produto: Detalhes → editar nome, preço, foto e estoque');
+  } catch (error) {
+    alert('Não foi possível validar a autorização. Verifique sua conexão e tente novamente.');
   }
 }
 
@@ -3480,12 +3494,20 @@ document.getElementById('btnResetSections')?.addEventListener('click', () => {
 
 document.getElementById('admSave')?.addEventListener('click', saveAdminEdit);
 document.getElementById('admExport')?.addEventListener('click', exportOverrides);
-if (isAdmin) {
-  const b = document.getElementById('btnAdmin');
-  if (b) b.textContent = 'Sair Admin';
-  const bs = document.getElementById('btnSections');
-  if (bs) bs.style.display = 'inline-flex';
-}
+// Não restaura privilégios usando apenas sessionStorage: valida a sessão HttpOnly no servidor.
+sessionStorage.removeItem(ADMIN_KEY);
+fetch('/api/admin-auth', { method: 'GET', credentials: 'same-origin', cache: 'no-store' })
+  .then(response => response.ok ? response.json() : null)
+  .then(result => {
+    if (!result?.authenticated) return;
+    isAdmin = true;
+    const b = document.getElementById('btnAdmin');
+    if (b) b.textContent = 'Sair Admin';
+    const bs = document.getElementById('btnSections');
+    if (bs) bs.style.display = 'inline-flex';
+    render();
+  })
+  .catch(() => {});
 refreshCategoryFilterVisibility();
 
 ensureBrandCategoryFilters();
