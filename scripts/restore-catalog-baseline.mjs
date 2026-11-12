@@ -41,4 +41,5 @@ console.log("KNOWN_GOOD_BASELINE_AMBIGUOUS_STOCK_REFS=" + result.ambiguousStockR
 for (const entry of result.ambiguousStockRefs) console.log("KNOWN_GOOD_BASELINE_AMBIGUOUS_SKIPPED=" + JSON.stringify(entry));
 console.log("KNOWN_GOOD_BASELINE_RESTORED=" + result.restoredIds.length);
 console.log("KNOWN_GOOD_BASELINE_WITHOUT_PUBLIC_ID_SKIPPED=" + result.skippedWithoutPublicId);
+for (const entry of result.rekeyedIds) console.log("KNOWN_GOOD_BASELINE_REKEYED_ITEM=" + JSON.stringify(entry));
 for (const id of result.restoredIds) console.log("KNOWN_GOOD_ITEM_RESTORED=" + id);

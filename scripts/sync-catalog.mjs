@@ -205,7 +205,12 @@ function preserveLivePublicFields(DATA, liveDATA) {
         if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];
         if (liveItem.stock_ref && item.stock_ref !== liveItem.stock_ref) item.stock_ref = liveItem.stock_ref;
         if (liveItem.stock_route && item.stock_route !== liveItem.stock_route) item.stock_route = liveItem.stock_route;
-        if (liveItem.public_id && item.public_id !== liveItem.public_id && item._preserve_public_id !== true) item.public_id = liveItem.public_id;
+        // O public_id já persistido na base interna é a identidade estável do produto.
+        // O Gist pode conter uma chave reemitida durante migração de origem; nunca
+        // substitua uma chave interna válida por essa cópia viva.
+        if (!/^p_[a-f0-9]{20}$/.test(String(item.public_id || "").trim()) &&
+            /^p_[a-f0-9]{20}$/.test(String(liveItem.public_id || "").trim()) &&
+            item._preserve_public_id !== true) item.public_id = liveItem.public_id;
       }
     }
   }
