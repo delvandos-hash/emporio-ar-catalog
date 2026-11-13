@@ -24,5 +24,5 @@ test('mantém texto já decodificado e não faz decodificação recursiva', () =
 
 test('preserva entidades desconhecidas e substitui pontos de código inválidos', () => {
   assert.equal(decodeHtmlEntities('&entidade-desconhecida;'), '&entidade-desconhecida;');
-  assert.equal(decodeHtmlEntities('&#xD800;'), '\\uFFFD');
+  assert.equal(decodeHtmlEntities('&#xD800;'), '\uFFFD');
 });
