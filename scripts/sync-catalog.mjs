@@ -15,6 +15,7 @@ import { dedupeConfirmedSourceProducts } from './source-identity-dedupe.mjs';
 import { shouldRemoveUnmatchedSourceItem, canMergeLegacyClothesClone } from './source-preservation.mjs';
 import { isFourPiecePerfumeKit, calculateFourPiecePerfumeKitPrices } from './four-piece-perfume-kit-pricing.mjs';
 import { preservePublicPrice, shouldProtectManualPrice } from './manual-price-protection.mjs';
+import { decodeHtmlEntities } from './html-entities.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataPath = path.join(__dirname, '..', 'js', 'data.js');
@@ -752,14 +753,11 @@ function calcPrecosRoupas(precoBase) {
 
 function limparDescricaoSophia(html) {
   if (!html) return '';
-  return String(html)
+  const plainText = String(html)
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ');
+  return decodeHtmlEntities(plainText)
     .replace(/\s+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]{2,}/g, ' ')
