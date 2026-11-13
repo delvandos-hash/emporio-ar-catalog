@@ -2757,6 +2757,109 @@ function addAllFavoritesToCart() {
 }
 
 
+
+/** Lista plana de todos os produtos do catálogo para busca ao vivo */
+function collectAllSearchProducts() {
+  const out = [];
+  if (!DATA) return out;
+  for (const line of Object.keys(DATA)) {
+    for (const g of DATA[line] || []) {
+      for (const item of g.items || []) {
+        out.push({
+          ...item,
+          brand: item.brand || g.brand,
+          cat: item.cat || g.cat,
+          line: item.line || line,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function closeSearchLiveResults() {
+  const wrap = document.getElementById('searchWrap');
+  const box = document.getElementById('searchLiveResults');
+  wrap?.classList.remove('has-live-results');
+  if (box) {
+    box.hidden = true;
+    box.innerHTML = '';
+  }
+}
+
+function renderSearchLiveResults(query) {
+  const wrap = document.getElementById('searchWrap');
+  const box = document.getElementById('searchLiveResults');
+  const recent = document.getElementById('recentSearches');
+  if (!wrap || !box) return;
+
+  const q = String(query || '').trim();
+  if (q.length < 1) {
+    closeSearchLiveResults();
+    return;
+  }
+
+  const tokens = normalizeSearch(q).split(' ').filter(Boolean);
+  if (!tokens.length) {
+    closeSearchLiveResults();
+    return;
+  }
+
+  const all = collectAllSearchProducts();
+  const hits = [];
+  for (const item of all) {
+    if (!matchesSearch(item, item.brand, item.cat, q, tokens)) continue;
+    hits.push(item);
+    if (hits.length >= 14) break;
+  }
+
+  // Esconde histórico enquanto há digitação
+  recent?.classList.remove('open');
+  wrap.classList.remove('is-focused');
+
+  if (!hits.length) {
+    box.innerHTML = `<div class="search-live-empty">Nenhum resultado para “${escapeHtml(q)}”.</div>`;
+    box.hidden = false;
+    wrap.classList.add('has-live-results');
+    return;
+  }
+
+  box.innerHTML = hits.map((item, idx) => {
+    const rawFoto = (item.fotos && item.fotos[0]) || item.foto || '';
+    const foto = escapeHtml(resolveCatalogImageUrl(rawFoto) || rawFoto || '');
+    const nome = escapeHtml(item.nome || '');
+    const sub = escapeHtml([item.brand, item.volume && item.volume !== '—' ? item.volume : '', item.cat].filter(Boolean).join(' · '));
+    const price = item.varejo ? `R$ ${escapeHtml(String(item.varejo))}` : '';
+    const esgotado = !isAvailable(item) ? ' · Esgotado' : '';
+    return `<button type="button" class="search-live-item" data-live-idx="${idx}">
+      <div class="search-live-photo">${foto ? `<img src="${foto}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"/>` : '<span>SEM<br>FOTO</span>'}</div>
+      <div class="search-live-meta">
+        <div class="search-live-name">${nome}</div>
+        <div class="search-live-sub">${sub}${esgotado}</div>
+      </div>
+      <div class="search-live-price">${price}</div>
+    </button>`;
+  }).join('');
+
+  box.hidden = false;
+  wrap.classList.add('has-live-results');
+
+  box.querySelectorAll('.search-live-item').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = Number(btn.getAttribute('data-live-idx'));
+      const target = hits[i];
+      if (!target) return;
+      pushRecentSearch(q);
+      closeSearchLiveResults();
+      document.getElementById('searchWrap')?.classList.remove('is-focused');
+      document.getElementById('recentSearches')?.classList.remove('open');
+      openDetails(target);
+    });
+  });
+}
+
 function loadRecentSearches() {
   try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch (e) { return []; }
 }
@@ -3141,8 +3244,14 @@ document.getElementById('modalAddCart').addEventListener('click', () => {
 
 document.getElementById('q').addEventListener('input', e => {
   clearTimeout(searchTimer);
+  const value = e.target.value;
+  // Lista ao vivo imediata (leve debounce)
+  clearTimeout(window.__liveSearchT);
+  window.__liveSearchT = setTimeout(() => {
+    renderSearchLiveResults(value);
+  }, 120);
   searchTimer = setTimeout(() => {
-    state.search = e.target.value;
+    state.search = value;
     if (state.search.trim().length >= 2) { clearTimeout(window.__recentSearchT); window.__recentSearchT = setTimeout(() => pushRecentSearch(state.search), 700); };
     render();
   }, 280);
@@ -3383,6 +3492,7 @@ document.getElementById('logoHome').addEventListener('click', e => {
   state.volume = 'Todos';
   state.vitrine = 'Todos';
   document.getElementById('q').value = '';
+  try { closeSearchLiveResults(); } catch (_) {}
   document.getElementById('sortBy').value = 'nome-asc';
   document.querySelectorAll('#genderFilters .fbtn').forEach(b => b.classList.toggle('active', b.dataset.value === 'Todos'));
   document.querySelectorAll('#categoryFilters .fbtn').forEach(b => b.classList.toggle('active', b.dataset.value === 'Todos'));
@@ -3804,29 +3914,33 @@ renderRecentSearches();
   const input = document.getElementById('q');
   const wrap = document.getElementById('searchWrap') || input?.closest('.search');
   const box = document.getElementById('recentSearches');
+  const live = document.getElementById('searchLiveResults');
   if (!input || !wrap) return;
-  const open = () => {
+  const openRecent = () => {
+    // Só histórico quando o campo está vazio (sem chips de sugestão de marca)
+    if (String(input.value || '').trim()) {
+      renderSearchLiveResults(input.value);
+      return;
+    }
+    closeSearchLiveResults();
     renderRecentSearches();
     if (box && box.children.length) {
       wrap.classList.add('is-focused');
       box.classList.add('open');
     }
   };
-  const close = () => {
+  const closeAll = () => {
     wrap.classList.remove('is-focused');
     box?.classList.remove('open');
+    closeSearchLiveResults();
   };
-  input.addEventListener('focus', open);
-  input.addEventListener('click', open);
-  input.addEventListener('input', () => {
-    // mantém aberto enquanto digita se houver histórico
-    if (box && box.children.length) {
-      wrap.classList.add('is-focused');
-      box.classList.add('open');
-    }
-  });
+  input.addEventListener('focus', openRecent);
+  input.addEventListener('click', openRecent);
   document.addEventListener('click', (e) => {
-    if (!wrap.contains(e.target)) close();
+    if (!wrap.contains(e.target)) closeAll();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAll();
   });
 })();
 
