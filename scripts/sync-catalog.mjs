@@ -1282,7 +1282,7 @@ function calcPrecosAcessorios(precoBase) {
   if (base >= 50) {
     return { atacado: fmt(base * 2.5), varejo: fmt(base * 3), base };
   }
-  return { atacado: fmt(base * 3.5), varejo: fmt(base * 5), base };
+  return { atacado: fmt(base * 3), varejo: fmt(base * 4), base };
 }
 
 function decodeEntities(s) {
