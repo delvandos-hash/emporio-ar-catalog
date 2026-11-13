@@ -154,16 +154,16 @@ function getProductShareUrl(p) {
 function getProductShareText(p) {
   const link = getProductShareUrl(p);
   let t = `*${p.nome}* — Empório A.R\n`;
-  if (p.brand) t += `Marca: ${p.brand}\n`;
-  if (p.volume && p.volume !== '—') t += `Volume: ${p.volume}\n`;
+  if (p.brand) t += `${p.brand}`;
+  if (p.volume && p.volume !== '—') t += (p.brand ? ' · ' : '') + p.volume;
+  if (p.brand || (p.volume && p.volume !== '—')) t += `\n`;
   if (isScoopProduct(p)) {
     if (p.varejo) t += `Preço fixo: R$ ${p.varejo}\n`;
   } else {
     if (p.varejo) t += `Varejo: R$ ${p.varejo}\n`;
-    if (p.atacado && p.atacado !== '—') t += `Atacado (6+): R$ ${p.atacado}\n`;
+    if (p.atacado && p.atacado !== '—') t += `Atacado (a partir de 6 un.): R$ ${p.atacado}\n`;
   }
-  t += `\n👉 Abra o produto no catálogo (link):\n${link}\n`;
-  t += `\nCatálogo completo: https://catalogoemporio.netlify.app`;
+  t += `\n👉 Ver no catálogo:\n${link}`;
   return t;
 }
 
@@ -264,17 +264,16 @@ async function renderStoryCardCanvas(p) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  // marca
+  // marca central no topo
   ctx.fillStyle = '#C9A84C';
   ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('Empório A.R', W / 2, 110);
 
-  // área da foto — grande (quase a metade da tela)
+  // área da foto — grande
   const imgX = 60, imgY = 150, imgW = W - 120, imgH = 1100;
   ctx.save();
-  // fundo da foto
-  ctx.fillStyle = '#0c0a09';
+  ctx.fillStyle = '#f5f2eb';
   if (typeof roundRect === 'function') {
     roundRect(ctx, imgX, imgY, imgW, imgH, 28);
     ctx.fill();
@@ -285,11 +284,11 @@ async function renderStoryCardCanvas(p) {
   }
   const img = await loadProductImage(p);
   if (img && img.width) {
-    // cover: preenche a área sem distorcer
+    // contain: foto inteira sem corte
     try {
-      drawImageCover(ctx, img, imgX, imgY, imgW, imgH);
+      drawImageContain(ctx, img, imgX, imgY, imgW, imgH);
     } catch (e) {
-      try { drawImageContain(ctx, img, imgX, imgY, imgW, imgH); } catch (e2) {}
+      try { drawImageCover(ctx, img, imgX, imgY, imgW, imgH); } catch (e2) {}
     }
   } else {
     ctx.fillStyle = '#9ca3af';
@@ -298,7 +297,7 @@ async function renderStoryCardCanvas(p) {
   }
   ctx.restore();
 
-  // textos abaixo da foto
+  // textos abaixo da foto (tipografia original)
   let ty = imgY + imgH + 70;
   ctx.fillStyle = '#fafaf9';
   ctx.font = 'bold 46px system-ui, -apple-system, sans-serif';
@@ -317,18 +316,48 @@ async function renderStoryCardCanvas(p) {
   }
 
   ctx.fillStyle = '#E8D5A3';
-  ctx.font = 'bold 52px system-ui, sans-serif';
+  ctx.font = 'bold 52px system-ui, -apple-system, sans-serif';
   if (p.varejo) ctx.fillText((isScoopProduct(p) ? 'Preço fixo R$ ' : 'R$ ') + p.varejo, W / 2, ty);
   ty += 50;
   if (!isScoopProduct(p) && p.atacado && p.atacado !== '—') {
     ctx.fillStyle = '#C9A84C';
     ctx.font = '36px system-ui, sans-serif';
     ctx.fillText('Atacado (6+) R$ ' + p.atacado, W / 2, ty);
+    ty += 44;
   }
 
-  ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.font = '28px system-ui, sans-serif';
-  ctx.fillText('Link do produto na legenda · catalogoemporio.netlify.app', W / 2, H - 70);
+  // logo circular discreta — centralizada, logo acima do rodapé
+  // reserva espaço inferior para o usuário colar link + CTA manual no Stories
+  try {
+    const logoSrc = (window.location && window.location.origin ? window.location.origin : '') + '/assets/logo.jpg';
+    const logo = await loadImageCors(logoSrc);
+    if (logo && logo.width) {
+      const size = 96;
+      const lx = (W - size) / 2;
+      // logo bem rente ao texto do rodapé (ainda sobra faixa para CTA/link manual)
+      const ly = H - 118 - size;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(lx + size / 2, ly + size / 2, size / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(lx, ly, size, size);
+      drawImageContain(ctx, logo, lx, ly, size, size);
+      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(lx + size / 2, ly + size / 2, size / 2 - 1, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(201,168,76,0.7)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  } catch (e) {}
+
+  // rodapé curto; área abaixo fica livre no Stories para link/CTA manual
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.font = '26px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('catalogoemporio.netlify.app', W / 2, H - 78);
 
   return canvas;
 }
