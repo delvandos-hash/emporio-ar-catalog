@@ -16,12 +16,12 @@ const HTML_ENTITIES = Object.freeze({
 });
 
 export function decodeHtmlEntities(value) {
-  return String(value ?? '').replace(/&(#x[0-9a-f]+|#\\d+|[a-z][a-z0-9]+);/gi, (entity, token) => {
+  return String(value ?? '').replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/gi, (entity, token) => {
     if (token[0] === '#') {
       const hex = token[1]?.toLowerCase() === 'x';
       const codePoint = Number.parseInt(token.slice(hex ? 2 : 1), hex ? 16 : 10);
       if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff ||
-          (codePoint >= 0xd800 && codePoint <= 0xdfff)) return '\\uFFFD';
+          (codePoint >= 0xd800 && codePoint <= 0xdfff)) return '\uFFFD';
       return String.fromCodePoint(codePoint);
     }
     return Object.prototype.hasOwnProperty.call(HTML_ENTITIES, token)
