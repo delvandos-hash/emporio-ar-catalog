@@ -177,7 +177,12 @@ function preserveLivePublicFields(DATA, liveDATA) {
         used.add(liveItem);
         matched++;
 
-        if (preservePublicPrice(item, liveItem)) prices++;
+        // Não restaurar preços do Gist em acessórios Dande (regra = base da raiz)
+        const lineKey = String(line || '').toLowerCase();
+        const fonteItem = String(item?.fonte || '').toLowerCase();
+        const skipPricePreserve = lineKey === 'acessorios' || lineKey === 'acessórios' ||
+          fonteItem === 'acessorios' || fonteItem === 'dande' || fonteItem === 'dandê';
+        if (!skipPricePreserve && preservePublicPrice(item, liveItem)) prices++;
 
         const existingPhotos = [
           ...(Array.isArray(item.fotos) ? item.fotos : []), item.foto || ""

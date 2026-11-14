@@ -25,6 +25,10 @@ function priceNumber(value) {
  */
 export function preservePublicPrice(target, publicItem) {
   if (isExplicitManualPrice(target)) return false;
+  // Dande / acessórios: preço sempre recalculado pela regra sobre o base da raiz.
+  // Não restaurar varejo/atacado antigos do Gist (ex.: multiplicadores ×5/×3,5).
+  const fonte = String(target?.fonte || publicItem?.fonte || "").toLowerCase();
+  if (fonte === "acessorios" || fonte === "dande" || fonte === "dandê") return false;
   const publicRetail = priceNumber(publicItem?.varejo);
   const publicWholesale = priceNumber(publicItem?.atacado);
   const currentRetail = priceNumber(target?.varejo);
