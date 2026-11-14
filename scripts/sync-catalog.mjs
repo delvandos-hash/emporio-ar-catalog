@@ -1277,8 +1277,12 @@ const DANDE_CATEGORIES = [
 ];
 
 function calcPrecosAcessorios(precoBase) {
-  const base = Number(String(precoBase).replace(',', '.')) || 0;
-  const fmt = (n) => n.toFixed(2).replace('.', ',');
+  // Regra Dande (acessórios) — sempre sobre o preço base do site raiz:
+  //   base >= 50 → atacado = base×2,5 | varejo = base×3,0
+  //   base <  50 → atacado = base×3,0 | varejo = base×4,0
+  const base = Number(String(precoBase ?? '').replace(/[R$\s]/g, '').replace(',', '.')) || 0;
+  const fmt = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',');
+  if (base <= 0) return { atacado: '0,00', varejo: '0,00', base: 0 };
   if (base >= 50) {
     return { atacado: fmt(base * 2.5), varejo: fmt(base * 3), base };
   }
@@ -1589,14 +1593,24 @@ async function fetchDandeAcessorios(existingGroups = []) {
               variants = null;
             }
           }
-          let precoBase = p.preco;
+          // Preço base SEMPRE do site raiz (listagem / variante). Não reutilizar
+          // varejo/atacado anteriores — evita multiplicadores antigos (ex.: ×5/×3,5).
+          let precoBase = Number(p.preco || 0);
           if ((!precoBase || precoBase <= 0) && variants && variants[0]) {
-            precoBase = Number(variants[0].price_number || variants[0].price || 0);
+            precoBase = Number(variants[0].price_number || variants[0].price || 0) || 0;
           }
-          if ((!precoBase || precoBase <= 0) && prev) {
-            precoBase = 0;
+          if ((!precoBase || precoBase <= 0) && prev && prev.preco_base != null) {
+            precoBase = Number(String(prev.preco_base).replace(',', '.')) || 0;
+          }
+          if ((!precoBase || precoBase <= 0) && prev && prev.precoBase != null) {
+            precoBase = Number(String(prev.precoBase).replace(',', '.')) || 0;
           }
           const prices = calcPrecosAcessorios(precoBase || 0);
+          if (precoBase > 0) {
+            // log amostral (primeiros por página já saem no console de lote)
+          } else {
+            console.log(`    Dande sem preço base (id=${p.id}); preços zerados até a próxima leitura da raiz`);
+          }
           let variacoes;
           let totalEstoque;
           if (variants && Array.isArray(variants) && variants.length && variants[0].stock !== undefined) {
@@ -1625,11 +1639,17 @@ async function fetchDandeAcessorios(existingGroups = []) {
             if (!foto) continue;
             nome = prev?.nome || `Item ${p.id}`;
           }
+          // Respeita preço manual; caso contrário aplica sempre a regra sobre o base da raiz
+          const manual = !!(prev && (prev.precoManual === true || prev.preco_manual === true));
+          const varejoFinal = manual && prev.varejo ? prev.varejo : prices.varejo;
+          const atacadoFinal = manual && prev.atacado ? prev.atacado : prices.atacado;
           byId.set(p.id, stampNovoDesde({
             nome: limparTexto(nome),
             volume: '—',
-            varejo: prices.varejo,
-            atacado: prices.atacado,
+            varejo: varejoFinal,
+            atacado: atacadoFinal,
+            preco_base: precoBase > 0 ? precoBase : (prev?.preco_base ?? null),
+            precoManual: manual ? true : undefined,
             disponivel: totalEstoque > 0 ? 'Sim' : (prev?.disponivel || 'Sim'),
             notas: desc || (prev?.notas || ''),
             foto,
