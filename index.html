@@ -3478,6 +3478,63 @@ footer img{opacity:.85}
   }
   body[class*="theme-"] .search-live-empty { color: #a8a29e; }
 
+
+
+  /* Faixa letreiro no topo — dúvidas WhatsApp */
+  .top-ticker {
+    position: relative;
+    z-index: 40;
+    overflow: hidden;
+    background: #1a120c;
+    border-bottom: 1px solid rgba(201,168,76,0.35);
+    height: 34px;
+  }
+  body[class*="theme-"] .top-ticker {
+    background: rgba(0,0,0,0.45);
+    border-bottom-color: rgba(232,213,163,0.25);
+  }
+  .top-ticker-link {
+    display: block;
+    height: 34px;
+    color: #f5ead8;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .top-ticker-track {
+    display: inline-flex;
+    align-items: center;
+    height: 34px;
+    gap: 3rem;
+    padding-left: 100%;
+    animation: topTickerScroll 28s linear infinite;
+    will-change: transform;
+  }
+  .top-ticker-link:active .top-ticker-track,
+  .top-ticker-link:hover .top-ticker-track {
+    animation-play-state: paused;
+  }
+  .top-ticker-item {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #f5ead8;
+  }
+  .top-ticker-item span {
+    color: #e8d5a3;
+  }
+  @keyframes topTickerScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .top-ticker-track {
+      animation: none;
+      padding-left: 0.75rem;
+      justify-content: center;
+      width: 100%;
+    }
+  }
+
 </style>
 
 <link rel="manifest" href="/manifest.webmanifest" />
@@ -3492,6 +3549,16 @@ footer img{opacity:.85}
 <div id="bootStatus" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0c0a09;color:#fdba74;font-family:system-ui,sans-serif;font-size:1rem;font-weight:600;z-index:99999;">Carregando Empório A.R…</div>
 
 
+<div class="top-ticker" role="region" aria-label="Aviso WhatsApp">
+  <a class="top-ticker-link" id="topTickerWa" href="https://wa.me/5562991134488?text=Ol%C3%A1!%20Vim%20pelo%20cat%C3%A1logo%20e%20tenho%20uma%20d%C3%BAvida." target="_blank" rel="noopener">
+    <div class="top-ticker-track">
+      <span class="top-ticker-item">Seja bem-vindo(a) à loja Empório A.R! Em caso de dúvidas, chame-nos no <span>WhatsApp</span>.</span>
+      <span class="top-ticker-item">Seja bem-vindo(a) à loja Empório A.R! Em caso de dúvidas, chame-nos no <span>WhatsApp</span>.</span>
+      <span class="top-ticker-item">Seja bem-vindo(a) à loja Empório A.R! Em caso de dúvidas, chame-nos no <span>WhatsApp</span>.</span>
+      <span class="top-ticker-item">Seja bem-vindo(a) à loja Empório A.R! Em caso de dúvidas, chame-nos no <span>WhatsApp</span>.</span>
+    </div>
+  </a>
+</div>
 <header>
   <a href="#" class="brand" id="logoHome" title="Voltar ao início">
     <img src="/assets/logo.jpg" alt="Empório A.R" width="58" height="58" />
