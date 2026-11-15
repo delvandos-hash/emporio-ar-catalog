@@ -177,10 +177,17 @@ function preserveLivePublicFields(DATA, liveDATA) {
         used.add(liveItem);
         matched++;
 
-        // Não restaurar preços do Gist em acessórios Dande (regra = base da raiz)
+        // Não restaurar preços do Gist em acessórios Dande nem em kits 4 peças
         const lineKey = String(line || '').toLowerCase();
         const fonteItem = String(item?.fonte || '').toLowerCase();
-        const skipPricePreserve = lineKey === 'acessorios' || lineKey === 'acessórios' ||
+        const nomeItem = String(item?.nome || '').toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const isFourKit = /\bkit\b/.test(nomeItem) && (
+          /\b4\s*(?:pecas?|pcs?|unidades?|frascos?)\b/.test(nomeItem) ||
+          /\b4\s*x\s*\d+/.test(nomeItem) ||
+          /\bx\s*4\s*pcs?\b/.test(nomeItem)
+        );
+        const skipPricePreserve = isFourKit || lineKey === 'acessorios' || lineKey === 'acessórios' ||
           fonteItem === 'acessorios' || fonteItem === 'dande' || fonteItem === 'dandê';
         if (!skipPricePreserve && preservePublicPrice(item, liveItem)) prices++;
 

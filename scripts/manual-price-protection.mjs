@@ -26,9 +26,20 @@ function priceNumber(value) {
 export function preservePublicPrice(target, publicItem) {
   if (isExplicitManualPrice(target)) return false;
   // Dande / acessórios: preço sempre recalculado pela regra sobre o base da raiz.
-  // Não restaurar varejo/atacado antigos do Gist (ex.: multiplicadores ×5/×3,5).
   const fonte = String(target?.fonte || publicItem?.fonte || "").toLowerCase();
   if (fonte === "acessorios" || fonte === "dande" || fonte === "dandê") return false;
+
+  // Kits de 4 perfumes (Liquid/Hawas/etc.): não restaurar preço antigo do Gist.
+  // A regra (+130/+125 sobre a base Imarat) deve prevalecer após o sync.
+  const nome = String(target?.nome || publicItem?.nome || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const isFourKit = /\bkit\b/.test(nome) && (
+    /\b4\s*(?:pecas?|pcs?|unidades?|frascos?)\b/.test(nome) ||
+    /\b4\s*x\s*\d+/.test(nome) ||
+    /\bx\s*4\s*pcs?\b/.test(nome)
+  );
+  if (isFourKit) return false;
+
   const publicRetail = priceNumber(publicItem?.varejo);
   const publicWholesale = priceNumber(publicItem?.atacado);
   const currentRetail = priceNumber(target?.varejo);
