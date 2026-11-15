@@ -2,8 +2,25 @@ import { createHash } from "node:crypto";
 import { sanitizePublicImageUrl } from "./public-image-url.mjs";
 
 const GROUP_FIELDS = new Set(["brand", "cat"]);
-const PRODUCT_FIELDS = new Set(["nome", "volume", "varejo", "atacado", "foto", "fotos", "notas", "disponivel", "badge", "novoDesde", "variacoes", "origin_ref", "categorias_origem", "relacionados"]);
-const DANDE_CATEGORY_NAMES = new Set(["Acessórios de Cabelo", "Anéis", "Braceletes", "Brincos", "Colares", "Conjuntos", "Lançamentos", "Masculinos", "Prata 925", "Pulseiras", "Semijoia Italiana", "Tornozeleiras"]);
+const PRODUCT_FIELDS = new Set(["nome", "volume", "varejo", "atacado", "foto", "fotos", "notas", "disponivel", "badge", "novoDesde", "variacoes", "origin_ref", "relacionados"]);
+// Campos que nunca podem ir para o Gist/API pública (origem, custo, URLs de raiz, etc.).
+const PUBLIC_DENY_KEYS = new Set([
+  "id_origem", "url_origem", "fonte_origem", "preco_base", "precoBase", "custo", "cost",
+  "precoManual", "markup", "varejoMarkup", "atacadoMarkup", "sku_origem", "skuOrigem",
+  "supplier", "fornecedor", "raw", "html", "page_url", "pageUrl", "source_url", "sourceUrl",
+  "categorias_origem", "origin_id", "originId", "external_id", "externalId",
+]);
+
+function stripPublicTextLeaks(text) {
+  return String(text || "")
+    // remove URLs absolutas (evita vazar domínio de loja raiz em notas)
+    .replace(/https?:\/\/[^\s<>"']+/gi, "")
+    .replace(/\b(?:www\.)[a-z0-9.-]+\.[a-z]{2,}(?:\/[^\s<>"']*)?/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 500);
+}
+
 const VARIATION_FIELDS = new Set(["nome", "estoque"]);
 
 function pick(value, allowed) {
@@ -169,11 +186,13 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
         } else {
           delete safeItem.relacionados;
         }
-        if (Array.isArray(safeItem.categorias_origem)) {
-          const categories = [...new Set(safeItem.categorias_origem.map(value => String(value || "").trim()).filter(value => DANDE_CATEGORY_NAMES.has(value)))];
-          if (categories.length) safeItem.categorias_origem = categories;
-          else delete safeItem.categorias_origem;
-        } else delete safeItem.categorias_origem;
+        delete safeItem.categorias_origem;
+        // Remove qualquer resíduo de campos internos/sensíveis (não publicáveis).
+        for (const key of PUBLIC_DENY_KEYS) delete safeItem[key];
+        if (typeof safeItem.notas === "string") {
+          safeItem.notas = stripPublicTextLeaks(safeItem.notas);
+          if (!safeItem.notas) delete safeItem.notas;
+        }
         safeItem.public_id = publicIdByItem.get(item) || publicId(line, group, item);
         const stableOriginRef = originRef(item?.fonte || publicSource(line, group?.cat), item?.id_origem, group?.brand);
         if (stableOriginRef) safeItem.origin_ref = stableOriginRef;
@@ -193,6 +212,12 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
           }
         }
         safeItem.fonte = publicSource(line, group?.cat);
+        // stock_route só faz sentido para roupas (multi-origem a/b); não publicar em perfumaria
+        if (safeItem.fonte !== "roupas") delete safeItem.stock_route;
+        if (safeItem.fonte === "perfumaria" || safeItem.fonte === "outros") {
+          delete safeItem.stock_ref;
+        }
+
         if (Array.isArray(safeItem.fotos)) {
           safeItem.fotos = safeItem.fotos.map(url => sanitizePublicImageUrl(url, imageOptions)).filter(Boolean);
         } else delete safeItem.fotos;
