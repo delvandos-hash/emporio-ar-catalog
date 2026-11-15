@@ -212,10 +212,11 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
           }
         }
         safeItem.fonte = publicSource(line, group?.cat);
-        // stock_route só faz sentido para roupas (multi-origem a/b); não publicar em perfumaria
-        if (safeItem.fonte !== "roupas") delete safeItem.stock_route;
-        if (safeItem.fonte === "perfumaria" || safeItem.fonte === "outros") {
+        // stock_ref/stock_route só para roupas e acessórios (estoque ao vivo).
+        // Perfumaria/brand/outros não publicam esses campos.
+        if (safeItem.fonte !== "roupas" && safeItem.fonte !== "acessorios") {
           delete safeItem.stock_ref;
+          delete safeItem.stock_route;
         }
 
         if (Array.isArray(safeItem.fotos)) {
