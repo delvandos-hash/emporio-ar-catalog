@@ -206,7 +206,7 @@ function preserveLivePublicFields(DATA, liveDATA) {
           sanitizePublicImageUrl(item.foto) || mergedPhotos[0] || "";
         if (preferredPhoto) item.foto = preferredPhoto;
         else delete item.foto;
-        if (liveItem.notas) item.notas = liveItem.notas;
+        if (liveItem.notas) item.notas = decodeHtmlEntities(String(liveItem.notas));
         if (liveItem.badge) item.badge = liveItem.badge;
         if (liveItem.novoDesde) item.novoDesde = liveItem.novoDesde;
         if (Array.isArray(liveItem.variacoes) && liveItem.variacoes.length) item.variacoes = [...liveItem.variacoes];

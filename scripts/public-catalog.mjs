@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { sanitizePublicImageUrl } from "./public-image-url.mjs";
+import { decodeHtmlEntities } from "./html-entities.mjs";
 
 const GROUP_FIELDS = new Set(["brand", "cat"]);
 const PRODUCT_FIELDS = new Set(["nome", "volume", "varejo", "atacado", "foto", "fotos", "notas", "disponivel", "badge", "novoDesde", "variacoes", "origin_ref", "relacionados"]);
@@ -173,6 +174,7 @@ export function toPublicCatalog(DATA, imageOptions = {}) {
       const safeGroup = pick(group, GROUP_FIELDS);
       safeGroup.items = Array.isArray(group?.items) ? group.items.map(item => {
         const safeItem = pick(item, PRODUCT_FIELDS);
+        if (typeof safeItem.notas === "string") safeItem.notas = decodeHtmlEntities(safeItem.notas);
         if (Array.isArray(safeItem.relacionados)) {
           safeItem.relacionados = safeItem.relacionados
             .map((r) => ({
