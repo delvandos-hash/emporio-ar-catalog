@@ -845,6 +845,33 @@ function isScoopProduct(p) {
 }
 
 // Valores vindos do catálogo, URL e armazenamento local são tratados como texto não confiável.
+
+function decodeHtmlEntities(value) {
+  const named = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    agrave: 'à', aacute: 'á', acirc: 'â', atilde: 'ã', auml: 'ä',
+    ccedil: 'ç', egrave: 'è', eacute: 'é', ecirc: 'ê', euml: 'ë',
+    igrave: 'ì', iacute: 'í', icirc: 'î', iuml: 'ï', ntilde: 'ñ',
+    ograve: 'ò', oacute: 'ó', ocirc: 'ô', otilde: 'õ', ouml: 'ö',
+    ugrave: 'ù', uacute: 'ú', ucirc: 'û', uuml: 'ü',
+    Agrave: 'À', Aacute: 'Á', Acirc: 'Â', Atilde: 'Ã', Auml: 'Ä',
+    Ccedil: 'Ç', Egrave: 'È', Eacute: 'É', Ecirc: 'Ê', Euml: 'Ë',
+    Igrave: 'Ì', Iacute: 'Í', Icirc: 'Î', Iuml: 'Ï', Ntilde: 'Ñ',
+    Ograve: 'Ò', Oacute: 'Ó', Ocirc: 'Ô', Otilde: 'Õ', Ouml: 'Ö',
+    Ugrave: 'Ù', Uacute: 'Ú', Ucirc: 'Û', Uuml: 'Ü',
+    ndash: '–', mdash: '—', bull: '•'
+  };
+  return String(value ?? '').replace(/&(#(?:x[\da-f]+|\d+)|[a-z][a-z\d]+);/gi, (entity, key) => {
+    if (key[0] === '#') {
+      const hex = key[1] && key[1].toLowerCase() === 'x';
+      const code = Number.parseInt(key.slice(hex ? 2 : 1), hex ? 16 : 10);
+      if (!Number.isInteger(code) || code <= 0) return entity;
+      try { return String.fromCodePoint(code); } catch { return entity; }
+    }
+    return Object.prototype.hasOwnProperty.call(named, key) ? named[key] : entity;
+  });
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -2304,7 +2331,7 @@ function openDetails(p, opts = {}) {
   let notasHtml = '';
   if (p.notas) {
     const titulo = (varCatalog || isScoop) ? 'Descrição' : 'Notas olfativas';
-    notasHtml += `<strong>${titulo}</strong><br>${escapeHtml(p.notas).replace(/\n/g, '<br>')}`;
+    notasHtml += `<strong>${titulo}</strong><br>${escapeHtml(decodeHtmlEntities(p.notas)).replace(/\n/g, '<br>')}`;
   }
   if (varCatalog) {
     notasHtml += buildVariacoesHtml(p, opts.preserveVariation ? (p.variacoesSelecionadas || []).map(v => v.id).filter(Boolean) : []);
