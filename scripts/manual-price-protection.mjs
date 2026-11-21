@@ -40,6 +40,23 @@ export function preservePublicPrice(target, publicItem) {
   );
   if (isFourKit) return false;
 
+  // Brand Collection (Imarat ou API Brand): não restaurar preço antigo do Gist.
+  // A regra unificada priceBrand deve prevalecer após o sync.
+  const brandName = String(target?.nome || publicItem?.nome || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const brandMeta = String(target?.fonte || publicItem?.fonte || "").toLowerCase();
+  const brandLabel = String(target?.brand || publicItem?.brand || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const isBrandCollection =
+    brandMeta === "brand" ||
+    brandLabel.includes("brand collection") ||
+    brandLabel.includes("colecao brand") ||
+    brandLabel.includes("coleção brand") ||
+    /\bminiatura\s+brand\b/.test(brandName) ||
+    /\bbrand\s+collection\b/.test(brandName) ||
+    /\bbrand\s+\d{2,4}\b/.test(brandName);
+  if (isBrandCollection) return false;
+
   const publicRetail = priceNumber(publicItem?.varejo);
   const publicWholesale = priceNumber(publicItem?.atacado);
   const currentRetail = priceNumber(target?.varejo);
