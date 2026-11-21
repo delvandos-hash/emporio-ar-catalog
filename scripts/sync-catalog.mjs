@@ -450,6 +450,25 @@ function calcularPrecoMiniatura(nome, brand, volume, categoria, precoVarejoOrig,
     return calculateFourPiecePerfumeKitPrices(precoVarejoOrig, precoAtacadoOrig);
   }
 
+  // Brand Collection (Imarat ou API Brand): SEMPRE a mesma regra priceBrand —
+  // evita diferença de preço no catálogo entre as duas fontes.
+  if (isBrandCollectionProduct(nome, brand, categoria)) {
+    const session = brandSessionFromMeta(nome, brand, categoria);
+    const arabicMini = session === 'ARABIC COLLECTION' && /25\s*ML/i.test(String(nome || ''));
+    // priceBrand usa um único "orig"; para Imarat há varejo e atacado de origem —
+    // aplicamos a regra sobre cada base quando não for preço fixo de sessão.
+    if (session === 'TUBETES BRAND' || arabicMini) {
+      return priceBrand(Number(precoVarejoOrig) || 0, arabicMini, session);
+    }
+    const ov = Number(precoVarejoOrig) || 0;
+    const oa = Number(precoAtacadoOrig) || 0;
+    // Mesma lógica de faixas do priceBrand, espelhada em varejo e atacado de origem
+    if (ov <= 100) {
+      return { varejo: fmtBRL(ov + 60), atacado: fmtBRL((oa || ov) + 40) };
+    }
+    return { varejo: fmtBRL(ov + 90), atacado: fmtBRL((oa || ov) + 70) };
+  }
+
   if (!isMiniatura(nome, volume, categoria)) return { varejo: fmtBRL(precoVarejoOrig + 30), atacado: fmtBRL(precoAtacadoOrig + 30) };
   
   const n = norm(nome); const b = norm(brand);
@@ -558,7 +577,36 @@ function brandDisponivel(p) {
 }
 function isArabicMiniBrand(p, session) { return session === 'ARABIC COLLECTION' && /25\s*ML/i.test(String(p.nome || '')); }
 
+
+/** Produtos Brand Collection (Imarat ou API Brand) — mesma regra de preço. */
+function isBrandCollectionProduct(nome, brand, categoria) {
+  const b = norm(String(brand || ''));
+  const n = norm(String(nome || ''));
+  const c = norm(String(categoria || ''));
+  if (c === 'brand' || c.startsWith('brand ')) return true;
+  if (b.includes('brand collection') || b.includes('colecao brand') || b.includes('coleção brand')) return true;
+  if (b === 'brand' || b.startsWith('brand ')) return true;
+  // Imarat: "Miniatura Brand 005", "Brand Collection 116", etc.
+  if (/\bminiatura\s+brand\b/.test(n) || /\bbrand\s+collection\b/.test(n)) return true;
+  if (/^brand\s+\d{2,4}\b/.test(n) || /\bbrand\s+\d{2,4}\b/.test(n)) return true;
+  // Flaconete / tubete brand tratados por session em priceBrand
+  if (b.includes('flaconete brand') || b.includes('tubetes brand') || b.includes('dream brand')) return true;
+  return false;
+}
+
+function brandSessionFromMeta(nome, brand, categoria) {
+  const b = String(brand || '');
+  const n = String(nome || '');
+  const c = String(categoria || '');
+  if (/tubete/i.test(b) || /tubete/i.test(n) || /tubete/i.test(c)) return 'TUBETES BRAND';
+  if (/arabic/i.test(b) || /arabic/i.test(c)) return 'ARABIC COLLECTION';
+  if (/flaconete/i.test(b) || /flaconete/i.test(n)) return 'FLACONETE BRAND';
+  if (/dream/i.test(b) && /brand/i.test(b)) return 'DREAM BRAND';
+  return 'COLEÇÃO BRAND';
+}
+
 function priceBrand(orig, isArabicMini, session) {
+  // Regra única Brand Collection (API Brand e, via calcularPrecoMiniatura, Imarat)
   // Tubetes: preço fixo
   if (session === 'TUBETES BRAND' || (typeof session === 'string' && /tubete/i.test(session))) {
     return { varejo: '82,00', atacado: '58,00' };
